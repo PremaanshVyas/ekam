@@ -71,7 +71,7 @@ export default function Painter({ tileId, x, y }: { tileId: string; x: number; y
   };
 
   const chip = (active: boolean): React.CSSProperties => ({
-    fontFamily: "var(--font-inter), sans-serif", fontSize: 14, fontWeight: 500, color: "var(--color-text-secondary)",
+    fontFamily: "var(--font-ui), sans-serif", fontSize: 14, fontWeight: 500, color: "var(--color-text-secondary)",
     background: active ? "var(--color-bg-surface)" : "var(--color-bg-elevated)",
     border: `1px solid ${active ? "var(--color-border-strong)" : "var(--color-border-default)"}`,
     borderRadius: 9999, padding: "8px 14px", cursor: "pointer",
@@ -80,9 +80,9 @@ export default function Painter({ tileId, x, y }: { tileId: string; x: number; y
   if (done) {
     return (
       <div style={{ width: SIZE + 64, maxWidth: "100%", background: "var(--color-bg-elevated)", border: "1px solid var(--color-border-default)", borderRadius: 16, padding: 40, display: "flex", flexDirection: "column", gap: 12, alignItems: "flex-start" }}>
-        <p style={{ fontFamily: "var(--font-shantell), cursive", fontSize: 32, color: "var(--color-text-primary)", margin: 0 }}>your tile is being stitched in ✦</p>
-        <p style={{ fontFamily: "var(--font-inter), sans-serif", fontSize: 16, color: "var(--color-text-secondary)", margin: 0 }}>it&apos;ll appear on the canvas once it&apos;s approved. thank you for adding to the quilt.</p>
-        <a href="/" style={{ marginTop: 8, fontFamily: "var(--font-inter), sans-serif", fontSize: 15, fontWeight: 500, color: "var(--color-text-inverse)", background: "var(--palette-ink)", borderRadius: 9999, padding: "10px 22px", textDecoration: "none" }}>see the canvas →</a>
+        <p style={{ fontFamily: "var(--font-display), sans-serif", fontSize: 32, color: "var(--color-text-primary)", margin: 0 }}>your tile is being stitched in ✦</p>
+        <p style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 16, color: "var(--color-text-secondary)", margin: 0 }}>it&apos;ll appear on the canvas once it&apos;s approved. thank you for adding to the quilt.</p>
+        <a href="/" style={{ marginTop: 8, fontFamily: "var(--font-ui), sans-serif", fontSize: 15, fontWeight: 500, color: "var(--color-text-inverse)", background: "var(--palette-ink)", borderRadius: 9999, padding: "10px 22px", textDecoration: "none" }}>see the canvas →</a>
       </div>
     );
   }
@@ -90,8 +90,8 @@ export default function Painter({ tileId, x, y }: { tileId: string; x: number; y
   return (
     <div style={{ width: SIZE + 64, maxWidth: "100%", background: "var(--color-bg-canvas)", border: "1px solid var(--color-border-default)", borderRadius: 16, padding: 32, display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-        <span style={{ fontFamily: "var(--font-shantell), cursive", fontSize: 36, color: "var(--color-text-primary)" }}>paint your tile</span>
-        <span style={{ fontFamily: "var(--font-inter), sans-serif", fontSize: 13, color: "var(--color-text-secondary)", background: "var(--color-bg-surface)", border: "1px solid var(--color-border-default)", borderRadius: 9999, padding: "4px 12px", whiteSpace: "nowrap" }}>tile {x},{y} · 23h left</span>
+        <span style={{ fontFamily: "var(--font-display), sans-serif", fontSize: 36, color: "var(--color-text-primary)" }}>paint your tile</span>
+        <span style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: "var(--color-text-secondary)", background: "var(--color-bg-surface)", border: "1px solid var(--color-border-default)", borderRadius: 9999, padding: "4px 12px", whiteSpace: "nowrap" }}>tile {x},{y} · 23h left</span>
       </div>
 
       <canvas
@@ -118,20 +118,20 @@ export default function Painter({ tileId, x, y }: { tileId: string; x: number; y
             <button style={chip(false)} onClick={doUndo}>undo</button>
             <button style={chip(false)} onClick={doClear}>clear</button>
           </div>
-          <button onClick={() => setPhase("story")} style={{ fontFamily: "var(--font-inter), sans-serif", fontSize: 16, fontWeight: 500, color: "var(--color-text-inverse)", background: "var(--palette-ink)", border: "none", borderRadius: 8, padding: 14, cursor: "pointer", width: "100%" }}>done — add your story →</button>
+          <button onClick={() => setPhase("story")} style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 16, fontWeight: 500, color: "var(--color-text-inverse)", background: "var(--palette-ink)", border: "none", borderRadius: 8, padding: 14, cursor: "pointer", width: "100%" }}>done — add your story →</button>
         </>
       ) : (
         <>
-          <label style={{ fontFamily: "var(--font-shantell), cursive", fontSize: 22, color: "var(--color-text-primary)" }}>where were you when home looked like this?</label>
+          <label style={{ fontFamily: "var(--font-display), sans-serif", fontSize: 22, color: "var(--color-text-primary)" }}>where were you when home looked like this?</label>
           <textarea
             value={story} onChange={(e) => setStory(e.target.value.slice(0, 140))} maxLength={140} rows={3}
             placeholder="made this at 3am, missing my nani"
-            style={{ width: "100%", boxSizing: "border-box", fontFamily: "var(--font-inter), sans-serif", fontSize: 16, color: "var(--color-text-primary)", background: "var(--color-bg-surface)", border: "1.5px solid var(--color-border-default)", borderRadius: 8, padding: "12px 16px", outline: "none", resize: "none" }}
+            style={{ width: "100%", boxSizing: "border-box", fontFamily: "var(--font-ui), sans-serif", fontSize: 16, color: "var(--color-text-primary)", background: "var(--color-bg-surface)", border: "1.5px solid var(--color-border-default)", borderRadius: 8, padding: "12px 16px", outline: "none", resize: "none" }}
           />
-          <div style={{ fontFamily: "var(--font-inter), sans-serif", fontSize: 12, color: "var(--color-text-muted)", textAlign: "right" }}>{story.length}/140</div>
+          <div style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 12, color: "var(--color-text-muted)", textAlign: "right" }}>{story.length}/140</div>
           <div style={{ display: "flex", gap: 12 }}>
-            <button onClick={() => setPhase("paint")} style={{ fontFamily: "var(--font-inter), sans-serif", fontSize: 15, color: "var(--color-text-secondary)", background: "var(--color-bg-elevated)", border: "1px solid var(--color-border-default)", borderRadius: 8, padding: "12px 18px", cursor: "pointer" }}>← back</button>
-            <button onClick={onSubmit} disabled={submitting || story.trim().length === 0} style={{ flex: 1, fontFamily: "var(--font-inter), sans-serif", fontSize: 16, fontWeight: 500, color: "var(--color-text-inverse)", background: "var(--palette-ink)", border: "none", borderRadius: 8, padding: 14, cursor: submitting ? "default" : "pointer", opacity: submitting || story.trim().length === 0 ? 0.6 : 1 }}>{submitting ? "stitching in…" : "stitch it in"}</button>
+            <button onClick={() => setPhase("paint")} style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 15, color: "var(--color-text-secondary)", background: "var(--color-bg-elevated)", border: "1px solid var(--color-border-default)", borderRadius: 8, padding: "12px 18px", cursor: "pointer" }}>← back</button>
+            <button onClick={onSubmit} disabled={submitting || story.trim().length === 0} style={{ flex: 1, fontFamily: "var(--font-ui), sans-serif", fontSize: 16, fontWeight: 500, color: "var(--color-text-inverse)", background: "var(--palette-ink)", border: "none", borderRadius: 8, padding: 14, cursor: submitting ? "default" : "pointer", opacity: submitting || story.trim().length === 0 ? 0.6 : 1 }}>{submitting ? "stitching in…" : "stitch it in"}</button>
           </div>
         </>
       )}

@@ -15,14 +15,14 @@ export type RenderTile = {
 
 const R = 80; // internal px per tile (crispness)
 const VIEW = 640; // displayed viewport size
-const PAPER = "#F3EAD6";
-const SURFACE = "#EBDFC7";
-const GROUT = "#CBB890"; // warm grid line — shown until the canvas is 100% complete
+const PAPER = "#F3F1EA"; // open-tile fill (clean stone)
+const SURFACE = "#E9E7DF"; // backdrop between tiles
+const GROUT = "#DCD8CE"; // tile border — shown until the canvas is 100% complete
 
 const zbtn: React.CSSProperties = {
   width: 32, height: 32, borderRadius: 8, border: "1px solid var(--color-border-default)",
   background: "var(--color-bg-elevated)", color: "var(--color-text-primary)",
-  fontFamily: "var(--font-inter), sans-serif", fontSize: 16, cursor: "pointer", lineHeight: 1,
+  fontFamily: "var(--font-ui), sans-serif", fontSize: 16, cursor: "pointer", lineHeight: 1,
 };
 
 export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols?: number }) {
@@ -224,8 +224,8 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
             pointerEvents: "none", zIndex: 40,
           }}
         >
-          <div style={{ fontFamily: "var(--font-shantell), cursive", fontSize: 18, color: "var(--color-text-primary)" }}>{hover.tile.story}</div>
-          <div style={{ fontFamily: "var(--font-inter), sans-serif", fontSize: 13, color: "var(--color-text-muted)", marginTop: 2 }}>— {hover.tile.name} · click to read</div>
+          <div style={{ fontFamily: "var(--font-display), sans-serif", fontSize: 18, color: "var(--color-text-primary)" }}>{hover.tile.story}</div>
+          <div style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: "var(--color-text-muted)", marginTop: 2 }}>— {hover.tile.name} · click to read</div>
         </div>
       )}
 
@@ -239,12 +239,12 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
             style={{ width: 340, maxWidth: "90vw", background: "var(--color-bg-elevated)", borderRadius: 12, padding: 24, boxShadow: "0 10px 30px rgba(32,32,29,.3)", display: "flex", flexDirection: "column", gap: 8 }}
           >
             <div style={{ width: 120, height: 120, borderRadius: 6, background: selected.img ? `center/cover url("${selected.img}")` : selected.color, border: "1px solid var(--color-border-default)" }} />
-            <div style={{ fontFamily: "var(--font-shantell), cursive", fontSize: 20, color: "var(--color-text-primary)", lineHeight: 1.3 }}>{selected.story}</div>
-            <div style={{ fontFamily: "var(--font-inter), sans-serif", fontSize: 14, color: "var(--color-text-secondary)" }}>
+            <div style={{ fontFamily: "var(--font-display), sans-serif", fontSize: 20, color: "var(--color-text-primary)", lineHeight: 1.3 }}>{selected.story}</div>
+            <div style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 14, color: "var(--color-text-secondary)" }}>
               — {selected.name}{selected.loc ? ` · ${selected.loc}` : ""}
             </div>
-            <div style={{ fontFamily: "var(--font-inter), sans-serif", fontSize: 13, color: "var(--color-text-muted)" }}>tile {selected.x},{selected.y} · published</div>
-            <button onClick={() => setSelected(null)} style={{ alignSelf: "flex-start", marginTop: 8, fontFamily: "var(--font-inter), sans-serif", fontSize: 13, color: "var(--color-text-muted)", background: "none", border: "none", cursor: "pointer" }}>close</button>
+            <div style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: "var(--color-text-muted)" }}>tile {selected.x},{selected.y} · published</div>
+            <button onClick={() => setSelected(null)} style={{ alignSelf: "flex-start", marginTop: 8, fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: "var(--color-text-muted)", background: "none", border: "none", cursor: "pointer" }}>close</button>
           </div>
         </div>
       )}

@@ -7,8 +7,8 @@ export const dynamic = "force-dynamic";
 
 const notice = (msg: string, href: string, cta: string) => (
   <main style={{ minHeight: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, padding: 48 }}>
-    <p style={{ fontFamily: "var(--font-shantell), cursive", fontSize: 24, color: "var(--color-text-primary)" }}>{msg}</p>
-    <Link href={href} style={{ fontFamily: "var(--font-inter), sans-serif", fontSize: 15, fontWeight: 500, color: "var(--color-text-inverse)", background: "var(--palette-ink)", borderRadius: 9999, padding: "10px 22px", textDecoration: "none" }}>{cta}</Link>
+    <p style={{ fontFamily: "var(--font-display), sans-serif", fontSize: 24, color: "var(--color-text-primary)" }}>{msg}</p>
+    <Link href={href} style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 15, fontWeight: 500, color: "var(--color-text-inverse)", background: "var(--palette-ink)", borderRadius: 9999, padding: "10px 22px", textDecoration: "none" }}>{cta}</Link>
   </main>
 );
 

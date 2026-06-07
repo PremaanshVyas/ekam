@@ -56,12 +56,13 @@ export default async function Home() {
   return (
     <main style={{ minHeight: "100%", display: "flex", flexDirection: "column" }}>
       <header
+        className="fade-up"
         style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
           gap: 16, padding: "22px 36px", flexWrap: "wrap",
         }}
       >
-        <span style={{ fontFamily: "var(--font-shantell), cursive", fontSize: 27, color: "var(--color-text-primary)" }}>
+        <span style={{ fontFamily: "var(--font-display), sans-serif", fontSize: 27, color: "var(--color-text-primary)" }}>
           ekam.ink
         </span>
 
@@ -72,18 +73,19 @@ export default async function Home() {
             borderRadius: 9999, padding: "8px 18px",
           }}
         >
-          <span style={{ fontFamily: "var(--font-shantell), cursive", fontSize: 18, color: "var(--color-text-primary)", whiteSpace: "nowrap" }}>
+          <span style={{ fontFamily: "var(--font-display), sans-serif", fontSize: 18, color: "var(--color-text-primary)", whiteSpace: "nowrap" }}>
             {painted} of {total} painted
           </span>
-          <div style={{ width: 150, height: 8, borderRadius: 9999, background: "var(--warm-300)", overflow: "hidden" }}>
+          <div style={{ width: 150, height: 8, borderRadius: 9999, background: "var(--stone-300)", overflow: "hidden" }}>
             <div style={{ width: `${pct}%`, height: "100%", background: "var(--palette-clay)", transition: "width .4s ease" }} />
           </div>
         </div>
 
         <a
           href="/claim"
+          className="lift"
           style={{
-            fontFamily: "var(--font-inter), sans-serif", fontSize: 15, fontWeight: 500,
+            fontFamily: "var(--font-ui), sans-serif", fontSize: 15, fontWeight: 500,
             color: "var(--color-text-inverse)", background: "var(--palette-ink)",
             borderRadius: 9999, padding: "10px 22px", textDecoration: "none", display: "inline-block",
           }}
@@ -99,9 +101,11 @@ export default async function Home() {
         }}
       >
         <p
+          className="fade-up"
           style={{
-            fontFamily: "var(--font-shantell), cursive", fontSize: 26, lineHeight: 1.3,
+            fontFamily: "var(--font-display), sans-serif", fontSize: 26, lineHeight: 1.3,
             color: "var(--color-text-secondary)", textAlign: "center", maxWidth: 640, margin: 0,
+            animationDelay: "80ms",
           }}
         >
           “where were you when home looked like this?”
@@ -109,17 +113,19 @@ export default async function Home() {
 
         {/* framed matte — the artwork, mounted */}
         <div
+          className="fade-up"
           style={{
             padding: 18, background: "var(--color-bg-elevated)",
             border: "1px solid var(--color-border-default)", borderRadius: 20,
-            boxShadow: "0 18px 50px -16px rgba(32,32,29,.28), 0 2px 8px rgba(32,32,29,.10)",
+            boxShadow: "0 18px 50px -16px rgba(26,25,22,.22), 0 2px 8px rgba(26,25,22,.08)",
+            animationDelay: "160ms",
           }}
         >
           <Canvas tiles={grid} cols={cols} />
         </div>
 
-        <p style={{ fontFamily: "var(--font-inter), sans-serif", fontSize: 13, color: "var(--color-text-muted)", textAlign: "center", margin: 0 }}>
-          one shared canvas, painted one tile at a time by hundreds of strangers · drag to pan, scroll the buttons to zoom
+        <p className="fade-up" style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: "var(--color-text-muted)", textAlign: "center", margin: 0, animationDelay: "240ms" }}>
+          one shared canvas, painted one tile at a time by hundreds of strangers · drag to pan · scroll to zoom
         </p>
       </section>
     </main>
