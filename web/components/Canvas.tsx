@@ -197,11 +197,12 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
   const onMove = (e: React.PointerEvent) => {
-    if (pan.current) {
-      const dx = e.clientX - pan.current.x;
-      const dy = e.clientY - pan.current.y;
+    const p = pan.current; // capture — it can be nulled (e.g. by a quick tap on mobile) before the updater runs
+    if (p) {
+      const dx = e.clientX - p.x;
+      const dy = e.clientY - p.y;
       if (Math.abs(dx) + Math.abs(dy) > 3) moved.current = true;
-      setView((v) => clamp({ scale: v.scale, tx: pan.current!.tx + dx, ty: pan.current!.ty + dy }));
+      setView((v) => clamp({ scale: v.scale, tx: p.tx + dx, ty: p.ty + dy }));
       return;
     }
     const t = cellAt(e.clientX, e.clientY);
