@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
+import type { Viewport } from "next";
 import { Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
+
+export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 
 const inter = Inter({ variable: "--font-ui", subsets: ["latin"] });
 const display = Space_Grotesk({ variable: "--font-display", subsets: ["latin"], weight: ["400", "500", "600", "700"] });
