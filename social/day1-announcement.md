@@ -14,7 +14,7 @@
 >
 > r/place was a battlefield. this is a quilt.
 >
-> follow along → [LINK]
+> follow along → https://ekam.ink
 > #ConfigMakeathon @figma
 
 ## Instagram / LinkedIn (longer)
@@ -29,7 +29,7 @@
 >
 > Building it in the open for the #ConfigMakeathon with @figma — design system and screens made in Figma, wired up with the Figma MCP. Daily build logs to follow.
 >
-> Want a tile? Follow along → [LINK]
+> Want a tile? Follow along → https://ekam.ink
 >
 > #ConfigMakeathon #Figma #buildinpublic
 

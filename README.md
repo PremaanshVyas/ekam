@@ -8,6 +8,8 @@ A collective tile-canvas artwork for the **Config Makeathon** (Figma × Contra).
 
 ## Status (live build ledger: `.figma-ds-state.json`)
 
+**Live app:** https://ekam.ink
+
 **Figma file** (design system + screens, → Figma Community on Day 10):
 https://www.figma.com/design/7TpgTn27dDmmig7T5hzhs3
 
