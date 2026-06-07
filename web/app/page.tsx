@@ -1,4 +1,5 @@
 import Canvas, { type RenderTile } from "@/components/Canvas";
+import LivePoll from "@/components/LivePoll";
 import { supabaseAnon, CANVAS_SLUG } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -55,6 +56,7 @@ export default async function Home() {
 
   return (
     <main style={{ minHeight: "100%", display: "flex", flexDirection: "column" }}>
+      <LivePoll />
       <header
         className="fade-up"
         style={{
