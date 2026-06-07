@@ -1,22 +1,22 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export type RenderTile = {
   x: number;
   y: number;
   painted: boolean;
-  color?: string; // hex (founding tiles) for published tiles
-  img?: string; // public storage URL (real submitted tiles)
+  color?: string; // hex (founding tiles)
+  img?: string; // public storage URL (real tiles)
   story?: string;
   name?: string;
   loc?: string;
 };
 
-const CELL = 22;
-const GAP = 2;
-const PAD = 16;
-const VIEW = 620;
+const R = 80; // internal px per tile (crispness)
+const VIEW = 640; // displayed viewport size
+const PAPER = "#F3EAD6";
+const SURFACE = "#EBDFC7";
 
 const zbtn: React.CSSProperties = {
   width: 32, height: 32, borderRadius: 8, border: "1px solid var(--color-border-default)",
@@ -25,15 +25,66 @@ const zbtn: React.CSSProperties = {
 };
 
 export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols?: number }) {
-  const inner = cols * CELL + (cols - 1) * GAP;
-  const board = inner + PAD * 2;
-  const center = (VIEW - board) / 2;
-
-  const [hover, setHover] = useState<number | null>(null);
+  const rows = Math.max(1, Math.round(tiles.length / cols));
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const imgs = useRef<Map<string, HTMLImageElement>>(new Map());
+  const [view, setView] = useState({ scale: 1, tx: 0, ty: 0 });
+  const [hover, setHover] = useState<{ tile: RenderTile; sx: number; sy: number } | null>(null);
   const [selected, setSelected] = useState<RenderTile | null>(null);
-  const [view, setView] = useState({ scale: 1, tx: center, ty: center });
   const pan = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
   const moved = useRef(false);
+
+  const draw = useCallback(() => {
+    const c = canvasRef.current;
+    if (!c) return;
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(0, 0, c.width, c.height);
+    for (const t of tiles) {
+      if (!t.painted) continue; // open cells stay paper — seamless, no border
+      const px = t.x * R;
+      const py = t.y * R;
+      if (t.img) {
+        const im = imgs.current.get(t.img);
+        if (im && im.complete && im.naturalWidth) ctx.drawImage(im, px, py, R, R);
+        else { ctx.fillStyle = SURFACE; ctx.fillRect(px, py, R, R); }
+      } else if (t.color) {
+        ctx.fillStyle = t.color;
+        ctx.fillRect(px, py, R, R);
+      }
+    }
+  }, [tiles]);
+
+  useEffect(() => {
+    const c = canvasRef.current;
+    if (!c) return;
+    c.width = cols * R;
+    c.height = rows * R;
+    let alive = true;
+    for (const t of tiles) {
+      if (t.painted && t.img && !imgs.current.has(t.img)) {
+        const im = new Image();
+        im.onload = () => { if (alive) draw(); };
+        im.src = t.img;
+        imgs.current.set(t.img, im);
+      }
+    }
+    draw();
+    return () => { alive = false; };
+  }, [tiles, cols, rows, draw]);
+
+  const cellAt = (clientX: number, clientY: number): RenderTile | null => {
+    const c = canvasRef.current;
+    if (!c) return null;
+    const rect = c.getBoundingClientRect(); // reflects current transform — maps at any zoom/pan
+    const cx = Math.floor(((clientX - rect.left) / rect.width) * cols);
+    const cy = Math.floor(((clientY - rect.top) / rect.height) * rows);
+    if (cx < 0 || cy < 0 || cx >= cols || cy >= rows) return null;
+    return tiles[cy * cols + cx] ?? null;
+  };
 
   const onDown = (e: React.PointerEvent) => {
     pan.current = { x: e.clientX, y: e.clientY, tx: view.tx, ty: view.ty };
@@ -41,70 +92,70 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
   const onMove = (e: React.PointerEvent) => {
-    if (!pan.current) return;
-    const dx = e.clientX - pan.current.x, dy = e.clientY - pan.current.y;
-    if (Math.abs(dx) + Math.abs(dy) > 3) moved.current = true;
-    setView((v) => ({ ...v, tx: pan.current!.tx + dx, ty: pan.current!.ty + dy }));
+    if (pan.current) {
+      const dx = e.clientX - pan.current.x;
+      const dy = e.clientY - pan.current.y;
+      if (Math.abs(dx) + Math.abs(dy) > 3) moved.current = true;
+      setView((v) => ({ ...v, tx: pan.current!.tx + dx, ty: pan.current!.ty + dy }));
+      return;
+    }
+    const t = cellAt(e.clientX, e.clientY);
+    if (t && t.painted && t.story) setHover({ tile: t, sx: e.clientX, sy: e.clientY });
+    else setHover(null);
   };
   const onUp = () => { pan.current = null; };
-  const zoom = (f: number) => setView((v) => ({ ...v, scale: Math.min(6, Math.max(1, v.scale * f)) }));
-  const reset = () => setView({ scale: 1, tx: center, ty: center });
-
-  const hv = hover != null ? tiles[hover] : null;
+  const onClick = (e: React.MouseEvent) => {
+    if (moved.current) return;
+    const t = cellAt(e.clientX, e.clientY);
+    if (t && t.painted) setSelected(t);
+  };
+  const zoom = (f: number) => setView((v) => ({ ...v, scale: Math.min(7, Math.max(1, v.scale * f)) }));
+  const reset = () => setView({ scale: 1, tx: 0, ty: 0 });
 
   return (
-    <div style={{ position: "relative" }}>
+    <div style={{ position: "relative", width: VIEW, maxWidth: "100%" }}>
       <div
-        onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp}
         style={{
-          width: VIEW, height: VIEW, maxWidth: "100%", overflow: "hidden",
-          background: "var(--color-bg-surface)", borderRadius: 12,
+          width: "100%", aspectRatio: "1 / 1", overflow: "hidden",
+          background: "var(--color-bg-surface)", borderRadius: 14,
           cursor: pan.current ? "grabbing" : "grab", touchAction: "none",
         }}
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        onPointerLeave={() => { onUp(); setHover(null); }}
+        onClick={onClick}
       >
-        <div
+        <canvas
+          ref={canvasRef}
           style={{
-            width: board, height: board,
+            width: "100%", height: "100%", display: "block",
             transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.scale})`,
-            transformOrigin: "0 0", padding: PAD, boxSizing: "border-box",
-            transition: pan.current ? "none" : "transform .15s ease-out",
+            transformOrigin: "0 0",
+            transition: pan.current ? "none" : "transform .18s ease-out",
           }}
-        >
-          <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, ${CELL}px)`, gap: GAP, width: inner }}>
-            {tiles.map((t, i) => (
-              <div
-                key={i}
-                onMouseEnter={() => setHover(i)}
-                onMouseLeave={() => setHover((h) => (h === i ? null : h))}
-                onClick={() => { if (!moved.current && t.painted) setSelected(t); }}
-                style={{
-                  width: CELL, height: CELL,
-                  background: t.painted ? (t.img ? `center/cover url("${t.img}")` : t.color) : "var(--palette-paper)",
-                  border: t.painted ? "1px solid var(--color-border-default)" : "1px solid var(--color-pencil)",
-                  cursor: t.painted ? "pointer" : "default",
-                }}
-              />
-            ))}
-          </div>
-        </div>
+        />
       </div>
 
       <div style={{ position: "absolute", top: 12, right: 12, display: "flex", gap: 6 }}>
-        <button style={zbtn} onClick={() => zoom(1.3)} aria-label="zoom in">+</button>
-        <button style={zbtn} onClick={() => zoom(1 / 1.3)} aria-label="zoom out">−</button>
+        <button style={zbtn} onClick={() => zoom(1.35)} aria-label="zoom in">+</button>
+        <button style={zbtn} onClick={() => zoom(1 / 1.35)} aria-label="zoom out">−</button>
         <button style={{ ...zbtn, width: "auto", padding: "0 10px", fontSize: 13 }} onClick={reset}>reset</button>
       </div>
 
-      {hv && hv.painted && hv.story && !selected && (
+      {hover && !selected && (
         <div
           style={{
-            position: "absolute", left: 12, bottom: 12, maxWidth: 300,
+            position: "fixed",
+            left: Math.min(hover.sx + 14, (typeof window !== "undefined" ? window.innerWidth : 9999) - 300),
+            top: hover.sy + 14, maxWidth: 280,
             background: "var(--color-bg-elevated)", border: "1px solid var(--color-border-default)",
-            borderRadius: 8, padding: "10px 14px", boxShadow: "0 4px 16px rgba(32,32,29,.16)", pointerEvents: "none",
+            borderRadius: 8, padding: "10px 14px", boxShadow: "0 4px 16px rgba(32,32,29,.16)",
+            pointerEvents: "none", zIndex: 40,
           }}
         >
-          <div style={{ fontFamily: "var(--font-shantell), cursive", fontSize: 18, color: "var(--color-text-primary)" }}>{hv.story}</div>
-          <div style={{ fontFamily: "var(--font-inter), sans-serif", fontSize: 13, color: "var(--color-text-muted)", marginTop: 2 }}>— {hv.name} · click to read</div>
+          <div style={{ fontFamily: "var(--font-shantell), cursive", fontSize: 18, color: "var(--color-text-primary)" }}>{hover.tile.story}</div>
+          <div style={{ fontFamily: "var(--font-inter), sans-serif", fontSize: 13, color: "var(--color-text-muted)", marginTop: 2 }}>— {hover.tile.name} · click to read</div>
         </div>
       )}
 
@@ -123,12 +174,7 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
               — {selected.name}{selected.loc ? ` · ${selected.loc}` : ""}
             </div>
             <div style={{ fontFamily: "var(--font-inter), sans-serif", fontSize: 13, color: "var(--color-text-muted)" }}>tile {selected.x},{selected.y} · published</div>
-            <button
-              onClick={() => setSelected(null)}
-              style={{ alignSelf: "flex-start", marginTop: 8, fontFamily: "var(--font-inter), sans-serif", fontSize: 13, color: "var(--color-text-muted)", background: "none", border: "none", cursor: "pointer" }}
-            >
-              close
-            </button>
+            <button onClick={() => setSelected(null)} style={{ alignSelf: "flex-start", marginTop: 8, fontFamily: "var(--font-inter), sans-serif", fontSize: 13, color: "var(--color-text-muted)", background: "none", border: "none", cursor: "pointer" }}>close</button>
           </div>
         </div>
       )}
