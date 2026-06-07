@@ -17,6 +17,7 @@ const R = 80; // internal px per tile (crispness)
 const VIEW = 640; // displayed viewport size
 const PAPER = "#F3EAD6";
 const SURFACE = "#EBDFC7";
+const GROUT = "#CBB890"; // warm grid line — shown until the canvas is 100% complete
 
 const zbtn: React.CSSProperties = {
   width: 32, height: 32, borderRadius: 8, border: "1px solid var(--color-border-default)",
@@ -73,19 +74,32 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
     if (!ctx) return;
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
-    ctx.fillStyle = PAPER;
+
+    // Grid view (visible tiles) until every tile is published — then stitch seamless.
+    const complete = tiles.length > 0 && tiles.every((t) => t.painted);
+    const gap = complete ? 0 : 6;
+    const inset = gap / 2;
+    const s = R - gap;
+
+    ctx.fillStyle = complete ? PAPER : GROUT; // grout = the grid lines; paper once seamless
     ctx.fillRect(0, 0, c.width, c.height);
+
     for (const t of tiles) {
-      if (!t.painted) continue; // open cells stay paper — seamless, no border
-      const px = t.x * R;
-      const py = t.y * R;
-      if (t.img) {
-        const im = imgs.current.get(t.img);
-        if (im && im.complete && im.naturalWidth) ctx.drawImage(im, px, py, R, R);
-        else { ctx.fillStyle = SURFACE; ctx.fillRect(px, py, R, R); }
-      } else if (t.color) {
-        ctx.fillStyle = t.color;
-        ctx.fillRect(px, py, R, R);
+      const px = t.x * R + inset;
+      const py = t.y * R + inset;
+      if (t.painted) {
+        if (t.img) {
+          const im = imgs.current.get(t.img);
+          if (im && im.complete && im.naturalWidth) ctx.drawImage(im, px, py, s, s);
+          else { ctx.fillStyle = SURFACE; ctx.fillRect(px, py, s, s); }
+        } else if (t.color) {
+          ctx.fillStyle = t.color;
+          ctx.fillRect(px, py, s, s);
+        }
+      } else {
+        // open tile (grid mode only) — a paper cell in the grout grid
+        ctx.fillStyle = PAPER;
+        ctx.fillRect(px, py, s, s);
       }
     }
   }, [tiles]);
