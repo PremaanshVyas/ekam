@@ -4,7 +4,6 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { supabaseAdmin, CANVAS_SLUG } from "@/lib/supabase";
 import { createSupabaseServer } from "@/lib/auth-server";
-import { reopenExpiredClaims } from "@/lib/expiry";
 
 export async function claimTile(formData: FormData) {
   // Identity comes from the verified magic-link session — not a typed field.
@@ -20,9 +19,6 @@ export async function claimTile(formData: FormData) {
   const { data: canvas } = await db.from("canvases").select("id").eq("slug", CANVAS_SLUG).maybeSingle();
   if (!canvas) redirect("/claim?error=nocanvas");
 
-  // Free up any tiles whose 24h claim lapsed.
-  await reopenExpiredClaims();
-
   const jar = await cookies();
 
   // One tile per verified person.
@@ -36,8 +32,8 @@ export async function claimTile(formData: FormData) {
     .maybeSingle();
 
   if (existing) {
-    if (existing.status === "published") redirect("/claim?error=already");
-    jar.set("tile", existing.id, { httpOnly: true, path: "/", maxAge: 60 * 60 * 24 });
+    // Already has a tile (claimed / pending / published) → go paint or edit it.
+    jar.set("tile", existing.id, { httpOnly: true, path: "/", maxAge: 60 * 60 * 24 * 120 });
     redirect("/paint");
   }
 
@@ -53,14 +49,13 @@ export async function claimTile(formData: FormData) {
 
   // Concurrency-safe: the `.eq("status","open")` condition + `.select()` row count
   // guarantees only ONE claimer wins a tile; if we lose the race, try the next one.
-  const expires = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
   let claimedId: string | null = null;
   for (const cand of open) {
     const { data: rows } = await db
       .from("tiles")
       .update({
         status: "claimed", artist_name: name, artist_email: email,
-        artist_location: loc || null, claimed_at: new Date().toISOString(), claim_expires_at: expires,
+        artist_location: loc || null, claimed_at: new Date().toISOString(),
       })
       .eq("id", cand.id)
       .eq("status", "open")
@@ -69,6 +64,6 @@ export async function claimTile(formData: FormData) {
   }
   if (!claimedId) redirect("/claim?error=full");
 
-  jar.set("tile", claimedId, { httpOnly: true, path: "/", maxAge: 60 * 60 * 24 });
+  jar.set("tile", claimedId, { httpOnly: true, path: "/", maxAge: 60 * 60 * 24 * 120 });
   redirect("/paint");
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { submitTile } from "@/app/paint/actions";
+import { submitTile, type SubmitMode } from "@/app/paint/actions";
 
 const SIZE = 512;
 const PAPER = "#F3EAD6";
@@ -15,42 +15,53 @@ const PALETTE = [
 ];
 const BRUSHES = [6, 14, 26];
 
-function fmtRemaining(expiresAt: string | null): { label: string; expired: boolean } {
-  if (!expiresAt) return { label: "24h left", expired: false };
-  const ms = new Date(expiresAt).getTime() - Date.now();
-  if (ms <= 0) return { label: "time's up", expired: true };
-  const totalMin = Math.floor(ms / 60000);
-  const h = Math.floor(totalMin / 60);
-  const m = totalMin % 60;
-  if (h > 0) return { label: `${h}h ${m}m left`, expired: false };
-  if (totalMin > 0) return { label: `${m}m left`, expired: false };
-  return { label: `${Math.floor(ms / 1000)}s left`, expired: false };
-}
+const DONE: Record<SubmitMode, { title: string; body: string }> = {
+  "new": {
+    title: "your tile is in the moderation queue ✦",
+    body: "it'll appear on the canvas once it's reviewed. thank you for adding to the canvas.",
+  },
+  "edit-pending": {
+    title: "your changes are saved ✦",
+    body: "your tile is in the moderation queue and will appear once it's reviewed.",
+  },
+  "edit-published": {
+    title: "your update is in the moderation queue ✦",
+    body: "your current tile stays on the canvas — the update replaces it once it's reviewed.",
+  },
+};
 
-export default function Painter({ tileId, x, y, expiresAt }: { tileId: string; x: number; y: number; expiresAt: string | null }) {
+export default function Painter({
+  tileId, x, y, status, initialImage, initialStory,
+}: { tileId: string; x: number; y: number; status: string; initialImage: string | null; initialStory: string }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
   const [hex, setHex] = useState("#C76B4A");
   const [brush, setBrush] = useState(BRUSHES[1]);
   const [erasing, setErasing] = useState(false);
   const [phase, setPhase] = useState<"paint" | "story">("paint");
-  const [story, setStory] = useState("");
+  const [story, setStory] = useState(initialStory ?? "");
   const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState(false);
-  const [remaining, setRemaining] = useState<{ label: string; expired: boolean } | null>(null);
+  const [doneMode, setDoneMode] = useState<SubmitMode | null>(null);
   const drawing = useRef(false);
   const last = useRef<{ x: number; y: number } | null>(null);
   const undo = useRef<ImageData[]>([]);
 
+  const isEditing = status !== "claimed";
   const ctx = () => ref.current?.getContext("2d") ?? null;
 
-  useEffect(() => { const c = ctx(); if (c) { c.fillStyle = PAPER; c.fillRect(0, 0, SIZE, SIZE); } }, []);
-
+  // Initial fill: load the existing art when editing, else blank paper.
   useEffect(() => {
-    const tick = () => setRemaining(fmtRemaining(expiresAt));
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [expiresAt]);
+    const c = ctx();
+    if (!c) return;
+    c.fillStyle = PAPER;
+    c.fillRect(0, 0, SIZE, SIZE);
+    if (initialImage) {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => { const cc = ctx(); if (cc) cc.drawImage(img, 0, 0, SIZE, SIZE); };
+      img.onerror = () => { /* leave blank paper if it can't load */ };
+      img.src = initialImage;
+    }
+  }, [initialImage]);
 
   const pos = (e: React.PointerEvent) => {
     const r = ref.current!.getBoundingClientRect();
@@ -82,8 +93,8 @@ export default function Painter({ tileId, x, y, expiresAt }: { tileId: string; x
     const c = ref.current; if (!c) return;
     setSubmitting(true);
     try {
-      await submitTile(tileId, c.toDataURL("image/png"), story.trim());
-      setDone(true);
+      const res = await submitTile(tileId, c.toDataURL("image/png"), story.trim());
+      setDoneMode(res.mode);
     } catch (err) {
       setSubmitting(false);
       alert("Couldn't submit — " + (err as Error).message);
@@ -97,21 +108,22 @@ export default function Painter({ tileId, x, y, expiresAt }: { tileId: string; x
     borderRadius: 9999, padding: "8px 14px", cursor: "pointer",
   });
 
-  if (done) {
+  if (doneMode) {
+    const m = DONE[doneMode];
     return (
-      <div style={{ width: "100%", maxWidth: SIZE + 64, background: "var(--color-bg-elevated)", border: "1px solid var(--color-border-default)", borderRadius: 16, padding: 40, display: "flex", flexDirection: "column", gap: 12, alignItems: "flex-start" }}>
-        <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 32, color: "var(--color-text-primary)", margin: 0 }}>your tile is being stitched in ✦</p>
-        <p style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 16, color: "var(--color-text-secondary)", margin: 0 }}>it&apos;ll appear on the canvas once it&apos;s approved. thank you for adding to the quilt.</p>
-        <a href="/" style={{ marginTop: 8, fontFamily: "var(--font-ui), sans-serif", fontSize: 15, fontWeight: 500, color: "var(--color-text-inverse)", background: "var(--palette-ink)", borderRadius: 9999, padding: "10px 22px", textDecoration: "none" }}>see the canvas →</a>
+      <div style={{ width: "100%", maxWidth: SIZE + 64, background: "var(--color-bg-elevated)", border: "1px solid var(--color-border-default)", borderRadius: 12, padding: 40, display: "flex", flexDirection: "column", gap: 12, alignItems: "flex-start" }}>
+        <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 30, color: "var(--color-text-primary)", margin: 0, lineHeight: 1.2 }}>{m.title}</p>
+        <p style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 16, color: "var(--color-text-secondary)", margin: 0 }}>{m.body}</p>
+        <a href="/" style={{ marginTop: 8, fontFamily: "var(--font-ui), sans-serif", fontSize: 15, fontWeight: 500, color: "var(--color-text-inverse)", background: "var(--palette-ink)", borderRadius: 4, padding: "11px 22px", textDecoration: "none" }}>see the canvas →</a>
       </div>
     );
   }
 
   return (
-    <div style={{ width: "100%", maxWidth: SIZE + 64, background: "var(--color-bg-canvas)", border: "1px solid var(--color-border-default)", borderRadius: 16, padding: 32, display: "flex", flexDirection: "column", gap: 16 }}>
+    <div style={{ width: "100%", maxWidth: SIZE + 64, background: "var(--color-bg-canvas)", border: "1px solid var(--color-border-default)", borderRadius: 12, padding: 32, display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-        <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 36, color: "var(--color-text-primary)" }}>paint your tile</span>
-        <span style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: remaining?.expired ? "var(--palette-rust)" : "var(--color-text-secondary)", background: "var(--color-bg-surface)", border: `1px solid ${remaining?.expired ? "var(--palette-rust)" : "var(--color-border-default)"}`, borderRadius: 9999, padding: "4px 12px", whiteSpace: "nowrap" }}>tile {x},{y} · {remaining?.label ?? "…"}</span>
+        <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 34, color: "var(--color-text-primary)" }}>{isEditing ? "edit your tile" : "paint your tile"}</span>
+        <span style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: "var(--color-text-secondary)", background: "var(--color-bg-surface)", border: "1px solid var(--color-border-default)", borderRadius: 9999, padding: "4px 12px", whiteSpace: "nowrap" }}>tile {x},{y}</span>
       </div>
 
       <canvas
@@ -140,7 +152,7 @@ export default function Painter({ tileId, x, y, expiresAt }: { tileId: string; x
             <button type="button" style={chip(false)} onClick={doUndo}>undo</button>
             <button type="button" style={chip(false)} onClick={doClear}>clear</button>
           </div>
-          <button onClick={() => setPhase("story")} style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 16, fontWeight: 500, color: "var(--color-text-inverse)", background: "var(--palette-ink)", border: "none", borderRadius: 8, padding: 14, cursor: "pointer", width: "100%" }}>done — add your story →</button>
+          <button onClick={() => setPhase("story")} style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 16, fontWeight: 500, color: "var(--color-text-inverse)", background: "var(--palette-ink)", border: "none", borderRadius: 6, padding: 14, cursor: "pointer", width: "100%" }}>{isEditing ? "next — your story →" : "done — add your story →"}</button>
         </>
       ) : (
         <>
@@ -152,9 +164,16 @@ export default function Painter({ tileId, x, y, expiresAt }: { tileId: string; x
             style={{ width: "100%", boxSizing: "border-box", fontFamily: "var(--font-ui), sans-serif", fontSize: 16, color: "var(--color-text-primary)", background: "var(--color-bg-surface)", border: "1.5px solid var(--color-border-default)", borderRadius: 8, padding: "12px 16px", outline: "none", resize: "none" }}
           />
           <div style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 12, color: "var(--color-text-muted)", textAlign: "right" }}>{story.length}/140</div>
+          {isEditing && status === "published" && (
+            <p style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: "var(--color-text-muted)", margin: 0, lineHeight: 1.5 }}>
+              your tile is already on the canvas — this update goes for a quick review before it replaces the current one.
+            </p>
+          )}
           <div style={{ display: "flex", gap: 12 }}>
-            <button onClick={() => setPhase("paint")} style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 15, color: "var(--color-text-secondary)", background: "var(--color-bg-elevated)", border: "1px solid var(--color-border-default)", borderRadius: 8, padding: "12px 18px", cursor: "pointer" }}>← back</button>
-            <button onClick={onSubmit} disabled={submitting || story.trim().length === 0} style={{ flex: 1, fontFamily: "var(--font-ui), sans-serif", fontSize: 16, fontWeight: 500, color: "var(--color-text-inverse)", background: "var(--palette-ink)", border: "none", borderRadius: 8, padding: 14, cursor: submitting ? "default" : "pointer", opacity: submitting || story.trim().length === 0 ? 0.6 : 1 }}>{submitting ? "stitching in…" : "stitch it in"}</button>
+            <button onClick={() => setPhase("paint")} style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 15, color: "var(--color-text-secondary)", background: "var(--color-bg-elevated)", border: "1px solid var(--color-border-default)", borderRadius: 6, padding: "12px 18px", cursor: "pointer" }}>← back</button>
+            <button onClick={onSubmit} disabled={submitting || story.trim().length === 0} style={{ flex: 1, fontFamily: "var(--font-ui), sans-serif", fontSize: 16, fontWeight: 500, color: "var(--color-text-inverse)", background: "var(--palette-ink)", border: "none", borderRadius: 6, padding: 14, cursor: submitting ? "default" : "pointer", opacity: submitting || story.trim().length === 0 ? 0.6 : 1 }}>
+              {submitting ? (isEditing ? "saving…" : "stitching in…") : (isEditing ? "save changes" : "stitch it in")}
+            </button>
           </div>
         </>
       )}

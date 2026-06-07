@@ -1,6 +1,9 @@
+import { redirect } from "next/navigation";
 import { createSupabaseServer } from "@/lib/auth-server";
+import { supabaseAdmin, CANVAS_SLUG } from "@/lib/supabase";
 import SignIn from "@/components/SignIn";
 import { claimTile } from "./actions";
+import { signOut } from "@/app/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -18,9 +21,22 @@ export default async function ClaimPage() {
   const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
 
+  // Already have a tile? Go straight to painting/editing it.
+  if (user?.email) {
+    const db = supabaseAdmin();
+    const { data: canvas } = await db.from("canvases").select("id").eq("slug", CANVAS_SLUG).maybeSingle();
+    if (canvas) {
+      const { data: mine } = await db
+        .from("tiles").select("id")
+        .eq("canvas_id", canvas.id).eq("artist_email", user.email.toLowerCase())
+        .in("status", ["claimed", "pending", "published"]).limit(1).maybeSingle();
+      if (mine) redirect("/paint");
+    }
+  }
+
   return (
     <main style={{ minHeight: "100%", display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "56px 24px" }}>
-      <div style={{ width: 440, maxWidth: "100%", background: "var(--color-bg-elevated)", borderRadius: 16, padding: 32, display: "flex", flexDirection: "column", gap: 16, boxShadow: "0 4px 16px rgba(32,32,29,.16)" }}>
+      <div style={{ width: 440, maxWidth: "100%", background: "var(--color-bg-elevated)", borderRadius: 12, padding: 32, display: "flex", flexDirection: "column", gap: 16, boxShadow: "0 4px 16px rgba(26,24,19,.10)" }}>
         <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 40, color: "var(--color-text-primary)", margin: 0 }}>claim a tile</h1>
         <p style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 16, color: "var(--color-text-secondary)", margin: 0 }}>one tile. one painting. one line about home.</p>
 
@@ -31,8 +47,14 @@ export default async function ClaimPage() {
             <p style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: "var(--color-text-muted)", margin: 0 }}>signed in as {user.email}</p>
             <div><label htmlFor="name" style={label}>your name</label><input id="name" name="name" style={field} placeholder="first name is fine" /></div>
             <div><label htmlFor="loc" style={label}>where are you? (optional)</label><input id="loc" name="loc" style={field} placeholder="Wyndham Vale, AU" /></div>
-            <button type="submit" style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 16, fontWeight: 500, color: "var(--color-text-inverse)", background: "var(--palette-ink)", border: "none", borderRadius: 8, padding: 14, cursor: "pointer" }}>claim my tile</button>
-            <p style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: "var(--color-text-muted)", margin: 0 }}>one tile per person · you have 24h to paint it</p>
+            <button type="submit" style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 16, fontWeight: 500, color: "var(--color-text-inverse)", background: "var(--palette-ink)", border: "none", borderRadius: 6, padding: 14, cursor: "pointer" }}>claim my tile</button>
+            <p style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: "var(--color-text-muted)", margin: 0 }}>one tile per person · it&apos;s yours — paint it whenever you like, and edit it anytime.</p>
+          </form>
+        )}
+
+        {user && (
+          <form action={signOut} style={{ marginTop: 2 }}>
+            <button type="submit" style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: "var(--color-text-muted)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>not you? sign out</button>
           </form>
         )}
       </div>

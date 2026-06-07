@@ -2,6 +2,8 @@ import { type RenderTile } from "@/components/Canvas";
 import Explorer from "@/components/Explorer";
 import LivePoll from "@/components/LivePoll";
 import { supabaseAnon, CANVAS_SLUG } from "@/lib/supabase";
+import { createSupabaseServer } from "@/lib/auth-server";
+import { signOut } from "@/app/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +19,8 @@ const overline: React.CSSProperties = {
 };
 
 export default async function Home() {
+  const authClient = await createSupabaseServer();
+  const { data: { user } } = await authClient.auth.getUser();
   const db = supabaseAnon();
   const { data: canvas } = await db
     .from("canvases")
@@ -79,9 +83,19 @@ export default async function Home() {
       {/* ── Header ── */}
       <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "20px 32px", borderBottom: "1px solid var(--color-border-default)", flexWrap: "wrap" }}>
         <span className="serif" style={{ fontSize: 24, fontWeight: 500, letterSpacing: "0.01em" }}>ekam.ink</span>
-        <nav style={{ display: "flex", alignItems: "center", gap: 22 }}>
+        <nav style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
           <a href="#canvas" style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 14, color: "var(--color-text-secondary)", textDecoration: "none" }}>the canvas</a>
-          <a href="/claim" className="lift" style={{ ...linkPrimary, fontSize: 14, padding: "9px 18px" }}>claim a tile</a>
+          {user ? (
+            <>
+              <span title={user.email} style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: "var(--color-text-muted)", maxWidth: 170, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.email}</span>
+              <form action={signOut} style={{ display: "inline" }}>
+                <button type="submit" style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 14, color: "var(--color-text-secondary)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>sign out</button>
+              </form>
+            </>
+          ) : (
+            <a href="/claim" style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 14, color: "var(--color-text-secondary)", textDecoration: "none" }}>sign in</a>
+          )}
+          <a href={user ? "/paint" : "/claim"} className="lift" style={{ ...linkPrimary, fontSize: 14, padding: "9px 18px" }}>{user ? "your tile" : "claim a tile"}</a>
         </nav>
       </header>
 
