@@ -33,6 +33,38 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
   const [selected, setSelected] = useState<RenderTile | null>(null);
   const pan = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
   const moved = useRef(false);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+
+  const vpSize = () => viewportRef.current?.clientWidth ?? VIEW;
+  const clamp = (v: { scale: number; tx: number; ty: number }) => {
+    const min = vpSize() * (1 - v.scale); // keep the canvas covering the viewport
+    return { scale: v.scale, tx: Math.min(0, Math.max(min, v.tx)), ty: Math.min(0, Math.max(min, v.ty)) };
+  };
+
+  // Wheel-to-zoom toward the cursor (native listener so we can preventDefault).
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      const size = el.clientWidth;
+      setView((v) => {
+        const ns = Math.min(7, Math.max(1, v.scale * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
+        const k = ns / v.scale;
+        const min = size * (1 - ns);
+        return {
+          scale: ns,
+          tx: Math.min(0, Math.max(min, mx - (mx - v.tx) * k)),
+          ty: Math.min(0, Math.max(min, my - (my - v.ty) * k)),
+        };
+      });
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
 
   const draw = useCallback(() => {
     const c = canvasRef.current;
@@ -96,7 +128,7 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
       const dx = e.clientX - pan.current.x;
       const dy = e.clientY - pan.current.y;
       if (Math.abs(dx) + Math.abs(dy) > 3) moved.current = true;
-      setView((v) => ({ ...v, tx: pan.current!.tx + dx, ty: pan.current!.ty + dy }));
+      setView((v) => clamp({ scale: v.scale, tx: pan.current!.tx + dx, ty: pan.current!.ty + dy }));
       return;
     }
     const t = cellAt(e.clientX, e.clientY);
@@ -109,12 +141,19 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
     const t = cellAt(e.clientX, e.clientY);
     if (t && t.painted) setSelected(t);
   };
-  const zoom = (f: number) => setView((v) => ({ ...v, scale: Math.min(7, Math.max(1, v.scale * f)) }));
+  const zoom = (f: number) =>
+    setView((v) => {
+      const c = vpSize() / 2;
+      const ns = Math.min(7, Math.max(1, v.scale * f));
+      const k = ns / v.scale;
+      return clamp({ scale: ns, tx: c - (c - v.tx) * k, ty: c - (c - v.ty) * k });
+    });
   const reset = () => setView({ scale: 1, tx: 0, ty: 0 });
 
   return (
     <div style={{ position: "relative", width: VIEW, maxWidth: "100%" }}>
       <div
+        ref={viewportRef}
         style={{
           width: "100%", aspectRatio: "1 / 1", overflow: "hidden",
           background: "var(--color-bg-surface)", borderRadius: 14,
