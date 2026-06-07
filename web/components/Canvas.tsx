@@ -18,6 +18,8 @@ const VIEW = 640; // displayed viewport size
 const PAPER = "#F3F1EA"; // open-tile fill (clean stone)
 const SURFACE = "#E9E7DF"; // backdrop between tiles
 const GROUT = "#DCD8CE"; // tile border — shown until the canvas is 100% complete
+const STITCH_MS = 520; // stitch-in animation duration
+const easeOutBack = (x: number) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
 
 const zbtn: React.CSSProperties = {
   width: 32, height: 32, borderRadius: 8, border: "1px solid var(--color-border-default)",
@@ -35,6 +37,9 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
   const pan = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
   const moved = useRef(false);
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const prevPainted = useRef<Set<number>>(new Set());
+  const anim = useRef<Map<number, number>>(new Map()); // tile index -> stitch-in start time
+  const rafRef = useRef<number | null>(null);
 
   const vpSize = () => viewportRef.current?.clientWidth ?? VIEW;
   const clamp = (v: { scale: number; tx: number; ty: number }) => {
@@ -67,13 +72,14 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
     return () => el.removeEventListener("wheel", onWheel);
   }, []);
 
-  const draw = useCallback(() => {
+  const draw = useCallback((ts?: number) => {
     const c = canvasRef.current;
     if (!c) return;
     const ctx = c.getContext("2d");
     if (!ctx) return;
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
+    const now = ts ?? performance.now();
 
     const complete = tiles.length > 0 && tiles.every((t) => t.painted);
 
@@ -101,9 +107,24 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
     const sw = 3;
     ctx.fillStyle = SURFACE; // backdrop between the tiles
     ctx.fillRect(0, 0, c.width, c.height);
-    for (const t of tiles) {
+    tiles.forEach((t, i) => {
       const px = t.x * R + inset;
       const py = t.y * R + inset;
+      // stitch-in: newly published tiles pop + fade in
+      const start = anim.current.get(i);
+      let alpha = 1, scale = 1;
+      if (start != null) {
+        const p = Math.min(1, (now - start) / STITCH_MS);
+        alpha = Math.min(1, p * 1.5);
+        scale = 0.35 + 0.65 * easeOutBack(p);
+        if (p >= 1) anim.current.delete(i);
+      }
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      if (scale !== 1) {
+        const cxp = px + s / 2, cyp = py + s / 2;
+        ctx.translate(cxp, cyp); ctx.scale(scale, scale); ctx.translate(-cxp, -cyp);
+      }
       if (t.painted && t.img) {
         const im = imgs.current.get(t.img);
         if (im && im.complete && im.naturalWidth) ctx.drawImage(im, px, py, s, s);
@@ -118,8 +139,18 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
       ctx.strokeStyle = GROUT; // each tile's own border
       ctx.lineWidth = sw;
       ctx.strokeRect(px + sw / 2, py + sw / 2, s - sw, s - sw);
-    }
+      ctx.restore();
+    });
   }, [tiles]);
+
+  const startLoop = useCallback(() => {
+    if (rafRef.current != null) return;
+    const loop = (ts: number) => {
+      draw(ts);
+      rafRef.current = anim.current.size > 0 ? requestAnimationFrame(loop) : null;
+    };
+    rafRef.current = requestAnimationFrame(loop);
+  }, [draw]);
 
   useEffect(() => {
     const c = canvasRef.current;
@@ -135,9 +166,20 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
         imgs.current.set(t.img, im);
       }
     }
+    // detect newly-published tiles → stitch them in (skip the very first render)
+    const nowPainted = new Set<number>();
+    tiles.forEach((t, i) => { if (t.painted) nowPainted.add(i); });
+    if (prevPainted.current.size > 0) {
+      for (const i of nowPainted) if (!prevPainted.current.has(i)) anim.current.set(i, performance.now());
+    }
+    prevPainted.current = nowPainted;
     draw();
-    return () => { alive = false; };
-  }, [tiles, cols, rows, draw]);
+    if (anim.current.size > 0) startLoop();
+    return () => {
+      alive = false;
+      if (rafRef.current != null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    };
+  }, [tiles, cols, rows, draw, startLoop]);
 
   const cellAt = (clientX: number, clientY: number): RenderTile | null => {
     const c = canvasRef.current;
