@@ -13,7 +13,7 @@ A collective tile-canvas artwork for the **Config Makeathon** (Figma × Contra).
 **Figma file** (design system + screens, → Figma Community on Day 10):
 https://www.figma.com/design/7TpgTn27dDmmig7T5hzhs3
 
-- ✅ **Design system** — 4 variable collections / 66 variables (10-color painting palette · warm neutral ramp · spacing · radius · type), 9 text styles (Inter + Shantell Sans), 2 effect styles — all scoped + `var(--…)` code syntax. Rendered Foundations page.
+- ✅ **Design system** — 4 variable collections / 66 variables (10-color painting palette · stone neutral ramp · spacing · radius · type), 9 text styles (Space Grotesk + Inter), 2 effect styles — all scoped + `var(--…)` code syntax. Rendered Foundations page.
 - ✅ **Components** — `Tile` (Open/Claimed/Published) · `Story Card` · `Hover Whisper`
 - ✅ **Screens** — Canvas view in 3 fill-states (5/40/90%) · Claim modal · Painter · Admin moderation queue
 - ✅ **Cover** + **OG/social** 1200×630 card

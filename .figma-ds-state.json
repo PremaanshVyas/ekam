@@ -7,7 +7,7 @@
   "fileUrl": "https://www.figma.com/design/7TpgTn27dDmmig7T5hzhs3",
   "decisions": {
     "modes": "single mode only (paper/ink product, no dark theme)",
-    "fonts": "display=Shantell Sans (fallback Caveat), ui=Inter",
+    "fonts": "display=Space Grotesk, ui=Inter",
     "grid": "24x24 = 576 tiles; tile source 512px PNG, thumb 64px"
   },
   "tokenPlan": {
@@ -67,7 +67,7 @@
       "radius/none": 0, "radius/sm": 4, "radius/md": 8, "radius/lg": 16, "radius/full": 9999
     },
     "typographyPrimitives": {
-      "family/display": "Shantell Sans",
+      "family/display": "Space Grotesk",
       "family/ui": "Inter",
       "size/xs": 14, "size/sm": 16, "size/md": 18, "size/lg": 24, "size/xl": 32, "size/2xl": 40,
       "weight/regular": "Regular", "weight/medium": "Medium", "weight/semibold": "Semi Bold", "weight/bold": "Bold"
@@ -96,7 +96,7 @@
       "Typography Primitives": "VariableCollectionId:3:5"
     },
     "counts": { "primitiveColors": 20, "spacingRadius": 14, "typographyPrimitives": 12, "semanticColors": 20, "textStyles": 9, "effectStyles": 2 },
-    "fonts": { "display": "Shantell Sans", "ui": "Inter" },
+    "fonts": { "display": "Space Grotesk", "ui": "Inter" },
     "pages": { "Cover":"0:1","Foundations":"12:2","sep":"12:3","Components":"12:4","Screens":"12:5" },
     "foundationsRootFrame": "13:2",
     "components": { "Tile": "18:2 (variants: Open/Claimed/Published)", "Story Card": "19:2" },
