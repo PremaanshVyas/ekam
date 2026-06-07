@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export type RenderTile = {
   x: number;
@@ -36,6 +37,9 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
   const [view, setView] = useState({ scale: 1, tx: 0, ty: 0 });
   const [hover, setHover] = useState<{ tile: RenderTile; sx: number; sy: number } | null>(null);
   const [selected, setSelected] = useState<RenderTile | null>(null);
+  const [claimHint, setClaimHint] = useState<{ sx: number; sy: number } | null>(null);
+  const hoverCell = useRef<number | null>(null); // index of hovered open tile (canvas highlight)
+  const router = useRouter();
   const pan = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
   const moved = useRef(false);
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -142,6 +146,27 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
       }
       ctx.restore();
     });
+
+    // hovered open tile → "claim here" affordance (only while gridded)
+    const hc = hoverCell.current;
+    if (hc != null && gap > 0.5) {
+      const t = tiles[hc];
+      if (t && !t.painted) {
+        const px = t.x * R + inset, py = t.y * R + inset;
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "rgba(32,32,29,0.06)";
+        ctx.fillRect(px, py, s, s);
+        ctx.strokeStyle = "#20201D";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(px + 1.5, py + 1.5, s - 3, s - 3);
+        ctx.lineCap = "round";
+        const mx = px + s / 2, my = py + s / 2, r = s * 0.17;
+        ctx.beginPath();
+        ctx.moveTo(mx - r, my); ctx.lineTo(mx + r, my);
+        ctx.moveTo(mx, my - r); ctx.lineTo(mx, my + r);
+        ctx.stroke();
+      }
+    }
   }, [tiles]);
 
   const startLoop = useCallback(() => {
@@ -194,19 +219,26 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
     };
   }, [tiles, cols, rows, draw, startLoop]);
 
-  const cellAt = (clientX: number, clientY: number): RenderTile | null => {
+  const cellIndexAt = (clientX: number, clientY: number): number | null => {
     const c = canvasRef.current;
     if (!c) return null;
     const rect = c.getBoundingClientRect(); // reflects current transform — maps at any zoom/pan
     const cx = Math.floor(((clientX - rect.left) / rect.width) * cols);
     const cy = Math.floor(((clientY - rect.top) / rect.height) * rows);
     if (cx < 0 || cy < 0 || cx >= cols || cy >= rows) return null;
-    return tiles[cy * cols + cx] ?? null;
+    return cy * cols + cx;
+  };
+  const cellAt = (clientX: number, clientY: number): RenderTile | null => {
+    const i = cellIndexAt(clientX, clientY);
+    return i == null ? null : tiles[i] ?? null;
   };
 
   const onDown = (e: React.PointerEvent) => {
     pan.current = { x: e.clientX, y: e.clientY, tx: view.tx, ty: view.ty };
     moved.current = false;
+    setHover(null);
+    setClaimHint(null);
+    if (hoverCell.current != null) { hoverCell.current = null; draw(); }
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
   const onMove = (e: React.PointerEvent) => {
@@ -218,15 +250,28 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
       setView((v) => clamp({ scale: v.scale, tx: p.tx + dx, ty: p.ty + dy }));
       return;
     }
-    const t = cellAt(e.clientX, e.clientY);
-    if (t && t.painted && t.story) setHover({ tile: t, sx: e.clientX, sy: e.clientY });
-    else setHover(null);
+    const idx = cellIndexAt(e.clientX, e.clientY);
+    const t = idx == null ? null : tiles[idx] ?? null;
+    if (t && t.painted && t.story) {
+      setHover({ tile: t, sx: e.clientX, sy: e.clientY });
+      setClaimHint(null);
+      if (hoverCell.current != null) { hoverCell.current = null; draw(); }
+    } else if (t && !t.painted) {
+      setClaimHint({ sx: e.clientX, sy: e.clientY });
+      setHover(null);
+      if (hoverCell.current !== idx) { hoverCell.current = idx; draw(); }
+    } else {
+      setHover(null);
+      setClaimHint(null);
+      if (hoverCell.current != null) { hoverCell.current = null; draw(); }
+    }
   };
   const onUp = () => { pan.current = null; };
   const onClick = (e: React.MouseEvent) => {
     if (moved.current) return;
     const t = cellAt(e.clientX, e.clientY);
     if (t && t.painted) setSelected(t);
+    else if (t && !t.painted) router.push("/claim");
   };
   const zoom = (f: number) =>
     setView((v) => {
@@ -244,12 +289,12 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
         style={{
           width: "100%", aspectRatio: "1 / 1", minWidth: 0, overflow: "hidden",
           background: "var(--color-bg-surface)", borderRadius: 14,
-          cursor: pan.current ? "grabbing" : "grab", touchAction: "none",
+          cursor: pan.current ? "grabbing" : (hover || claimHint ? "pointer" : "grab"), touchAction: "none",
         }}
         onPointerDown={onDown}
         onPointerMove={onMove}
         onPointerUp={onUp}
-        onPointerLeave={() => { onUp(); setHover(null); }}
+        onPointerLeave={() => { onUp(); setHover(null); setClaimHint(null); if (hoverCell.current != null) { hoverCell.current = null; draw(); } }}
         onClick={onClick}
       >
         <canvas
@@ -283,6 +328,22 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
         <button style={zbtn} onClick={() => zoom(1 / 1.35)} aria-label="zoom out">−</button>
         <button style={{ ...zbtn, width: "auto", padding: "0 10px", fontSize: 13 }} onClick={reset}>reset</button>
       </div>
+
+      {claimHint && !hover && !selected && (
+        <div
+          style={{
+            position: "fixed",
+            left: Math.min(claimHint.sx + 14, (typeof window !== "undefined" ? window.innerWidth : 9999) - 180),
+            top: claimHint.sy + 14,
+            background: "var(--palette-ink)", color: "var(--color-text-inverse)",
+            fontFamily: "var(--font-ui), sans-serif", fontSize: 13, fontWeight: 500,
+            borderRadius: 9999, padding: "6px 14px", whiteSpace: "nowrap",
+            boxShadow: "0 4px 14px rgba(26,25,22,.22)", pointerEvents: "none", zIndex: 40,
+          }}
+        >
+          ✦ claim this tile
+        </div>
+      )}
 
       {hover && !selected && (
         <div
