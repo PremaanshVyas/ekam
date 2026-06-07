@@ -3,7 +3,8 @@ import Explorer from "@/components/Explorer";
 import LivePoll from "@/components/LivePoll";
 import { supabaseAnon, CANVAS_SLUG } from "@/lib/supabase";
 import { createSupabaseServer } from "@/lib/auth-server";
-import { signOut } from "@/app/actions";
+import Link from "next/link";
+import SiteHeader from "@/components/SiteHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -80,24 +81,7 @@ export default async function Home() {
     <main style={{ minHeight: "100%", maxWidth: "100%", overflowX: "hidden", display: "flex", flexDirection: "column" }}>
       <LivePoll />
 
-      {/* ── Header ── */}
-      <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "20px 32px", borderBottom: "1px solid var(--color-border-default)", flexWrap: "wrap" }}>
-        <span className="serif" style={{ fontSize: 24, fontWeight: 500, letterSpacing: "0.01em" }}>ekam.ink</span>
-        <nav style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
-          <a href="#canvas" style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 14, color: "var(--color-text-secondary)", textDecoration: "none" }}>the canvas</a>
-          {user ? (
-            <>
-              <span title={user.email} style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: "var(--color-text-muted)", maxWidth: 170, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.email}</span>
-              <form action={signOut} style={{ display: "inline" }}>
-                <button type="submit" style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 14, color: "var(--color-text-secondary)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>sign out</button>
-              </form>
-            </>
-          ) : (
-            <a href="/claim" style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 14, color: "var(--color-text-secondary)", textDecoration: "none" }}>sign in</a>
-          )}
-          <a href={user ? "/paint" : "/claim"} className="lift" style={{ ...linkPrimary, fontSize: 14, padding: "9px 18px" }}>{user ? "your tile" : "claim a tile"}</a>
-        </nav>
-      </header>
+      <SiteHeader email={user?.email ?? null} />
 
       {/* ── Hero ── */}
       <section style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "72px 24px 24px", gap: 0 }}>
@@ -109,8 +93,8 @@ export default async function Home() {
           Claim a tile. Hand-paint what home looks like within the canvas palette. When the painting is complete, it becomes one artwork — and your story lives on it forever.
         </p>
         <div className="fade-up" style={{ display: "flex", gap: 12, marginTop: 34, flexWrap: "wrap", justifyContent: "center", animationDelay: "180ms" }}>
-          <a href="/claim" className="lift" style={linkPrimary}>claim a tile</a>
-          <a href="#canvas" className="lift" style={linkGhost}>see the canvas</a>
+          <Link href="/claim" className="lift" style={linkPrimary}>claim a tile</Link>
+          <Link href="#canvas" className="lift" style={linkGhost}>see the canvas</Link>
         </div>
 
         {/* ── Live card ── */}

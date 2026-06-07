@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import Canvas, { type RenderTile } from "@/components/Canvas";
 
 const PALETTE: [string, string][] = [
@@ -84,7 +85,7 @@ export default function Explorer({ grid, cols, painted, total }: { grid: RenderT
             <p style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 14, color: "var(--color-text-muted)", margin: "14px 0 0", lineHeight: 1.5 }}>
               Click a painted tile to read its story. Click an empty tile to claim your own.
             </p>
-            <a href="/claim" className="lift" style={{ marginTop: 18, textAlign: "center", fontFamily: "var(--font-ui), sans-serif", fontSize: 15, fontWeight: 500, color: "var(--color-text-inverse)", background: "var(--palette-ink)", borderRadius: 4, padding: "11px 18px", textDecoration: "none" }}>claim a tile</a>
+            <Link href="/claim" className="lift" style={{ marginTop: 18, textAlign: "center", fontFamily: "var(--font-ui), sans-serif", fontSize: 15, fontWeight: 500, color: "var(--color-text-inverse)", background: "var(--palette-ink)", borderRadius: 4, padding: "11px 18px", textDecoration: "none" }}>claim a tile</Link>
           </div>
         )}
       </aside>

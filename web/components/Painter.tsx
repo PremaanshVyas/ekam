@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { submitTile, type SubmitMode } from "@/app/paint/actions";
 
 const SIZE = 512;
@@ -114,7 +115,10 @@ export default function Painter({
       <div style={{ width: "100%", maxWidth: SIZE + 64, background: "var(--color-bg-elevated)", border: "1px solid var(--color-border-default)", borderRadius: 12, padding: 40, display: "flex", flexDirection: "column", gap: 12, alignItems: "flex-start" }}>
         <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 30, color: "var(--color-text-primary)", margin: 0, lineHeight: 1.2 }}>{m.title}</p>
         <p style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 16, color: "var(--color-text-secondary)", margin: 0 }}>{m.body}</p>
-        <a href="/" style={{ marginTop: 8, fontFamily: "var(--font-ui), sans-serif", fontSize: 15, fontWeight: 500, color: "var(--color-text-inverse)", background: "var(--palette-ink)", borderRadius: 4, padding: "11px 22px", textDecoration: "none" }}>see the canvas →</a>
+        <div style={{ display: "flex", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
+          <Link href="/me" style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 15, fontWeight: 500, color: "var(--color-text-primary)", background: "var(--color-bg-canvas)", border: "1px solid var(--color-border-strong)", borderRadius: 4, padding: "10px 20px", textDecoration: "none" }}>back to your tile</Link>
+          <Link href="/" style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 15, fontWeight: 500, color: "var(--color-text-inverse)", background: "var(--palette-ink)", borderRadius: 4, padding: "11px 22px", textDecoration: "none" }}>see the canvas →</Link>
+        </div>
       </div>
     );
   }

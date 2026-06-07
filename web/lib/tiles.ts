@@ -1,52 +1,36 @@
-// Mock tile data for the canvas demo. In production these come from Supabase
-// (the `public_tiles` view — see supabase/schema.sql). Painted tiles use the
-// constrained palette only; each carries an artist name + one-line story.
+import type { SupabaseClient } from "@supabase/supabase-js";
 
-export const PALETTE = [
-  "--palette-clay", "--palette-rust", "--palette-honey", "--palette-sage",
-  "--palette-pine", "--palette-sky", "--palette-dusk", "--palette-plum", "--palette-ink",
-];
-
-const STORIES = [
-  { story: "made this at 3am, missing my nani", name: "Mickey" },
-  { story: "the train window on the way to nani’s", name: "Aanya" },
-  { story: "mum’s kitchen, the yellow light", name: "Sam" },
-  { story: "our balcony in winter, the city humming", name: "Lee" },
-  { story: "the rug we all sat on as kids", name: "Priya" },
-];
-
-export type Tile = {
-  x: number;
-  y: number;
-  painted: boolean;
-  color?: string; // a CSS custom-property name from PALETTE
-  story?: string;
-  name?: string;
+export type MyTile = {
+  id: string; x: number; y: number; status: string;
+  image_path: string | null; story: string | null;
+  pending_image_path: string | null; pending_story: string | null;
 };
 
-// Deterministic PRNG so the demo canvas is stable across renders/SSR.
-function rng(seed: number) {
-  let s = seed >>> 0;
-  return () => {
-    s = (s * 1664525 + 1013904223) >>> 0;
-    return s / 4294967296;
-  };
+// Find the signed-in person's tile (by email). Tolerant of the pending_* columns
+// not existing yet (i.e. migration 0003 not run) — falls back to safe columns so
+// the dashboard / painter never hard-error.
+export async function findMyTile(db: SupabaseClient, canvasId: string, email: string): Promise<MyTile | null> {
+  const e = email.toLowerCase();
+  const full = await db
+    .from("tiles")
+    .select("id, x, y, status, image_path, story, pending_image_path, pending_story")
+    .eq("canvas_id", canvasId).eq("artist_email", e)
+    .in("status", ["claimed", "pending", "published"])
+    .limit(1).maybeSingle();
+  if (!full.error && full.data) return full.data as MyTile;
+  if (!full.error) return null;
+
+  // pending_* columns may not exist yet → retry with the always-present columns.
+  const safe = await db
+    .from("tiles")
+    .select("id, x, y, status, image_path, story")
+    .eq("canvas_id", canvasId).eq("artist_email", e)
+    .in("status", ["claimed", "pending", "published"])
+    .limit(1).maybeSingle();
+  if (safe.data) return { ...(safe.data as Omit<MyTile, "pending_image_path" | "pending_story">), pending_image_path: null, pending_story: null };
+  return null;
 }
 
-export function makeTiles(cols = 24, rows = 24, fill = 0.4): Tile[] {
-  const r = rng(42);
-  const out: Tile[] = [];
-  let k = 0;
-  for (let y = 0; y < rows; y++) {
-    for (let x = 0; x < cols; x++) {
-      if (r() < fill) {
-        const color = PALETTE[Math.floor(r() * PALETTE.length)];
-        const st = STORIES[k++ % STORIES.length];
-        out.push({ x, y, painted: true, color, story: st.story, name: st.name });
-      } else {
-        out.push({ x, y, painted: false });
-      }
-    }
-  }
-  return out;
+export function tileImageUrl(path: string | null): string | null {
+  return path ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/tiles/${path}` : null;
 }

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createSupabaseServer } from "@/lib/auth-server";
 import { supabaseAdmin, CANVAS_SLUG } from "@/lib/supabase";
 import SignIn from "@/components/SignIn";
+import SiteHeader from "@/components/SiteHeader";
 import { claimTile } from "./actions";
 import { signOut } from "@/app/actions";
 
@@ -30,11 +31,13 @@ export default async function ClaimPage() {
         .from("tiles").select("id")
         .eq("canvas_id", canvas.id).eq("artist_email", user.email.toLowerCase())
         .in("status", ["claimed", "pending", "published"]).limit(1).maybeSingle();
-      if (mine) redirect("/paint");
+      if (mine) redirect("/me");
     }
   }
 
   return (
+    <>
+    <SiteHeader email={user?.email ?? null} />
     <main style={{ minHeight: "100%", display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "56px 24px" }}>
       <div style={{ width: 440, maxWidth: "100%", background: "var(--color-bg-elevated)", borderRadius: 12, padding: 32, display: "flex", flexDirection: "column", gap: 16, boxShadow: "0 4px 16px rgba(26,24,19,.10)" }}>
         <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 40, color: "var(--color-text-primary)", margin: 0 }}>claim a tile</h1>
@@ -59,5 +62,6 @@ export default async function ClaimPage() {
         )}
       </div>
     </main>
+    </>
   );
 }
