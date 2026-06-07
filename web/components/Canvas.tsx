@@ -20,6 +20,8 @@ const SURFACE = "#E9E7DF"; // backdrop between tiles
 const GROUT = "#DCD8CE"; // tile border — shown until the canvas is 100% complete
 const STITCH_MS = 520; // stitch-in animation duration
 const easeOutBack = (x: number) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+const SEAL_MS = 1100; // completion reveal: grid → seamless seal duration
+const easeInOutCubic = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
 
 const zbtn: React.CSSProperties = {
   width: 32, height: 32, borderRadius: 8, border: "1px solid var(--color-border-default)",
@@ -40,6 +42,9 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
   const prevPainted = useRef<Set<number>>(new Set());
   const anim = useRef<Map<number, number>>(new Map()); // tile index -> stitch-in start time
   const rafRef = useRef<number | null>(null);
+  const wasComplete = useRef(false);
+  const sealStart = useRef<number | null>(null); // set when the canvas hits 100% live → drives the seal animation
+  const [isComplete, setIsComplete] = useState(false);
 
   const vpSize = () => viewportRef.current?.clientWidth ?? VIEW;
   const clamp = (v: { scale: number; tx: number; ty: number }) => {
@@ -83,29 +88,22 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
 
     const complete = tiles.length > 0 && tiles.every((t) => t.painted);
 
+    // Grid gap + border fade. On completion they animate to 0 — the tiles "stitch" together.
+    let gap = 8, borderAlpha = 1;
     if (complete) {
-      // 100% painted → stitch seamless: tiles edge-to-edge, no gaps/borders.
-      ctx.fillStyle = PAPER;
-      ctx.fillRect(0, 0, c.width, c.height);
-      for (const t of tiles) {
-        const px = t.x * R, py = t.y * R;
-        if (t.img) {
-          const im = imgs.current.get(t.img);
-          if (im && im.complete && im.naturalWidth) ctx.drawImage(im, px, py, R, R);
-        } else if (t.color) {
-          ctx.fillStyle = t.color;
-          ctx.fillRect(px, py, R, R);
-        }
+      if (sealStart.current != null) {
+        const e = easeInOutCubic(Math.min(1, (now - sealStart.current) / SEAL_MS));
+        gap = 8 * (1 - e);
+        borderAlpha = 1 - e;
+        if (e >= 1) sealStart.current = null;
+      } else {
+        gap = 0; borderAlpha = 0; // already complete (e.g. loaded at 100%) → seamless, no animation
       }
-      return;
     }
-
-    // In progress → each tile is a distinct, separated card (gap + its own border).
-    const gap = 8;
     const inset = gap / 2;
     const s = R - gap;
     const sw = 3;
-    ctx.fillStyle = SURFACE; // backdrop between the tiles
+    ctx.fillStyle = gap < 0.5 ? PAPER : SURFACE; // paper once sealed; surface backdrop while gridded
     ctx.fillRect(0, 0, c.width, c.height);
     tiles.forEach((t, i) => {
       const px = t.x * R + inset;
@@ -136,9 +134,12 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
         ctx.fillStyle = PAPER; // open tile
         ctx.fillRect(px, py, s, s);
       }
-      ctx.strokeStyle = GROUT; // each tile's own border
-      ctx.lineWidth = sw;
-      ctx.strokeRect(px + sw / 2, py + sw / 2, s - sw, s - sw);
+      if (borderAlpha > 0.01) {
+        ctx.globalAlpha = alpha * borderAlpha; // border fades out as the quilt seals
+        ctx.strokeStyle = GROUT;
+        ctx.lineWidth = sw;
+        ctx.strokeRect(px + sw / 2, py + sw / 2, s - sw, s - sw);
+      }
       ctx.restore();
     });
   }, [tiles]);
@@ -147,7 +148,7 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
     if (rafRef.current != null) return;
     const loop = (ts: number) => {
       draw(ts);
-      rafRef.current = anim.current.size > 0 ? requestAnimationFrame(loop) : null;
+      rafRef.current = (anim.current.size > 0 || sealStart.current != null) ? requestAnimationFrame(loop) : null;
     };
     rafRef.current = requestAnimationFrame(loop);
   }, [draw]);
@@ -169,12 +170,24 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
     // detect newly-published tiles → stitch them in (skip the very first render)
     const nowPainted = new Set<number>();
     tiles.forEach((t, i) => { if (t.painted) nowPainted.add(i); });
-    if (prevPainted.current.size > 0) {
+    const isFirst = prevPainted.current.size === 0;
+    if (!isFirst) {
       for (const i of nowPainted) if (!prevPainted.current.has(i)) anim.current.set(i, performance.now());
+    }
+    // detect 100% completion → seal the grid into the seamless quilt
+    const complete = tiles.length > 0 && nowPainted.size === tiles.length;
+    if (complete && !wasComplete.current) {
+      wasComplete.current = true;
+      setIsComplete(true);
+      if (!isFirst) sealStart.current = performance.now(); // animate only when it completes live
+    } else if (!complete && wasComplete.current) {
+      wasComplete.current = false;
+      setIsComplete(false);
+      sealStart.current = null;
     }
     prevPainted.current = nowPainted;
     draw();
-    if (anim.current.size > 0) startLoop();
+    if (anim.current.size > 0 || sealStart.current != null) startLoop();
     return () => {
       alive = false;
       if (rafRef.current != null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
@@ -249,6 +262,21 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
           }}
         />
       </div>
+
+      {isComplete && (
+        <div
+          className="fade-up"
+          style={{
+            position: "absolute", top: 12, left: "50%", transform: "translateX(-50%)",
+            background: "var(--palette-ink)", color: "var(--color-text-inverse)",
+            fontFamily: "var(--font-display), sans-serif", fontSize: 15,
+            padding: "8px 18px", borderRadius: 9999, whiteSpace: "nowrap",
+            boxShadow: "0 6px 20px rgba(26,25,22,.25)", zIndex: 30,
+          }}
+        >
+          ✦ the quilt is complete
+        </div>
+      )}
 
       <div style={{ position: "absolute", top: 12, right: 12, display: "flex", gap: 6 }}>
         <button style={zbtn} onClick={() => zoom(1.35)} aria-label="zoom in">+</button>
