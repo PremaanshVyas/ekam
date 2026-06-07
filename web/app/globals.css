@@ -8,7 +8,7 @@
 
   /* ── Modern "stone" neutrals (chrome) — clean, sharp, low-warmth ── */
   --stone-50:#FBFAF7; --stone-100:#F5F3ED; --stone-200:#ECEAE2; --stone-300:#E1DED4; --stone-400:#CFCBBF;
-  --stone-500:#A8A498; --stone-600:#827E74; --stone-700:#54514B; --stone-800:#2C2B27; --stone-900:#1A1916;
+  --stone-500:#A8A498; --stone-600:#6B675E; --stone-700:#54514B; --stone-800:#2C2B27; --stone-900:#1A1916;
 
   /* ── Semantic chrome ── */
   --color-bg-canvas:var(--stone-100);
@@ -49,3 +49,8 @@ body {
   .fade-up, .fade-in { animation: none; }
   .lift { transition: none; }
 }
+
+/* Visible keyboard focus — honey ring reads on light, white, and dark (ink) surfaces.
+   Uses box-shadow so it works even where elements set inline outline:none. */
+:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--palette-honey); }
+:focus:not(:focus-visible) { outline: none; }

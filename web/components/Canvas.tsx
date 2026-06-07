@@ -32,6 +32,7 @@ const zbtn: React.CSSProperties = {
 
 export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols?: number }) {
   const rows = Math.max(1, Math.round(tiles.length / cols));
+  const paintedCount = tiles.reduce((n, t) => n + (t.painted ? 1 : 0), 0);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const imgs = useRef<Map<string, HTMLImageElement>>(new Map());
   const [view, setView] = useState({ scale: 1, tx: 0, ty: 0 });
@@ -196,7 +197,8 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
     const nowPainted = new Set<number>();
     tiles.forEach((t, i) => { if (t.painted) nowPainted.add(i); });
     const isFirst = prevPainted.current.size === 0;
-    if (!isFirst) {
+    const reduce = typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (!isFirst && !reduce) {
       for (const i of nowPainted) if (!prevPainted.current.has(i)) anim.current.set(i, performance.now());
     }
     // detect 100% completion → seal the grid into the seamless quilt
@@ -204,7 +206,7 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
     if (complete && !wasComplete.current) {
       wasComplete.current = true;
       setIsComplete(true);
-      if (!isFirst) sealStart.current = performance.now(); // animate only when it completes live
+      if (!isFirst && !reduce) sealStart.current = performance.now(); // animate only when it completes live (respects reduced-motion)
     } else if (!complete && wasComplete.current) {
       wasComplete.current = false;
       setIsComplete(false);
@@ -299,6 +301,8 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
       >
         <canvas
           ref={canvasRef}
+          role="img"
+          aria-label={`ekam.ink collaborative canvas — ${paintedCount} of ${tiles.length} tiles painted`}
           style={{
             width: "100%", height: "100%", display: "block",
             transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.scale})`,

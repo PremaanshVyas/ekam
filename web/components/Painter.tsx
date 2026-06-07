@@ -116,6 +116,7 @@ export default function Painter({ tileId, x, y, expiresAt }: { tileId: string; x
 
       <canvas
         ref={ref} width={SIZE} height={SIZE}
+        role="img" aria-label="your tile — draw your painting here"
         onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={up}
         style={{ width: "100%", maxWidth: SIZE, aspectRatio: "1 / 1", background: PAPER, border: "1.5px solid var(--color-border-strong)", borderRadius: 2, touchAction: "none", cursor: "crosshair", display: "block" }}
       />
@@ -124,26 +125,28 @@ export default function Painter({ tileId, x, y, expiresAt }: { tileId: string; x
         <>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             {PALETTE.map((p) => (
-              <button key={p.name} onClick={() => { setHex(p.hex); setErasing(false); }} title={p.name}
+              <button key={p.name} type="button" onClick={() => { setHex(p.hex); setErasing(false); }}
+                title={p.name} aria-label={`paint colour ${p.name}`} aria-pressed={!erasing && hex === p.hex}
                 style={{ width: 34, height: 34, borderRadius: "50%", background: p.hex, cursor: "pointer", border: !erasing && hex === p.hex ? "3px solid var(--color-text-primary)" : "1px solid var(--color-border-default)" }} />
             ))}
           </div>
           <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
             <div style={{ display: "flex", gap: 8, alignItems: "center", background: "var(--color-bg-surface)", border: "1px solid var(--color-border-default)", borderRadius: 9999, padding: "8px 12px" }}>
               {BRUSHES.map((b) => (
-                <button key={b} onClick={() => setBrush(b)} style={{ width: b, height: b, borderRadius: "50%", border: "none", cursor: "pointer", background: brush === b ? "var(--color-text-primary)" : "var(--color-text-muted)" }} />
+                <button key={b} type="button" onClick={() => setBrush(b)} aria-label={`brush size ${b === BRUSHES[0] ? "small" : b === BRUSHES[1] ? "medium" : "large"}`} aria-pressed={brush === b} style={{ width: b, height: b, borderRadius: "50%", border: "none", cursor: "pointer", background: brush === b ? "var(--color-text-primary)" : "var(--color-text-muted)" }} />
               ))}
             </div>
-            <button style={chip(erasing)} onClick={() => setErasing((e) => !e)}>eraser</button>
-            <button style={chip(false)} onClick={doUndo}>undo</button>
-            <button style={chip(false)} onClick={doClear}>clear</button>
+            <button type="button" aria-pressed={erasing} style={chip(erasing)} onClick={() => setErasing((e) => !e)}>eraser</button>
+            <button type="button" style={chip(false)} onClick={doUndo}>undo</button>
+            <button type="button" style={chip(false)} onClick={doClear}>clear</button>
           </div>
           <button onClick={() => setPhase("story")} style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 16, fontWeight: 500, color: "var(--color-text-inverse)", background: "var(--palette-ink)", border: "none", borderRadius: 8, padding: 14, cursor: "pointer", width: "100%" }}>done — add your story →</button>
         </>
       ) : (
         <>
-          <label style={{ fontFamily: "var(--font-display), sans-serif", fontSize: 22, color: "var(--color-text-primary)" }}>where were you when home looked like this?</label>
+          <label htmlFor="story-input" style={{ fontFamily: "var(--font-display), sans-serif", fontSize: 22, color: "var(--color-text-primary)" }}>where were you when home looked like this?</label>
           <textarea
+            id="story-input"
             value={story} onChange={(e) => setStory(e.target.value.slice(0, 140))} maxLength={140} rows={3}
             placeholder="made this at 3am, missing my nani"
             style={{ width: "100%", boxSizing: "border-box", fontFamily: "var(--font-ui), sans-serif", fontSize: 16, color: "var(--color-text-primary)", background: "var(--color-bg-surface)", border: "1.5px solid var(--color-border-default)", borderRadius: 8, padding: "12px 16px", outline: "none", resize: "none" }}

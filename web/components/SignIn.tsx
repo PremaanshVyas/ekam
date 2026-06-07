@@ -59,6 +59,7 @@ export default function SignIn() {
         <input
           value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 10))}
           inputMode="numeric" autoComplete="one-time-code" autoFocus placeholder="enter your code"
+          aria-label="verification code"
           style={{ ...field, fontSize: 22, letterSpacing: 6, textAlign: "center" }}
         />
         {err && <p style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: "var(--palette-rust)", margin: 0 }}>{err}</p>}
@@ -75,8 +76,8 @@ export default function SignIn() {
 
   return (
     <form onSubmit={sendCode} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <label style={labelStyle}>your email — never shown publicly</label>
-      <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com" style={field} />
+      <label htmlFor="email" style={labelStyle}>your email — never shown publicly</label>
+      <input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com" style={field} />
       {err && <p style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: "var(--palette-rust)", margin: 0 }}>{err}</p>}
       <button type="submit" disabled={loading} style={{ ...btn, opacity: loading ? 0.6 : 1 }}>
         {loading ? "sending…" : "email me a code"}

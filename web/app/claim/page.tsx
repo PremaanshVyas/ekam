@@ -29,8 +29,8 @@ export default async function ClaimPage() {
         ) : (
           <form action={claimTile} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <p style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: "var(--color-text-muted)", margin: 0 }}>signed in as {user.email}</p>
-            <div><label style={label}>your name</label><input name="name" style={field} placeholder="first name is fine" /></div>
-            <div><label style={label}>where are you? (optional)</label><input name="loc" style={field} placeholder="Wyndham Vale, AU" /></div>
+            <div><label htmlFor="name" style={label}>your name</label><input id="name" name="name" style={field} placeholder="first name is fine" /></div>
+            <div><label htmlFor="loc" style={label}>where are you? (optional)</label><input id="loc" name="loc" style={field} placeholder="Wyndham Vale, AU" /></div>
             <button type="submit" style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 16, fontWeight: 500, color: "var(--color-text-inverse)", background: "var(--palette-ink)", border: "none", borderRadius: 8, padding: 14, cursor: "pointer" }}>claim my tile</button>
             <p style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: "var(--color-text-muted)", margin: 0 }}>one tile per person · you have 24h to paint it</p>
           </form>
