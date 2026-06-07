@@ -17,12 +17,12 @@ export default async function PaintPage() {
   if (!tileId) return notice("you haven't claimed a tile yet", "/claim", "claim a tile →");
 
   const db = supabaseAdmin();
-  const { data: tile } = await db.from("tiles").select("id, x, y, status").eq("id", tileId).maybeSingle();
+  const { data: tile } = await db.from("tiles").select("id, x, y, status, claim_expires_at").eq("id", tileId).maybeSingle();
   if (!tile || tile.status !== "claimed") return notice("this tile isn't yours to paint right now", "/claim", "claim a tile →");
 
   return (
     <main style={{ minHeight: "100%", display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "40px 24px 80px" }}>
-      <Painter tileId={tile.id} x={tile.x} y={tile.y} />
+      <Painter tileId={tile.id} x={tile.x} y={tile.y} expiresAt={tile.claim_expires_at} />
     </main>
   );
 }

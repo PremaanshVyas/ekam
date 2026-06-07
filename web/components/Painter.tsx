@@ -15,7 +15,19 @@ const PALETTE = [
 ];
 const BRUSHES = [6, 14, 26];
 
-export default function Painter({ tileId, x, y }: { tileId: string; x: number; y: number }) {
+function fmtRemaining(expiresAt: string | null): { label: string; expired: boolean } {
+  if (!expiresAt) return { label: "24h left", expired: false };
+  const ms = new Date(expiresAt).getTime() - Date.now();
+  if (ms <= 0) return { label: "time's up", expired: true };
+  const totalMin = Math.floor(ms / 60000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h > 0) return { label: `${h}h ${m}m left`, expired: false };
+  if (totalMin > 0) return { label: `${m}m left`, expired: false };
+  return { label: `${Math.floor(ms / 1000)}s left`, expired: false };
+}
+
+export default function Painter({ tileId, x, y, expiresAt }: { tileId: string; x: number; y: number; expiresAt: string | null }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
   const [hex, setHex] = useState("#C76B4A");
   const [brush, setBrush] = useState(BRUSHES[1]);
@@ -24,6 +36,7 @@ export default function Painter({ tileId, x, y }: { tileId: string; x: number; y
   const [story, setStory] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const [remaining, setRemaining] = useState<{ label: string; expired: boolean } | null>(null);
   const drawing = useRef(false);
   const last = useRef<{ x: number; y: number } | null>(null);
   const undo = useRef<ImageData[]>([]);
@@ -31,6 +44,13 @@ export default function Painter({ tileId, x, y }: { tileId: string; x: number; y
   const ctx = () => ref.current?.getContext("2d") ?? null;
 
   useEffect(() => { const c = ctx(); if (c) { c.fillStyle = PAPER; c.fillRect(0, 0, SIZE, SIZE); } }, []);
+
+  useEffect(() => {
+    const tick = () => setRemaining(fmtRemaining(expiresAt));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [expiresAt]);
 
   const pos = (e: React.PointerEvent) => {
     const r = ref.current!.getBoundingClientRect();
@@ -91,7 +111,7 @@ export default function Painter({ tileId, x, y }: { tileId: string; x: number; y
     <div style={{ width: "100%", maxWidth: SIZE + 64, background: "var(--color-bg-canvas)", border: "1px solid var(--color-border-default)", borderRadius: 16, padding: 32, display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
         <span style={{ fontFamily: "var(--font-display), sans-serif", fontSize: 36, color: "var(--color-text-primary)" }}>paint your tile</span>
-        <span style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: "var(--color-text-secondary)", background: "var(--color-bg-surface)", border: "1px solid var(--color-border-default)", borderRadius: 9999, padding: "4px 12px", whiteSpace: "nowrap" }}>tile {x},{y} · 23h left</span>
+        <span style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: remaining?.expired ? "var(--palette-rust)" : "var(--color-text-secondary)", background: "var(--color-bg-surface)", border: `1px solid ${remaining?.expired ? "var(--palette-rust)" : "var(--color-border-default)"}`, borderRadius: 9999, padding: "4px 12px", whiteSpace: "nowrap" }}>tile {x},{y} · {remaining?.label ?? "…"}</span>
       </div>
 
       <canvas
