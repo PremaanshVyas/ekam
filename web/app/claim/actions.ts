@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { supabaseAdmin, CANVAS_SLUG } from "@/lib/supabase";
+import { reopenExpiredClaims } from "@/lib/expiry";
 
 export async function claimTile(formData: FormData) {
   const name = String(formData.get("name") || "").trim();
@@ -13,6 +14,9 @@ export async function claimTile(formData: FormData) {
   const db = supabaseAdmin();
   const { data: canvas } = await db.from("canvases").select("id").eq("slug", CANVAS_SLUG).maybeSingle();
   if (!canvas) redirect("/claim?error=nocanvas");
+
+  // Lazily free up any tiles whose 24h claim lapsed, so they're claimable again.
+  await reopenExpiredClaims();
 
   const jar = await cookies();
 
