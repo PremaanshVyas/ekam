@@ -79,7 +79,7 @@ export default function Painter({ tileId, x, y }: { tileId: string; x: number; y
 
   if (done) {
     return (
-      <div style={{ width: SIZE + 64, maxWidth: "100%", background: "var(--color-bg-elevated)", border: "1px solid var(--color-border-default)", borderRadius: 16, padding: 40, display: "flex", flexDirection: "column", gap: 12, alignItems: "flex-start" }}>
+      <div style={{ width: "100%", maxWidth: SIZE + 64, background: "var(--color-bg-elevated)", border: "1px solid var(--color-border-default)", borderRadius: 16, padding: 40, display: "flex", flexDirection: "column", gap: 12, alignItems: "flex-start" }}>
         <p style={{ fontFamily: "var(--font-display), sans-serif", fontSize: 32, color: "var(--color-text-primary)", margin: 0 }}>your tile is being stitched in ✦</p>
         <p style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 16, color: "var(--color-text-secondary)", margin: 0 }}>it&apos;ll appear on the canvas once it&apos;s approved. thank you for adding to the quilt.</p>
         <a href="/" style={{ marginTop: 8, fontFamily: "var(--font-ui), sans-serif", fontSize: 15, fontWeight: 500, color: "var(--color-text-inverse)", background: "var(--palette-ink)", borderRadius: 9999, padding: "10px 22px", textDecoration: "none" }}>see the canvas →</a>
@@ -88,7 +88,7 @@ export default function Painter({ tileId, x, y }: { tileId: string; x: number; y
   }
 
   return (
-    <div style={{ width: SIZE + 64, maxWidth: "100%", background: "var(--color-bg-canvas)", border: "1px solid var(--color-border-default)", borderRadius: 16, padding: 32, display: "flex", flexDirection: "column", gap: 16 }}>
+    <div style={{ width: "100%", maxWidth: SIZE + 64, background: "var(--color-bg-canvas)", border: "1px solid var(--color-border-default)", borderRadius: 16, padding: 32, display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
         <span style={{ fontFamily: "var(--font-display), sans-serif", fontSize: 36, color: "var(--color-text-primary)" }}>paint your tile</span>
         <span style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: "var(--color-text-secondary)", background: "var(--color-bg-surface)", border: "1px solid var(--color-border-default)", borderRadius: 9999, padding: "4px 12px", whiteSpace: "nowrap" }}>tile {x},{y} · 23h left</span>
@@ -97,7 +97,7 @@ export default function Painter({ tileId, x, y }: { tileId: string; x: number; y
       <canvas
         ref={ref} width={SIZE} height={SIZE}
         onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={up}
-        style={{ width: SIZE, maxWidth: "100%", aspectRatio: "1 / 1", background: PAPER, border: "1.5px solid var(--color-border-strong)", borderRadius: 2, touchAction: "none", cursor: "crosshair", display: "block" }}
+        style={{ width: "100%", maxWidth: SIZE, aspectRatio: "1 / 1", background: PAPER, border: "1.5px solid var(--color-border-strong)", borderRadius: 2, touchAction: "none", cursor: "crosshair", display: "block" }}
       />
 
       {phase === "paint" ? (

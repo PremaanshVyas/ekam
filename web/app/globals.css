@@ -28,7 +28,7 @@
   --paint-pine:var(--palette-pine); --paint-sky:var(--palette-sky); --paint-dusk:var(--palette-dusk); --paint-plum:var(--palette-plum);
 }
 
-html, body { height: 100%; }
+html, body { height: 100%; overflow-x: hidden; }
 body {
   background-color: var(--color-bg-canvas);
   color: var(--color-text-primary);

@@ -117,6 +117,7 @@ export default async function Home() {
         <div
           className="fade-up"
           style={{
+            width: "min(676px, calc(100vw - 48px))", boxSizing: "border-box",
             padding: 18, background: "var(--color-bg-elevated)",
             border: "1px solid var(--color-border-default)", borderRadius: 20,
             boxShadow: "0 18px 50px -16px rgba(26,25,22,.22), 0 2px 8px rgba(26,25,22,.08)",

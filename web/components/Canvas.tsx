@@ -224,11 +224,11 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
   const reset = () => setView({ scale: 1, tx: 0, ty: 0 });
 
   return (
-    <div style={{ position: "relative", width: VIEW, maxWidth: "100%" }}>
+    <div style={{ position: "relative", width: "100%", maxWidth: VIEW, minWidth: 0 }}>
       <div
         ref={viewportRef}
         style={{
-          width: "100%", aspectRatio: "1 / 1", overflow: "hidden",
+          width: "100%", maxWidth: "100%", minWidth: 0, aspectRatio: "1 / 1", overflow: "hidden",
           background: "var(--color-bg-surface)", borderRadius: 14,
           cursor: pan.current ? "grabbing" : "grab", touchAction: "none",
         }}
