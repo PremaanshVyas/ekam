@@ -23,6 +23,7 @@ export default function Painter({ tileId, x, y }: { tileId: string; x: number; y
   const [phase, setPhase] = useState<"paint" | "story">("paint");
   const [story, setStory] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
   const drawing = useRef(false);
   const last = useRef<{ x: number; y: number } | null>(null);
   const undo = useRef<ImageData[]>([]);
@@ -62,6 +63,7 @@ export default function Painter({ tileId, x, y }: { tileId: string; x: number; y
     setSubmitting(true);
     try {
       await submitTile(tileId, c.toDataURL("image/png"), story.trim());
+      setDone(true);
     } catch (err) {
       setSubmitting(false);
       alert("Couldn't submit — " + (err as Error).message);
@@ -74,6 +76,16 @@ export default function Painter({ tileId, x, y }: { tileId: string; x: number; y
     border: `1px solid ${active ? "var(--color-border-strong)" : "var(--color-border-default)"}`,
     borderRadius: 9999, padding: "8px 14px", cursor: "pointer",
   });
+
+  if (done) {
+    return (
+      <div style={{ width: SIZE + 64, maxWidth: "100%", background: "var(--color-bg-elevated)", border: "1px solid var(--color-border-default)", borderRadius: 16, padding: 40, display: "flex", flexDirection: "column", gap: 12, alignItems: "flex-start" }}>
+        <p style={{ fontFamily: "var(--font-shantell), cursive", fontSize: 32, color: "var(--color-text-primary)", margin: 0 }}>your tile is being stitched in ✦</p>
+        <p style={{ fontFamily: "var(--font-inter), sans-serif", fontSize: 16, color: "var(--color-text-secondary)", margin: 0 }}>it&apos;ll appear on the canvas once it&apos;s approved. thank you for adding to the quilt.</p>
+        <a href="/" style={{ marginTop: 8, fontFamily: "var(--font-inter), sans-serif", fontSize: 15, fontWeight: 500, color: "var(--color-text-inverse)", background: "var(--palette-ink)", borderRadius: 9999, padding: "10px 22px", textDecoration: "none" }}>see the canvas →</a>
+      </div>
+    );
+  }
 
   return (
     <div style={{ width: SIZE + 64, maxWidth: "100%", background: "var(--color-bg-canvas)", border: "1px solid var(--color-border-default)", borderRadius: 16, padding: 32, display: "flex", flexDirection: "column", gap: 16 }}>

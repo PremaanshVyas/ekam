@@ -1,7 +1,6 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase";
 
@@ -24,5 +23,5 @@ export async function submitTile(tileId: string, dataUrl: string, story: string)
 
   (await cookies()).delete("tile");
   revalidatePath("/");
-  redirect("/?submitted=1");
+  return { ok: true as const };
 }
