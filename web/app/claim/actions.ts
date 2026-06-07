@@ -42,21 +42,33 @@ export async function claimTile(formData: FormData) {
   }
 
   const { data: open } = await db
-    .from("tiles").select("id").eq("canvas_id", canvas.id).eq("status", "open").limit(50);
+    .from("tiles").select("id").eq("canvas_id", canvas.id).eq("status", "open").limit(80);
   if (!open || open.length === 0) redirect("/claim?error=full");
 
-  const pick = open[Math.floor(Math.random() * open.length)];
-  const expires = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
-  const { error } = await db
-    .from("tiles")
-    .update({
-      status: "claimed", artist_name: name, artist_email: email,
-      artist_location: loc || null, claimed_at: new Date().toISOString(), claim_expires_at: expires,
-    })
-    .eq("id", pick.id)
-    .eq("status", "open");
-  if (error) redirect("/claim?error=fail");
+  // Shuffle for fair random assignment.
+  for (let i = open.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [open[i], open[j]] = [open[j], open[i]];
+  }
 
-  jar.set("tile", pick.id, { httpOnly: true, path: "/", maxAge: 60 * 60 * 24 });
+  // Concurrency-safe: the `.eq("status","open")` condition + `.select()` row count
+  // guarantees only ONE claimer wins a tile; if we lose the race, try the next one.
+  const expires = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
+  let claimedId: string | null = null;
+  for (const cand of open) {
+    const { data: rows } = await db
+      .from("tiles")
+      .update({
+        status: "claimed", artist_name: name, artist_email: email,
+        artist_location: loc || null, claimed_at: new Date().toISOString(), claim_expires_at: expires,
+      })
+      .eq("id", cand.id)
+      .eq("status", "open")
+      .select("id");
+    if (rows && rows.length) { claimedId = cand.id; break; }
+  }
+  if (!claimedId) redirect("/claim?error=full");
+
+  jar.set("tile", claimedId, { httpOnly: true, path: "/", maxAge: 60 * 60 * 24 });
   redirect("/paint");
 }

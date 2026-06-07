@@ -62,11 +62,17 @@ create policy "canvases are public" on canvases
 -- policy, anon/authenticated cannot read the raw table at all — this is what
 -- keeps artist_email unreadable (leaking it is fatal per the brief).
 -- The public reads a column-projected, owner-executed VIEW instead:
+-- Only published tiles expose content; non-published rows return just x,y,status.
 create view public_tiles
 with (security_invoker = false) as
-  select id, canvas_id, x, y, status,
-         artist_name, artist_location, story,
-         image_path, thumb_path, published_at, claim_expires_at
+  select
+    id, canvas_id, x, y, status,
+    case when status = 'published' then artist_name end     as artist_name,
+    case when status = 'published' then artist_location end as artist_location,
+    case when status = 'published' then story end           as story,
+    case when status = 'published' then image_path end      as image_path,
+    case when status = 'published' then thumb_path end      as thumb_path,
+    case when status = 'published' then published_at end    as published_at
   from tiles
   where status in ('open', 'claimed', 'pending', 'published');
 
