@@ -1,4 +1,6 @@
+import { redirect } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase";
+import { isAdmin } from "@/lib/admin-auth";
 import { approve, reject } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +11,7 @@ type Pending = {
 };
 
 export default async function AdminPage() {
+  if (!(await isAdmin())) redirect("/admin/login");
   const db = supabaseAdmin();
   const { data } = await db
     .from("tiles")

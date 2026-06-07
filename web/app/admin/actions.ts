@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase";
+import { isAdmin } from "@/lib/admin-auth";
 
 export async function approve(id: string) {
+  if (!(await isAdmin())) throw new Error("unauthorized");
   const db = supabaseAdmin();
   await db.from("tiles").update({ status: "published", published_at: new Date().toISOString() }).eq("id", id).eq("status", "pending");
   await db.from("moderation_log").insert({ tile_id: id, action: "approved" });
@@ -12,6 +14,7 @@ export async function approve(id: string) {
 }
 
 export async function reject(id: string) {
+  if (!(await isAdmin())) throw new Error("unauthorized");
   const db = supabaseAdmin();
   // Rejection reopens the tile (clears artist data so it's claimable again).
   await db.from("tiles").update({
