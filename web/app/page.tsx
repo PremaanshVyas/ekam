@@ -1,7 +1,7 @@
 import Canvas, { type RenderTile } from "@/components/Canvas";
 import { supabaseAnon, CANVAS_SLUG } from "@/lib/supabase";
 
-export const dynamic = "force-dynamic"; // always reflect the latest painted tiles
+export const dynamic = "force-dynamic";
 
 type Row = {
   x: number; y: number; status: string;
@@ -58,10 +58,10 @@ export default async function Home() {
       <header
         style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          gap: 16, padding: "20px 32px", flexWrap: "wrap",
+          gap: 16, padding: "22px 36px", flexWrap: "wrap",
         }}
       >
-        <span style={{ fontFamily: "var(--font-shantell), cursive", fontSize: 26, color: "var(--color-text-primary)" }}>
+        <span style={{ fontFamily: "var(--font-shantell), cursive", fontSize: 27, color: "var(--color-text-primary)" }}>
           what home looks like
         </span>
 
@@ -75,8 +75,8 @@ export default async function Home() {
           <span style={{ fontFamily: "var(--font-shantell), cursive", fontSize: 18, color: "var(--color-text-primary)", whiteSpace: "nowrap" }}>
             {painted} of {total} painted
           </span>
-          <div style={{ width: 160, height: 8, borderRadius: 9999, background: "var(--warm-300)", overflow: "hidden" }}>
-            <div style={{ width: `${pct}%`, height: "100%", background: "var(--palette-clay)" }} />
+          <div style={{ width: 150, height: 8, borderRadius: 9999, background: "var(--warm-300)", overflow: "hidden" }}>
+            <div style={{ width: `${pct}%`, height: "100%", background: "var(--palette-clay)", transition: "width .4s ease" }} />
           </div>
         </div>
 
@@ -85,22 +85,43 @@ export default async function Home() {
           style={{
             fontFamily: "var(--font-inter), sans-serif", fontSize: 15, fontWeight: 500,
             color: "var(--color-text-inverse)", background: "var(--palette-ink)",
-            borderRadius: 9999, padding: "10px 22px", cursor: "pointer",
-            textDecoration: "none", display: "inline-block",
+            borderRadius: 9999, padding: "10px 22px", textDecoration: "none", display: "inline-block",
           }}
         >
           claim a tile
         </a>
       </header>
 
-      <div
+      <section
         style={{
-          flex: 1, display: "flex", justifyContent: "center", alignItems: "flex-start",
-          padding: "24px 32px 64px",
+          flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
+          gap: 20, padding: "16px 24px 80px",
         }}
       >
-        <Canvas tiles={grid} cols={cols} />
-      </div>
+        <p
+          style={{
+            fontFamily: "var(--font-shantell), cursive", fontSize: 26, lineHeight: 1.3,
+            color: "var(--color-text-secondary)", textAlign: "center", maxWidth: 640, margin: 0,
+          }}
+        >
+          “where were you when home looked like this?”
+        </p>
+
+        {/* framed matte — the artwork, mounted */}
+        <div
+          style={{
+            padding: 18, background: "var(--color-bg-elevated)",
+            border: "1px solid var(--color-border-default)", borderRadius: 20,
+            boxShadow: "0 18px 50px -16px rgba(32,32,29,.28), 0 2px 8px rgba(32,32,29,.10)",
+          }}
+        >
+          <Canvas tiles={grid} cols={cols} />
+        </div>
+
+        <p style={{ fontFamily: "var(--font-inter), sans-serif", fontSize: 13, color: "var(--color-text-muted)", textAlign: "center", margin: 0 }}>
+          one shared canvas, painted one tile at a time by hundreds of strangers · drag to pan, scroll the buttons to zoom
+        </p>
+      </section>
     </main>
   );
 }
