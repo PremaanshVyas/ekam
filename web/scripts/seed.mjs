@@ -19,7 +19,7 @@ if (e1) {
 }
 if (!canvas) {
   const ins = await db.from("canvases").insert({
-    slug: SLUG, title: "What Home Looks Like",
+    slug: SLUG, title: "ekam.ink",
     theme_prompt: "where were you when home looked like this?",
     grid_cols: COLS, grid_rows: ROWS, palette: PALETTE, status: "open",
   }).select().single();

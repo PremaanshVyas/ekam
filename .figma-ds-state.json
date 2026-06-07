@@ -1,6 +1,6 @@
 {
   "runId": "whll-2026-06-07",
-  "project": "What Home Looks Like",
+  "project": "ekam.ink",
   "note": "Design-system state ledger for the Figma MCP build. Source of truth for tokens; survives context truncation. Also the basis for the Phase-B Tailwind theme / CSS vars.",
   "phase": "phase2-file-structure",
   "fileKey": "7TpgTn27dDmmig7T5hzhs3",

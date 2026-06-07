@@ -62,7 +62,7 @@ export default async function Home() {
         }}
       >
         <span style={{ fontFamily: "var(--font-shantell), cursive", fontSize: 27, color: "var(--color-text-primary)" }}>
-          what home looks like
+          ekam.ink
         </span>
 
         <div

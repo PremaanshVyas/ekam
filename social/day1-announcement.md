@@ -1,4 +1,4 @@
-# Day-1 announcement post — "What Home Looks Like"
+# Day-1 announcement post — "ekam.ink"
 
 **Goal:** start the Build-in-Public clock before the product exists (§2 action #8). Attach the OG image (`OG — 1200x630` from the Figma file) or a 15–30s screen-recording of the canvas/painter. Tag **#ConfigMakeathon** and **@figma**.
 

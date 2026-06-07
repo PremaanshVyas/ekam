@@ -1,4 +1,4 @@
-# What Home Looks Like
+# ekam.ink
 
 A collective tile-canvas artwork for the **Config Makeathon** (Figma × Contra). One shared 24×24 canvas; strangers each claim **one tile**, hand-paint *what home looks like*, and leave one line. Zoom out → a single collective artwork. Zoom in → individual paintings, each with a name and a story. Hover → the tile whispers.
 

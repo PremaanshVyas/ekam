@@ -1,4 +1,4 @@
--- What Home Looks Like — Supabase schema
+-- ekam.ink — Supabase schema
 -- Source of truth: CLAUDE_MASTER_BRIEF.md §5. Run in the Supabase SQL editor
 -- after creating the project (action item #6). Free tier is sufficient
 -- (≤576 tiles × 512px PNGs).
