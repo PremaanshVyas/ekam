@@ -29,13 +29,13 @@ export default async function AdminPage() {
           {pending.length} pending · nothing publishes without your approval
         </p>
         {pending.length === 0 && (
-          <p style={{ fontFamily: "var(--font-display), sans-serif", fontSize: 20, color: "var(--color-text-secondary)" }}>all caught up ✦</p>
+          <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 20, color: "var(--color-text-secondary)" }}>all caught up ✦</p>
         )}
         {pending.map((r) => (
           <div key={r.id} style={{ display: "flex", gap: 16, alignItems: "center", background: "var(--color-bg-surface)", border: "1px solid var(--color-border-default)", borderRadius: 8, padding: 12 }}>
             <div style={{ width: 72, height: 72, flexShrink: 0, borderRadius: 4, border: "1px solid var(--color-border-default)", background: r.image_path ? `center/cover url("${base}${r.image_path}")` : "var(--palette-paper)" }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: "var(--font-display), sans-serif", fontSize: 18, color: "var(--color-text-primary)" }}>“{r.story}”</div>
+              <div style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 18, color: "var(--color-text-primary)" }}>“{r.story}”</div>
               <div style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: "var(--color-text-muted)", marginTop: 2 }}>{r.artist_name} · tile {r.x},{r.y}{r.artist_location ? ` · ${r.artist_location}` : ""}</div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, width: 96 }}>

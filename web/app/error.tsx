@@ -15,7 +15,7 @@ export default function Error({
         textAlign: "center", fontFamily: "var(--font-ui), sans-serif",
       }}
     >
-      <div style={{ fontFamily: "var(--font-display), sans-serif", fontSize: 30, color: "var(--color-text-primary)" }}>
+      <div style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 30, color: "var(--color-text-primary)" }}>
         ekam.ink
       </div>
       <p style={{ color: "var(--color-text-secondary)", margin: 0, maxWidth: 440 }}>

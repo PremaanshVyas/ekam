@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 :root {
-  /* ── Painting palette (the art — unchanged; the canvas owns the color) ── */
+  /* ── Painting palette (the art — the canvas owns the colour) ── */
   --palette-paper:#F3EAD6; --palette-ink:#20201D; --palette-clay:#C76B4A; --palette-rust:#9C4A33;
   --palette-honey:#E0A33E; --palette-sage:#8A9A5B; --palette-pine:#4F6F52; --palette-sky:#6E94BE;
   --palette-dusk:#4E5C8A; --palette-plum:#8A5A78;
 
-  /* ── Modern "stone" neutrals (chrome) — clean, sharp, low-warmth ── */
-  --stone-50:#FBFAF7; --stone-100:#F5F3ED; --stone-200:#ECEAE2; --stone-300:#E1DED4; --stone-400:#CFCBBF;
-  --stone-500:#A8A498; --stone-600:#6B675E; --stone-700:#54514B; --stone-800:#2C2B27; --stone-900:#1A1916;
+  /* ── Warm "paper" neutrals (chrome) — editorial gallery cream ── */
+  --stone-50:#FCFAF4; --stone-100:#F7F4EC; --stone-200:#F0ECE1; --stone-300:#E5DFD1; --stone-400:#D3CCBB;
+  --stone-500:#A89F8C; --stone-600:#6E6A5E; --stone-700:#524E45; --stone-800:#2C2A24; --stone-900:#1A1813;
 
   /* ── Semantic chrome ── */
   --color-bg-canvas:var(--stone-100);
@@ -17,10 +17,11 @@
   --color-text-primary:var(--stone-900);
   --color-text-secondary:var(--stone-700);
   --color-text-muted:var(--stone-600);
-  --color-text-inverse:#FBFAF7;
+  --color-text-inverse:#FBF9F3;
   --color-border-default:var(--stone-300);
   --color-border-strong:var(--stone-400);
   --color-pencil:var(--stone-400);
+  --color-live:#D9654A; /* live indicator — warm ember */
 
   /* ── Painting palette semantics (unchanged) ── */
   --paint-paper:var(--palette-paper); --paint-ink:var(--palette-ink); --paint-clay:var(--palette-clay);
@@ -37,20 +38,39 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* ── Editorial type helpers ── */
+.serif {
+  font-family: var(--font-display), Georgia, "Times New Roman", serif;
+  font-variation-settings: "opsz" 144, "SOFT" 0, "WONK" 0;
+  font-weight: 400;
+}
+.overline {
+  font-family: var(--font-ui), system-ui, sans-serif;
+  text-transform: uppercase; letter-spacing: 0.18em;
+  font-size: 12px; font-weight: 500; color: var(--color-text-muted);
+}
+
 /* ── Animations ── */
-@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-.fade-up { animation: fadeUp .65s cubic-bezier(.2,.65,.3,1) both; }
-.fade-in { animation: fadeIn .8s ease both; }
-.lift { transition: transform .15s cubic-bezier(.2,.65,.3,1), box-shadow .15s ease, opacity .15s ease; }
+@keyframes risePanel { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+@keyframes livePulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.8); } }
+.fade-up { animation: fadeUp 0.7s cubic-bezier(0.2, 0.6, 0.2, 1) both; }
+.fade-in { animation: fadeIn 0.9s ease both; }
+.rise-panel { animation: risePanel 0.4s cubic-bezier(0.2, 0.6, 0.2, 1) both; }
+.pulse { animation: livePulse 2.2s ease-in-out infinite; }
+.lift { transition: transform 0.16s cubic-bezier(0.2, 0.6, 0.2, 1), box-shadow 0.16s ease, background-color 0.16s ease, color 0.16s ease, opacity 0.16s ease; }
 .lift:hover { transform: translateY(-2px); }
-.lift:active { transform: translateY(0); opacity: .92; }
+.lift:active { transform: translateY(0); opacity: 0.92; }
 @media (prefers-reduced-motion: reduce) {
-  .fade-up, .fade-in { animation: none; }
+  .fade-up, .fade-in, .rise-panel, .pulse { animation: none; }
   .lift { transition: none; }
 }
 
-/* Visible keyboard focus — honey ring reads on light, white, and dark (ink) surfaces.
-   Uses box-shadow so it works even where elements set inline outline:none. */
+/* ── Visible keyboard focus (honey ring; works over inline outline:none) ── */
 :focus-visible { outline: none; box-shadow: 0 0 0 3px var(--palette-honey); }
 :focus:not(:focus-visible) { outline: none; }
+
+/* ── Explorer: left rail · canvas · tile-detail panel (collapses on mobile) ── */
+.explorer { display: grid; grid-template-columns: minmax(220px, 270px) minmax(0, 1fr) minmax(260px, 330px); gap: 32px; align-items: start; }
+@media (max-width: 980px) { .explorer { grid-template-columns: 1fr; gap: 24px; } }

@@ -1,30 +1,30 @@
 import type { Metadata } from "next";
 import type { Viewport } from "next";
-import { Inter, Space_Grotesk } from "next/font/google";
+import { Inter, Fraunces } from "next/font/google";
 import "./globals.css";
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 
 const inter = Inter({ variable: "--font-ui", subsets: ["latin"] });
-const display = Space_Grotesk({ variable: "--font-display", subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+const display = Fraunces({ variable: "--font-display", subsets: ["latin"], axes: ["opsz", "SOFT", "WONK"] });
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://ekam.ink"),
   title: "ekam.ink",
   description:
-    "r/place was a battlefield. This is a quilt. One shared canvas, painted one tile at a time by hundreds of strangers.",
+    "576 strangers. One canvas. One moment in history. Claim a tile, hand-paint what home looks like, and your story lives on it forever.",
   openGraph: {
-    title: "ekam.ink",
+    title: "ekam.ink — 576 strangers. One canvas. One moment in history.",
     description:
-      "One shared canvas. Hundreds of strangers. Each claims one tile, hand-paints what home looks like, and leaves one line.",
+      "Claim a tile. Hand-paint what home looks like within the canvas palette. When it's complete, it becomes one artwork — and your story lives on it forever.",
     url: "https://ekam.ink",
     siteName: "ekam.ink",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "ekam.ink",
-    description: "r/place was a battlefield. This is a quilt.",
+    title: "ekam.ink — 576 strangers. One canvas. One moment in history.",
+    description: "Claim a tile. Hand-paint what home looks like. Your story lives on it forever.",
   },
 };
 

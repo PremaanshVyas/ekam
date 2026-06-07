@@ -100,7 +100,7 @@ export default function Painter({ tileId, x, y, expiresAt }: { tileId: string; x
   if (done) {
     return (
       <div style={{ width: "100%", maxWidth: SIZE + 64, background: "var(--color-bg-elevated)", border: "1px solid var(--color-border-default)", borderRadius: 16, padding: 40, display: "flex", flexDirection: "column", gap: 12, alignItems: "flex-start" }}>
-        <p style={{ fontFamily: "var(--font-display), sans-serif", fontSize: 32, color: "var(--color-text-primary)", margin: 0 }}>your tile is being stitched in ✦</p>
+        <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 32, color: "var(--color-text-primary)", margin: 0 }}>your tile is being stitched in ✦</p>
         <p style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 16, color: "var(--color-text-secondary)", margin: 0 }}>it&apos;ll appear on the canvas once it&apos;s approved. thank you for adding to the quilt.</p>
         <a href="/" style={{ marginTop: 8, fontFamily: "var(--font-ui), sans-serif", fontSize: 15, fontWeight: 500, color: "var(--color-text-inverse)", background: "var(--palette-ink)", borderRadius: 9999, padding: "10px 22px", textDecoration: "none" }}>see the canvas →</a>
       </div>
@@ -110,7 +110,7 @@ export default function Painter({ tileId, x, y, expiresAt }: { tileId: string; x
   return (
     <div style={{ width: "100%", maxWidth: SIZE + 64, background: "var(--color-bg-canvas)", border: "1px solid var(--color-border-default)", borderRadius: 16, padding: 32, display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-        <span style={{ fontFamily: "var(--font-display), sans-serif", fontSize: 36, color: "var(--color-text-primary)" }}>paint your tile</span>
+        <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 36, color: "var(--color-text-primary)" }}>paint your tile</span>
         <span style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: remaining?.expired ? "var(--palette-rust)" : "var(--color-text-secondary)", background: "var(--color-bg-surface)", border: `1px solid ${remaining?.expired ? "var(--palette-rust)" : "var(--color-border-default)"}`, borderRadius: 9999, padding: "4px 12px", whiteSpace: "nowrap" }}>tile {x},{y} · {remaining?.label ?? "…"}</span>
       </div>
 
@@ -144,7 +144,7 @@ export default function Painter({ tileId, x, y, expiresAt }: { tileId: string; x
         </>
       ) : (
         <>
-          <label htmlFor="story-input" style={{ fontFamily: "var(--font-display), sans-serif", fontSize: 22, color: "var(--color-text-primary)" }}>where were you when home looked like this?</label>
+          <label htmlFor="story-input" style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 22, color: "var(--color-text-primary)" }}>where were you when home looked like this?</label>
           <textarea
             id="story-input"
             value={story} onChange={(e) => setStory(e.target.value.slice(0, 140))} maxLength={140} rows={3}

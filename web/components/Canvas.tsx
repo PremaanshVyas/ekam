@@ -16,9 +16,9 @@ export type RenderTile = {
 
 const R = 80; // internal px per tile (crispness)
 const VIEW = 640; // displayed viewport size
-const PAPER = "#F3F1EA"; // open-tile fill (clean stone)
-const SURFACE = "#E9E7DF"; // backdrop between tiles
-const GROUT = "#DCD8CE"; // tile border — shown until the canvas is 100% complete
+const PAPER = "#F4EFE3"; // open-tile fill (warm paper)
+const SURFACE = "#EAE4D6"; // backdrop between tiles
+const GROUT = "#DAD2C1"; // tile border — shown until the canvas is 100% complete
 const STITCH_MS = 520; // stitch-in animation duration
 const easeOutBack = (x: number) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
 const SEAL_MS = 1100; // completion reveal: grid → seamless seal duration
@@ -30,7 +30,7 @@ const zbtn: React.CSSProperties = {
   fontFamily: "var(--font-ui), sans-serif", fontSize: 16, cursor: "pointer", lineHeight: 1,
 };
 
-export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols?: number }) {
+export default function Canvas({ tiles, cols = 24, onSelect }: { tiles: RenderTile[]; cols?: number; onSelect?: (t: RenderTile | null) => void }) {
   const rows = Math.max(1, Math.round(tiles.length / cols));
   const paintedCount = tiles.reduce((n, t) => n + (t.painted ? 1 : 0), 0);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -272,8 +272,11 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
   const onClick = (e: React.MouseEvent) => {
     if (moved.current) return;
     const t = cellAt(e.clientX, e.clientY);
-    if (t && t.painted) setSelected(t);
-    else if (t && !t.painted) router.push("/claim");
+    if (t && t.painted) {
+      if (onSelect) onSelect(t); else setSelected(t);
+    } else if (t && !t.painted) {
+      router.push("/claim");
+    }
   };
   const zoom = (f: number) =>
     setView((v) => {
@@ -318,7 +321,7 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
           style={{
             position: "absolute", top: 12, left: "50%", transform: "translateX(-50%)",
             background: "var(--palette-ink)", color: "var(--color-text-inverse)",
-            fontFamily: "var(--font-display), sans-serif", fontSize: 15,
+            fontFamily: "var(--font-display), Georgia, serif", fontSize: 15,
             padding: "8px 18px", borderRadius: 9999, whiteSpace: "nowrap",
             boxShadow: "0 6px 20px rgba(26,25,22,.25)", zIndex: 30,
           }}
@@ -360,7 +363,7 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
             pointerEvents: "none", zIndex: 40,
           }}
         >
-          <div style={{ fontFamily: "var(--font-display), sans-serif", fontSize: 18, color: "var(--color-text-primary)" }}>{hover.tile.story}</div>
+          <div style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 18, color: "var(--color-text-primary)" }}>{hover.tile.story}</div>
           <div style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: "var(--color-text-muted)", marginTop: 2 }}>— {hover.tile.name} · click to read</div>
         </div>
       )}
@@ -375,7 +378,7 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
             style={{ width: 340, maxWidth: "90vw", background: "var(--color-bg-elevated)", borderRadius: 12, padding: 24, boxShadow: "0 10px 30px rgba(32,32,29,.3)", display: "flex", flexDirection: "column", gap: 8 }}
           >
             <div style={{ width: 120, height: 120, borderRadius: 6, background: selected.img ? `center/cover url("${selected.img}")` : selected.color, border: "1px solid var(--color-border-default)" }} />
-            <div style={{ fontFamily: "var(--font-display), sans-serif", fontSize: 20, color: "var(--color-text-primary)", lineHeight: 1.3 }}>{selected.story}</div>
+            <div style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 20, color: "var(--color-text-primary)", lineHeight: 1.3 }}>{selected.story}</div>
             <div style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 14, color: "var(--color-text-secondary)" }}>
               — {selected.name}{selected.loc ? ` · ${selected.loc}` : ""}
             </div>

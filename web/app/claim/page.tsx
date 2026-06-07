@@ -21,7 +21,7 @@ export default async function ClaimPage() {
   return (
     <main style={{ minHeight: "100%", display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "56px 24px" }}>
       <div style={{ width: 440, maxWidth: "100%", background: "var(--color-bg-elevated)", borderRadius: 16, padding: 32, display: "flex", flexDirection: "column", gap: 16, boxShadow: "0 4px 16px rgba(32,32,29,.16)" }}>
-        <h1 style={{ fontFamily: "var(--font-display), sans-serif", fontSize: 40, color: "var(--color-text-primary)", margin: 0 }}>claim a tile</h1>
+        <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 40, color: "var(--color-text-primary)", margin: 0 }}>claim a tile</h1>
         <p style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 16, color: "var(--color-text-secondary)", margin: 0 }}>one tile. one painting. one line about home.</p>
 
         {!user ? (

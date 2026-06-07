@@ -8,7 +8,7 @@ export default async function AdminLogin({ searchParams }: { searchParams: Promi
         action={login}
         style={{ width: 360, maxWidth: "100%", background: "var(--color-bg-elevated)", borderRadius: 16, padding: 32, display: "flex", flexDirection: "column", gap: 14, boxShadow: "0 4px 16px rgba(32,32,29,.16)" }}
       >
-        <h1 style={{ fontFamily: "var(--font-display), sans-serif", fontSize: 32, color: "var(--color-text-primary)", margin: 0 }}>moderation</h1>
+        <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 32, color: "var(--color-text-primary)", margin: 0 }}>moderation</h1>
         <p style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 14, color: "var(--color-text-muted)", margin: 0 }}>admins only — enter the passphrase.</p>
         <input
           name="password" type="password" required autoFocus placeholder="passphrase"
