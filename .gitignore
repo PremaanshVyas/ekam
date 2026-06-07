@@ -1,0 +1,24 @@
+# OS
+.DS_Store
+*.log
+
+# dependencies / build output (web/.gitignore also covers these)
+node_modules/
+.next/
+out/
+build/
+
+# env & secrets — NEVER commit
+.env
+.env.*
+*.local
+
+# Vercel
+.vercel
+
+# Claude Code local config
+.claude/
+
+# Private playbook — keep local; contains business strategy not for public repos.
+# (Delete this line if you make the repo PRIVATE and want the brief tracked.)
+CLAUDE_MASTER_BRIEF.md

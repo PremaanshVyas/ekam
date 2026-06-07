@@ -1,0 +1,110 @@
+{
+  "runId": "whll-2026-06-07",
+  "project": "What Home Looks Like",
+  "note": "Design-system state ledger for the Figma MCP build. Source of truth for tokens; survives context truncation. Also the basis for the Phase-B Tailwind theme / CSS vars.",
+  "phase": "phase2-file-structure",
+  "fileKey": "7TpgTn27dDmmig7T5hzhs3",
+  "fileUrl": "https://www.figma.com/design/7TpgTn27dDmmig7T5hzhs3",
+  "decisions": {
+    "modes": "single mode only (paper/ink product, no dark theme)",
+    "fonts": "display=Shantell Sans (fallback Caveat), ui=Inter",
+    "grid": "24x24 = 576 tiles; tile source 512px PNG, thumb 64px"
+  },
+  "tokenPlan": {
+    "primitives": {
+      "palette (10 painting colors)": {
+        "palette/paper": "#F3EAD6",
+        "palette/ink": "#20201D",
+        "palette/clay": "#C76B4A",
+        "palette/rust": "#9C4A33",
+        "palette/honey": "#E0A33E",
+        "palette/sage": "#8A9A5B",
+        "palette/pine": "#4F6F52",
+        "palette/sky": "#6E94BE",
+        "palette/dusk": "#4E5C8A",
+        "palette/plum": "#8A5A78"
+      },
+      "warm (paper neutral ramp)": {
+        "warm/50": "#FAF5E9",
+        "warm/100": "#F3EAD6",
+        "warm/200": "#EBDFC7",
+        "warm/300": "#DDCDAB",
+        "warm/400": "#CBB890",
+        "warm/500": "#A8966F",
+        "warm/600": "#837458",
+        "warm/700": "#5F5746",
+        "warm/800": "#3A352B",
+        "warm/900": "#20201D"
+      }
+    },
+    "semanticColor": {
+      "color/bg/canvas": "warm/100 [FRAME_FILL,SHAPE_FILL]",
+      "color/bg/surface": "warm/200 [FRAME_FILL,SHAPE_FILL]",
+      "color/bg/elevated": "warm/50 [FRAME_FILL,SHAPE_FILL]",
+      "color/text/primary": "warm/900 [TEXT_FILL]",
+      "color/text/secondary": "warm/700 [TEXT_FILL]",
+      "color/text/muted": "warm/600 [TEXT_FILL]",
+      "color/text/inverse": "warm/50 [TEXT_FILL]",
+      "color/border/default": "warm/400 [STROKE_COLOR]",
+      "color/border/strong": "warm/500 [STROKE_COLOR]",
+      "color/pencil": "warm/400 [STROKE_COLOR,SHAPE_FILL]",
+      "paint/paper": "palette/paper [FRAME_FILL,SHAPE_FILL,STROKE_COLOR]",
+      "paint/ink": "palette/ink",
+      "paint/clay": "palette/clay",
+      "paint/rust": "palette/rust",
+      "paint/honey": "palette/honey",
+      "paint/sage": "palette/sage",
+      "paint/pine": "palette/pine",
+      "paint/sky": "palette/sky",
+      "paint/dusk": "palette/dusk",
+      "paint/plum": "palette/plum"
+    },
+    "spacing (FLOAT, GAP)": {
+      "spacing/2xs": 2, "spacing/xs": 4, "spacing/sm": 8, "spacing/md": 12,
+      "spacing/lg": 16, "spacing/xl": 24, "spacing/2xl": 32, "spacing/3xl": 48, "spacing/4xl": 64
+    },
+    "radius (FLOAT, CORNER_RADIUS)": {
+      "radius/none": 0, "radius/sm": 4, "radius/md": 8, "radius/lg": 16, "radius/full": 9999
+    },
+    "typographyPrimitives": {
+      "family/display": "Shantell Sans",
+      "family/ui": "Inter",
+      "size/xs": 14, "size/sm": 16, "size/md": 18, "size/lg": 24, "size/xl": 32, "size/2xl": 40,
+      "weight/regular": "Regular", "weight/medium": "Medium", "weight/semibold": "Semi Bold", "weight/bold": "Bold"
+    },
+    "textStyles": {
+      "Display/Prompt": "display ~40 (theme prompt)",
+      "Heading/H1": "Inter Semi Bold 32",
+      "Heading/H2": "Inter Semi Bold 24",
+      "Body/Large": "Inter Regular 18",
+      "Body/Medium": "Inter Regular 16",
+      "Body/Small": "Inter Regular 14",
+      "Label": "Inter Medium 14",
+      "Whisper": "display Regular 18 (hover story)",
+      "Counter": "display 20 (217 of 576)"
+    },
+    "effectStyles": {
+      "Shadow/Tile-Hover": "subtle lift on tile hover",
+      "Shadow/Card": "story card / modal elevation"
+    }
+  },
+  "entities": {
+    "collections": {
+      "Primitives": "VariableCollectionId:3:2",
+      "Color": "VariableCollectionId:3:3",
+      "Spacing": "VariableCollectionId:3:4",
+      "Typography Primitives": "VariableCollectionId:3:5"
+    },
+    "counts": { "primitiveColors": 20, "spacingRadius": 14, "typographyPrimitives": 12, "semanticColors": 20, "textStyles": 9, "effectStyles": 2 },
+    "fonts": { "display": "Shantell Sans", "ui": "Inter" },
+    "pages": { "Cover":"0:1","Foundations":"12:2","sep":"12:3","Components":"12:4","Screens":"12:5" },
+    "foundationsRootFrame": "13:2",
+    "components": { "Tile": "18:2 (variants: Open/Claimed/Published)", "Story Card": "19:2" },
+    "screens": { "Canvas — 5% / 40% / 90% full": "20:2 / 21:2 / 22:2 (on Screens page 12:5)", "Claim Modal": "23:2", "Painter": "27:2", "Admin Queue": "31:2" },
+    "componentsExtra": { "Hover Whisper": "30:5", "Live Counter + Share": "34:5" },
+    "coverAndSocial": { "Cover Hero": "32:2 (Cover page)", "OG 1200x630": "33:11 (Screens page)", "IG 1080x1080": "35:11 (Screens page)" },
+    "codeArtifacts": { "tokens": "styles/tokens.css (Figma→CSS bridge, names match Dev Mode)", "schema": "supabase/schema.sql (§5 + hardened RLS / public_tiles view)", "announcement": "social/day1-announcement.md", "webApp": "web/ — Next.js 16 + React 19 + Tailwind v4 from tokens; routes: / (canvas + pan/zoom + hover whisper + click→story card), /claim (form→paint), /paint (working HTML5 painter: palette/brush/eraser/undo/clear), /admin (moderation approve/reject). Build + serve verified. WIRED TO SUPABASE (DB + Storage): full claim→paint→submit→moderate→publish loop verified; 576 tiles + 10 founders seeded; lib/supabase.ts, scripts/seed.mjs" },
+    "knownPolish": ["RESOLVED: cleared 45 default-white auto-layout fills across Foundations/Components/Screens pages"]
+  },
+  "completedSteps": ["phase0-scope-lock","phase1-collections","phase1-primitive-colors","phase1-spacing-radius","phase1-typography-primitives","phase1-semantic-colors","phase1-text-styles","phase1-effect-styles","phase2-pages","phase2-foundations-docs"]
+}

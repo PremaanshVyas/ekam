@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+/* What Home Looks Like — design tokens (mirror of styles/tokens.css / the Figma variables). */
+:root {
+  /* painting palette */
+  --palette-paper:#F3EAD6; --palette-ink:#20201D; --palette-clay:#C76B4A; --palette-rust:#9C4A33;
+  --palette-honey:#E0A33E; --palette-sage:#8A9A5B; --palette-pine:#4F6F52; --palette-sky:#6E94BE;
+  --palette-dusk:#4E5C8A; --palette-plum:#8A5A78;
+  /* warm neutral ramp */
+  --warm-50:#FAF5E9; --warm-100:#F3EAD6; --warm-200:#EBDFC7; --warm-300:#DDCDAB; --warm-400:#CBB890;
+  --warm-500:#A8966F; --warm-600:#837458; --warm-700:#5F5746; --warm-800:#3A352B; --warm-900:#20201D;
+  /* semantic chrome */
+  --color-bg-canvas:var(--warm-100); --color-bg-surface:var(--warm-200); --color-bg-elevated:var(--warm-50);
+  --color-text-primary:var(--warm-900); --color-text-secondary:var(--warm-700); --color-text-muted:var(--warm-600);
+  --color-text-inverse:var(--warm-50); --color-border-default:var(--warm-400); --color-border-strong:var(--warm-500);
+  --color-pencil:var(--warm-400);
+}
+
+@theme inline {
+  --color-canvas: var(--color-bg-canvas);
+  --color-surface: var(--color-bg-surface);
+  --color-elevated: var(--color-bg-elevated);
+  --color-ink: var(--color-text-primary);
+  --font-display: var(--font-shantell), "Caveat", cursive;
+  --font-ui: var(--font-inter), system-ui, sans-serif;
+}
+
+html, body { height: 100%; }
+body {
+  background: var(--color-bg-canvas);
+  color: var(--color-text-primary);
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
