@@ -54,12 +54,12 @@ export default function SignIn() {
     return (
       <form onSubmit={verify} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <p style={{ fontFamily: "var(--font-inter), sans-serif", fontSize: 15, color: "var(--color-text-secondary)", margin: 0 }}>
-          we emailed a 6-digit code to <strong>{email}</strong>. enter it below.
+          we emailed a code to <strong>{email}</strong>. enter it below.
         </p>
         <input
-          value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-          inputMode="numeric" autoComplete="one-time-code" autoFocus placeholder="123456"
-          style={{ ...field, fontSize: 24, letterSpacing: 8, textAlign: "center" }}
+          value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 10))}
+          inputMode="numeric" autoComplete="one-time-code" autoFocus placeholder="enter your code"
+          style={{ ...field, fontSize: 22, letterSpacing: 6, textAlign: "center" }}
         />
         {err && <p style={{ fontFamily: "var(--font-inter), sans-serif", fontSize: 13, color: "var(--palette-rust)", margin: 0 }}>{err}</p>}
         <button type="submit" disabled={loading || code.length < 6} style={{ ...btn, opacity: loading || code.length < 6 ? 0.6 : 1 }}>
