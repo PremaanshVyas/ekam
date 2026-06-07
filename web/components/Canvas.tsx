@@ -75,32 +75,49 @@ export default function Canvas({ tiles, cols = 24 }: { tiles: RenderTile[]; cols
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
 
-    // Grid view (visible tiles) until every tile is published — then stitch seamless.
     const complete = tiles.length > 0 && tiles.every((t) => t.painted);
-    const gap = complete ? 0 : 6;
+
+    if (complete) {
+      // 100% painted → stitch seamless: tiles edge-to-edge, no gaps/borders.
+      ctx.fillStyle = PAPER;
+      ctx.fillRect(0, 0, c.width, c.height);
+      for (const t of tiles) {
+        const px = t.x * R, py = t.y * R;
+        if (t.img) {
+          const im = imgs.current.get(t.img);
+          if (im && im.complete && im.naturalWidth) ctx.drawImage(im, px, py, R, R);
+        } else if (t.color) {
+          ctx.fillStyle = t.color;
+          ctx.fillRect(px, py, R, R);
+        }
+      }
+      return;
+    }
+
+    // In progress → each tile is a distinct, separated card (gap + its own border).
+    const gap = 8;
     const inset = gap / 2;
     const s = R - gap;
-
-    ctx.fillStyle = complete ? PAPER : GROUT; // grout = the grid lines; paper once seamless
+    const sw = 3;
+    ctx.fillStyle = SURFACE; // backdrop between the tiles
     ctx.fillRect(0, 0, c.width, c.height);
-
     for (const t of tiles) {
       const px = t.x * R + inset;
       const py = t.y * R + inset;
-      if (t.painted) {
-        if (t.img) {
-          const im = imgs.current.get(t.img);
-          if (im && im.complete && im.naturalWidth) ctx.drawImage(im, px, py, s, s);
-          else { ctx.fillStyle = SURFACE; ctx.fillRect(px, py, s, s); }
-        } else if (t.color) {
-          ctx.fillStyle = t.color;
-          ctx.fillRect(px, py, s, s);
-        }
+      if (t.painted && t.img) {
+        const im = imgs.current.get(t.img);
+        if (im && im.complete && im.naturalWidth) ctx.drawImage(im, px, py, s, s);
+        else { ctx.fillStyle = SURFACE; ctx.fillRect(px, py, s, s); }
+      } else if (t.painted && t.color) {
+        ctx.fillStyle = t.color;
+        ctx.fillRect(px, py, s, s);
       } else {
-        // open tile (grid mode only) — a paper cell in the grout grid
-        ctx.fillStyle = PAPER;
+        ctx.fillStyle = PAPER; // open tile
         ctx.fillRect(px, py, s, s);
       }
+      ctx.strokeStyle = GROUT; // each tile's own border
+      ctx.lineWidth = sw;
+      ctx.strokeRect(px + sw / 2, py + sw / 2, s - sw, s - sw);
     }
   }, [tiles]);
 
