@@ -1,4 +1,4 @@
-/* What Home Looks Like — design tokens
+/* ekam.ink — design tokens
  * Generated from the Figma design system (file 7TpgTn27dDmmig7T5hzhs3).
  * Variable names match the Figma Dev Mode code syntax (var(--…)) 1:1,
  * so design → code handoff is pixel-honest. Single theme (paper / ink). */
@@ -16,29 +16,29 @@
   --palette-dusk:  #4E5C8A;
   --palette-plum:  #8A5A78;
 
-  /* ── Primitives · warm neutral ramp ── */
-  --warm-50:  #FAF5E9;
-  --warm-100: #F3EAD6;
-  --warm-200: #EBDFC7;
-  --warm-300: #DDCDAB;
-  --warm-400: #CBB890;
-  --warm-500: #A8966F;
-  --warm-600: #837458;
-  --warm-700: #5F5746;
-  --warm-800: #3A352B;
-  --warm-900: #20201D;
+  /* ── Primitives · modern stone neutral ramp ── */
+  --stone-50:  #FBFAF7;
+  --stone-100: #F5F3ED;
+  --stone-200: #ECEAE2;
+  --stone-300: #E1DED4;
+  --stone-400: #CFCBBF;
+  --stone-500: #A8A498;
+  --stone-600: #827E74;
+  --stone-700: #54514B;
+  --stone-800: #2C2B27;
+  --stone-900: #1A1916;
 
-  /* ── Semantic · chrome (warm paper neutrals only) ── */
-  --color-bg-canvas:      var(--warm-100);
-  --color-bg-surface:     var(--warm-200);
-  --color-bg-elevated:    var(--warm-50);
-  --color-text-primary:   var(--warm-900);
-  --color-text-secondary: var(--warm-700);
-  --color-text-muted:     var(--warm-600);
-  --color-text-inverse:   var(--warm-50);
-  --color-border-default: var(--warm-400);
-  --color-border-strong:  var(--warm-500);
-  --color-pencil:         var(--warm-400);
+  /* ── Semantic · chrome (clean stone neutrals; the artwork owns the color) ── */
+  --color-bg-canvas:      var(--stone-100);
+  --color-bg-surface:     var(--stone-200);
+  --color-bg-elevated:    #FFFFFF;
+  --color-text-primary:   var(--stone-900);
+  --color-text-secondary: var(--stone-700);
+  --color-text-muted:     var(--stone-600);
+  --color-text-inverse:   var(--stone-50);
+  --color-border-default: var(--stone-300);
+  --color-border-strong:  var(--stone-400);
+  --color-pencil:         var(--stone-400);
 
   /* ── Semantic · painting palette (the ONLY color on screen) ── */
   --paint-paper: var(--palette-paper);
