@@ -2,16 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 
-// ── Playlist ────────────────────────────────────────────────────────────────
-// Default: SomaFM commercial-free ambient/lofi stations (no files to host).
-// To use your OWN royalty-free tracks instead (e.g. Pixabay — free, no attribution),
-// drop MP3s into web/public/audio/ and swap the `src` values to "/audio/yourfile.mp3"
-// (and set `live: false` so a progress position could be added later).
-const TRACKS = [
-  { title: "Groove Salad", desc: "chilled ambient · downtempo", src: "https://ice1.somafm.com/groovesalad-128-mp3", live: true },
-  { title: "Fluid", desc: "instrumental hip-hop · lofi", src: "https://ice1.somafm.com/fluid-128-mp3", live: true },
-  { title: "Drone Zone", desc: "atmospheric ambient", src: "https://ice1.somafm.com/dronezone-128-mp3", live: true },
-  { title: "Lush", desc: "mellow, vocal chill", src: "https://ice1.somafm.com/lush-128-mp3", live: true },
+type Track = { title: string; artist: string; src: string };
+
+// Fallback if /audio/playlist.json can't be read. The live playlist is curated in
+// web/public/audio/playlist.json (see the README there — add your own tracks easily).
+const DEFAULT: Track[] = [
+  { title: "Groove Salad", artist: "ambient · downtempo", src: "https://ice1.somafm.com/groovesalad-128-mp3" },
+  { title: "Fluid", artist: "instrumental hip-hop · lofi", src: "https://ice1.somafm.com/fluid-128-mp3" },
+  { title: "Drone Zone", artist: "atmospheric ambient", src: "https://ice1.somafm.com/dronezone-128-mp3" },
+  { title: "Lush", artist: "mellow · vocal chill", src: "https://ice1.somafm.com/lush-128-mp3" },
 ];
 
 const iconBtn: React.CSSProperties = {
@@ -23,21 +22,32 @@ const iconBtn: React.CSSProperties = {
 export default function MusicPlayer() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const cardRef = useRef<HTMLDivElement | null>(null);
+  const [tracks, setTracks] = useState<Track[]>(DEFAULT);
   const [open, setOpen] = useState(true);
+  const [showList, setShowList] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
   const [idx, setIdx] = useState(0);
   const [vol, setVol] = useState(0.7);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
 
-  const track = TRACKS[idx];
+  // Curated playlist (edit web/public/audio/playlist.json — no code needed).
+  useEffect(() => {
+    fetch("/audio/playlist.json")
+      .then((r) => r.json())
+      .then((d) => { if (Array.isArray(d) && d.length && d.every((t) => t?.src)) setTracks(d); })
+      .catch(() => { /* keep DEFAULT */ });
+  }, []);
 
   useEffect(() => { if (audioRef.current) audioRef.current.volume = vol; }, [vol]);
+
+  const track = tracks[idx] ?? tracks[0];
+  const isSoma = !!track && track.src.includes("somafm");
 
   const start = (i: number) => {
     const a = audioRef.current; if (!a) return;
     setIdx(i);
-    a.src = TRACKS[i].src;
+    a.src = tracks[i].src;
     setLoading(true);
     a.play().then(() => { setPlaying(true); setLoading(false); }).catch(() => { setPlaying(false); setLoading(false); });
   };
@@ -48,10 +58,9 @@ export default function MusicPlayer() {
     setLoading(true);
     a.play().then(() => { setPlaying(true); setLoading(false); }).catch(() => { setLoading(false); });
   };
-  const next = () => start((idx + 1) % TRACKS.length);
-  const prev = () => start((idx - 1 + TRACKS.length) % TRACKS.length);
+  const next = () => start((idx + 1) % tracks.length);
+  const prev = () => start((idx - 1 + tracks.length) % tracks.length);
 
-  // Drag the card by its header.
   const onDragStart = (e: React.PointerEvent) => {
     const el = cardRef.current; if (!el) return;
     const rect = el.getBoundingClientRect();
@@ -73,7 +82,7 @@ export default function MusicPlayer() {
       <audio ref={audioRef} preload="none" onPlaying={() => { setPlaying(true); setLoading(false); }} onPause={() => setPlaying(false)} onWaiting={() => setLoading(true)} onError={() => { setLoading(false); setPlaying(false); }} />
 
       {open ? (
-        <div ref={cardRef} style={{ position: "fixed", ...place, zIndex: 60, width: 248, background: "var(--color-bg-elevated)", border: "1px solid var(--color-border-default)", borderRadius: 10, boxShadow: "0 12px 34px rgba(26,24,19,.18)", fontFamily: "var(--font-ui), sans-serif", overflow: "hidden" }}>
+        <div ref={cardRef} style={{ position: "fixed", ...place, zIndex: 60, width: 252, background: "var(--color-bg-elevated)", border: "1px solid var(--color-border-default)", borderRadius: 10, boxShadow: "0 12px 34px rgba(26,24,19,.18)", fontFamily: "var(--font-ui), sans-serif", overflow: "hidden" }}>
           <div onPointerDown={onDragStart} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", cursor: "grab", borderBottom: "1px solid var(--color-border-default)", background: "var(--color-bg-surface)", touchAction: "none" }}>
             <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--color-text-muted)" }}>♪ studio radio</span>
             <button onClick={() => setOpen(false)} aria-label="minimize player" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-text-muted)", fontSize: 18, lineHeight: 1, padding: "0 2px" }}>–</button>
@@ -82,10 +91,10 @@ export default function MusicPlayer() {
           <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
             <div>
               <div style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 18, color: "var(--color-text-primary)", display: "flex", alignItems: "center", gap: 8 }}>
-                {playing && <span className="pulse" style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--color-live)", display: "inline-block" }} />}
-                {track.title}
+                {playing && <span className="pulse" style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--color-live)", display: "inline-block", flexShrink: 0 }} />}
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{track?.title}</span>
               </div>
-              <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 2 }}>{track.desc}</div>
+              <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{track?.artist}</div>
             </div>
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14 }}>
@@ -99,7 +108,22 @@ export default function MusicPlayer() {
               <input type="range" min={0} max={1} step={0.01} value={vol} onChange={(e) => setVol(parseFloat(e.target.value))} style={{ flex: 1, accentColor: "var(--palette-ink)" }} aria-label="volume" />
             </div>
 
-            <div style={{ fontSize: 11, color: "var(--color-text-muted)", textAlign: "center" }}>ambient radio · via SomaFM ♥</div>
+            <button onClick={() => setShowList((s) => !s)} aria-expanded={showList} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-text-secondary)", fontSize: 12, fontFamily: "var(--font-ui), sans-serif", textAlign: "left", padding: 0 }}>
+              browse tracks ({tracks.length}) {showList ? "▴" : "▾"}
+            </button>
+
+            {showList && (
+              <div style={{ maxHeight: 156, overflowY: "auto", display: "flex", flexDirection: "column", gap: 2, borderTop: "1px solid var(--color-border-default)", paddingTop: 6 }}>
+                {tracks.map((t, i) => (
+                  <button key={i} onClick={() => { start(i); setShowList(false); }} style={{ textAlign: "left", padding: "6px 8px", borderRadius: 6, border: "none", cursor: "pointer", background: i === idx ? "var(--color-bg-surface)" : "transparent" }}>
+                    <div style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, fontWeight: i === idx ? 600 : 400, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.title}</div>
+                    <div style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 11, color: "var(--color-text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.artist}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {isSoma && <div style={{ fontSize: 11, color: "var(--color-text-muted)", textAlign: "center" }}>ambient radio · via SomaFM ♥</div>}
           </div>
         </div>
       ) : (
