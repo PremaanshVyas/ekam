@@ -47,3 +47,26 @@ export async function reject(id: string) {
   revalidatePath("/admin");
   revalidatePath("/");
 }
+
+// Take a tile fully back to "open" — clears the painting AND the artist (email, name,
+// story). Frees the tile so it (and that email) can be claimed again.
+export async function removeTile(id: string) {
+  if (!(await isAdmin())) throw new Error("unauthorized");
+  const db = supabaseAdmin();
+  const full = {
+    status: "open", artist_name: null, artist_email: null, artist_location: null,
+    story: null, image_path: null, thumb_path: null, claimed_at: null, claim_expires_at: null,
+    published_at: null, pending_image_path: null, pending_story: null, pending_submitted_at: null,
+  };
+  let { error } = await db.from("tiles").update(full).eq("id", id);
+  if (error && /pending_|column/.test(error.message)) {
+    const safe = { ...full } as Record<string, unknown>;
+    delete safe.pending_image_path; delete safe.pending_story; delete safe.pending_submitted_at;
+    ({ error } = await db.from("tiles").update(safe).eq("id", id));
+  }
+  if (error) throw new Error(error.message);
+  await db.from("moderation_log").insert({ tile_id: id, action: "removed" });
+  revalidatePath("/admin");
+  revalidatePath("/");
+}
+
