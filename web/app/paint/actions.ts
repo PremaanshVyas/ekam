@@ -41,7 +41,9 @@ export async function submitTile(tileId: string, dataUrl: string, story: string)
   }
 
   // New tile, or edit of an un-approved one → goes (back) into the queue.
-  const path = `${tileId}.png`;
+  // Versioned filename so a re-submit never collides with a cached copy of the old image
+  // (browser + Supabase CDN cache by URL — reusing the path would show the stale image).
+  const path = `${tileId}-${Date.now()}.png`;
   const up = await db.storage.from("tiles").upload(path, bytes, { contentType: "image/png", upsert: true });
   if (up.error) throw new Error(up.error.message);
   const { error } = await db.from("tiles").update({
