@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { Viewport } from "next";
 import { Inter, Fraunces } from "next/font/google";
 import "./globals.css";
+import MusicPlayer from "@/components/MusicPlayer";
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 
@@ -33,7 +34,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${inter.variable} ${display.variable}`}>
-      <body>{children}</body>
+      <body>{children}<MusicPlayer /></body>
     </html>
   );
 }
