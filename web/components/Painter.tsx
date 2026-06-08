@@ -5,39 +5,67 @@ import Link from "next/link";
 import { submitTile, type SubmitMode } from "@/app/paint/actions";
 
 const SIZE = 512;
-const PAPER = "#F3EAD6";
+const BG = "#FFFFFF"; // blank canvas — full colour freedom, no theme palette
 
-const PALETTE = [
-  { name: "paper", hex: "#F3EAD6" }, { name: "ink", hex: "#20201D" },
-  { name: "clay", hex: "#C76B4A" }, { name: "rust", hex: "#9C4A33" },
-  { name: "honey", hex: "#E0A33E" }, { name: "sage", hex: "#8A9A5B" },
-  { name: "pine", hex: "#4F6F52" }, { name: "sky", hex: "#6E94BE" },
-  { name: "dusk", hex: "#4E5C8A" }, { name: "plum", hex: "#8A5A78" },
+// A friendly Paint-style starter set; the "any colour" button opens the full spectrum.
+const PRESETS = [
+  "#000000", "#5C5C5C", "#9AA0A6", "#FFFFFF",
+  "#E03B3B", "#F07A29", "#F4C430", "#7DBE3C",
+  "#2E8B57", "#1FA6A6", "#2D6CDF", "#243B8F",
+  "#7A3FB0", "#E0559E", "#8A5A2B", "#E8B894",
 ];
-const BRUSHES = [6, 14, 26];
+const BRUSHES = [4, 12, 24, 40];
+
+type Tool = "brush" | "fill" | "eraser";
 
 const DONE: Record<SubmitMode, { title: string; body: string }> = {
-  "new": {
-    title: "your tile is in the moderation queue ✦",
-    body: "it'll appear on the canvas once it's reviewed. thank you for adding to the canvas.",
-  },
-  "edit-pending": {
-    title: "your changes are saved ✦",
-    body: "your tile is in the moderation queue and will appear once it's reviewed.",
-  },
-  "edit-published": {
-    title: "your update is in the moderation queue ✦",
-    body: "your current tile stays on the canvas — the update replaces it once it's reviewed.",
-  },
+  "new": { title: "your tile is in the moderation queue ✦", body: "it'll appear on the canvas once it's reviewed. thank you for adding to the canvas." },
+  "edit-pending": { title: "your changes are saved ✦", body: "your tile is in the moderation queue and will appear once it's reviewed." },
+  "edit-published": { title: "your update is in the moderation queue ✦", body: "your current tile stays on the canvas — the update replaces it once it's reviewed." },
 };
+
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+
+// Stack flood-fill with a small tolerance (handles anti-aliased edges); `visited`
+// guarantees termination. Click on a blank tile fills the whole thing.
+function floodFill(ctx: CanvasRenderingContext2D, sxF: number, syF: number, hex: string) {
+  const sx = Math.max(0, Math.min(SIZE - 1, Math.floor(sxF)));
+  const sy = Math.max(0, Math.min(SIZE - 1, Math.floor(syF)));
+  const img = ctx.getImageData(0, 0, SIZE, SIZE);
+  const d = img.data;
+  const s = (sy * SIZE + sx) * 4;
+  const tr = d[s], tg = d[s + 1], tb = d[s + 2], ta = d[s + 3];
+  const [fr, fg, fb] = hexToRgb(hex);
+  const tol = 28;
+  const visited = new Uint8Array(SIZE * SIZE);
+  const stack: number[] = [sy * SIZE + sx];
+  while (stack.length) {
+    const p = stack.pop()!;
+    if (visited[p]) continue;
+    visited[p] = 1;
+    const i = p * 4;
+    if (Math.abs(d[i] - tr) > tol || Math.abs(d[i + 1] - tg) > tol || Math.abs(d[i + 2] - tb) > tol || Math.abs(d[i + 3] - ta) > tol) continue;
+    d[i] = fr; d[i + 1] = fg; d[i + 2] = fb; d[i + 3] = 255;
+    const x = p % SIZE, y = (p - x) / SIZE;
+    if (x + 1 < SIZE) stack.push(p + 1);
+    if (x - 1 >= 0) stack.push(p - 1);
+    if (y + 1 < SIZE) stack.push(p + SIZE);
+    if (y - 1 >= 0) stack.push(p - SIZE);
+  }
+  ctx.putImageData(img, 0, 0);
+}
 
 export default function Painter({
   tileId, x, y, status, initialImage, initialStory,
 }: { tileId: string; x: number; y: number; status: string; initialImage: string | null; initialStory: string }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
-  const [hex, setHex] = useState("#C76B4A");
+  const colorRef = useRef<HTMLInputElement | null>(null);
+  const [hex, setHex] = useState("#1A1A1A");
+  const [tool, setTool] = useState<Tool>("brush");
   const [brush, setBrush] = useState(BRUSHES[1]);
-  const [erasing, setErasing] = useState(false);
   const [phase, setPhase] = useState<"paint" | "story">("paint");
   const [story, setStory] = useState(initialStory ?? "");
   const [submitting, setSubmitting] = useState(false);
@@ -49,17 +77,16 @@ export default function Painter({
   const isEditing = status !== "claimed";
   const ctx = () => ref.current?.getContext("2d") ?? null;
 
-  // Initial fill: load the existing art when editing, else blank paper.
   useEffect(() => {
     const c = ctx();
     if (!c) return;
-    c.fillStyle = PAPER;
+    c.fillStyle = BG;
     c.fillRect(0, 0, SIZE, SIZE);
     if (initialImage) {
       const img = new Image();
       img.crossOrigin = "anonymous";
       img.onload = () => { const cc = ctx(); if (cc) cc.drawImage(img, 0, 0, SIZE, SIZE); };
-      img.onerror = () => { /* leave blank paper if it can't load */ };
+      img.onerror = () => { /* leave blank if it can't load */ };
       img.src = initialImage;
     }
   }, [initialImage]);
@@ -68,13 +95,16 @@ export default function Painter({
     const r = ref.current!.getBoundingClientRect();
     return { x: (e.clientX - r.left) * (SIZE / r.width), y: (e.clientY - r.top) * (SIZE / r.height) };
   };
-  const snapshot = () => { const c = ctx(); if (!c) return; undo.current.push(c.getImageData(0, 0, SIZE, SIZE)); if (undo.current.length > 20) undo.current.shift(); };
-  const paintColor = () => (erasing ? PAPER : hex);
+  const snapshot = () => { const c = ctx(); if (!c) return; undo.current.push(c.getImageData(0, 0, SIZE, SIZE)); if (undo.current.length > 25) undo.current.shift(); };
+  const paintColor = () => (tool === "eraser" ? BG : hex);
 
   const down = (e: React.PointerEvent) => {
     const c = ctx(); if (!c) return;
-    snapshot(); drawing.current = true;
-    const p = pos(e); last.current = p;
+    snapshot();
+    const p = pos(e);
+    if (tool === "fill") { floodFill(c, p.x, p.y, hex); return; }
+    drawing.current = true;
+    last.current = p;
     c.fillStyle = paintColor(); c.beginPath(); c.arc(p.x, p.y, brush / 2, 0, Math.PI * 2); c.fill();
     ref.current!.setPointerCapture(e.pointerId);
   };
@@ -88,7 +118,8 @@ export default function Painter({
   };
   const up = () => { drawing.current = false; last.current = null; };
   const doUndo = () => { const c = ctx(); const img = undo.current.pop(); if (c && img) c.putImageData(img, 0, 0); };
-  const doClear = () => { const c = ctx(); if (!c) return; snapshot(); c.fillStyle = PAPER; c.fillRect(0, 0, SIZE, SIZE); };
+  const doClear = () => { const c = ctx(); if (!c) return; snapshot(); c.fillStyle = BG; c.fillRect(0, 0, SIZE, SIZE); };
+  const fillTile = () => { const c = ctx(); if (!c) return; snapshot(); c.fillStyle = hex; c.fillRect(0, 0, SIZE, SIZE); };
 
   const onSubmit = async () => {
     const c = ref.current; if (!c) return;
@@ -102,12 +133,18 @@ export default function Painter({
     }
   };
 
-  const chip = (active: boolean): React.CSSProperties => ({
-    fontFamily: "var(--font-ui), sans-serif", fontSize: 14, fontWeight: 500, color: "var(--color-text-secondary)",
-    background: active ? "var(--color-bg-surface)" : "var(--color-bg-elevated)",
-    border: `1px solid ${active ? "var(--color-border-strong)" : "var(--color-border-default)"}`,
-    borderRadius: 9999, padding: "8px 14px", cursor: "pointer",
+  const customActive = tool !== "eraser" && !PRESETS.some((p) => p.toLowerCase() === hex.toLowerCase());
+  const toolBtn = (active: boolean): React.CSSProperties => ({
+    fontFamily: "var(--font-ui), sans-serif", fontSize: 14, fontWeight: 500,
+    color: active ? "var(--color-text-inverse)" : "var(--color-text-secondary)",
+    background: active ? "var(--palette-ink)" : "transparent",
+    border: "none", borderRadius: 9999, padding: "7px 15px", cursor: "pointer",
   });
+  const chip: React.CSSProperties = {
+    fontFamily: "var(--font-ui), sans-serif", fontSize: 14, fontWeight: 500, color: "var(--color-text-secondary)",
+    background: "var(--color-bg-elevated)", border: "1px solid var(--color-border-default)",
+    borderRadius: 9999, padding: "8px 14px", cursor: "pointer",
+  };
 
   if (doneMode) {
     const m = DONE[doneMode];
@@ -134,28 +171,40 @@ export default function Painter({
         ref={ref} width={SIZE} height={SIZE}
         role="img" aria-label="your tile — draw your painting here"
         onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={up}
-        style={{ width: "100%", maxWidth: SIZE, aspectRatio: "1 / 1", background: PAPER, border: "1.5px solid var(--color-border-strong)", borderRadius: 2, touchAction: "none", cursor: "crosshair", display: "block" }}
+        style={{ width: "100%", maxWidth: SIZE, aspectRatio: "1 / 1", background: BG, border: "1.5px solid var(--color-border-strong)", borderRadius: 2, touchAction: "none", cursor: tool === "fill" ? "cell" : "crosshair", display: "block" }}
       />
 
       {phase === "paint" ? (
         <>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            {PALETTE.map((p) => (
-              <button key={p.name} type="button" onClick={() => { setHex(p.hex); setErasing(false); }}
-                title={p.name} aria-label={`paint colour ${p.name}`} aria-pressed={!erasing && hex === p.hex}
-                style={{ width: 34, height: 34, borderRadius: "50%", background: p.hex, cursor: "pointer", border: !erasing && hex === p.hex ? "3px solid var(--color-text-primary)" : "1px solid var(--color-border-default)" }} />
+          {/* colours — presets + full spectrum */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", position: "relative" }}>
+            {PRESETS.map((c) => (
+              <button key={c} type="button" title={c} aria-label={`colour ${c}`} aria-pressed={tool !== "eraser" && hex.toLowerCase() === c.toLowerCase()}
+                onClick={() => { setHex(c); setTool("brush"); }}
+                style={{ width: 30, height: 30, borderRadius: "50%", background: c, cursor: "pointer", border: tool !== "eraser" && hex.toLowerCase() === c.toLowerCase() ? "3px solid var(--color-text-primary)" : "1px solid var(--color-border-default)" }} />
             ))}
+            <button type="button" title="any colour" aria-label="pick any colour" aria-pressed={customActive} onClick={() => colorRef.current?.click()}
+              style={{ width: 30, height: 30, borderRadius: "50%", cursor: "pointer", background: customActive ? hex : "conic-gradient(from 90deg, #f44, #fa3, #fd3, #6c3, #3bb, #36f, #a4f, #f49, #f44)", border: customActive ? "3px solid var(--color-text-primary)" : "1px solid var(--color-border-default)" }} />
+            <input ref={colorRef} type="color" value={hex} onChange={(e) => { setHex(e.target.value); setTool("brush"); }} aria-hidden style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none", left: 0, bottom: 0 }} />
           </div>
-          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+
+          {/* tools */}
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 4, background: "var(--color-bg-surface)", border: "1px solid var(--color-border-default)", borderRadius: 9999, padding: 4 }}>
+              <button type="button" onClick={() => setTool("brush")} aria-pressed={tool === "brush"} style={toolBtn(tool === "brush")}>brush</button>
+              <button type="button" onClick={() => setTool("fill")} aria-pressed={tool === "fill"} style={toolBtn(tool === "fill")}>fill</button>
+              <button type="button" onClick={() => setTool("eraser")} aria-pressed={tool === "eraser"} style={toolBtn(tool === "eraser")}>eraser</button>
+            </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center", background: "var(--color-bg-surface)", border: "1px solid var(--color-border-default)", borderRadius: 9999, padding: "8px 12px" }}>
               {BRUSHES.map((b) => (
-                <button key={b} type="button" onClick={() => setBrush(b)} aria-label={`brush size ${b === BRUSHES[0] ? "small" : b === BRUSHES[1] ? "medium" : "large"}`} aria-pressed={brush === b} style={{ width: b, height: b, borderRadius: "50%", border: "none", cursor: "pointer", background: brush === b ? "var(--color-text-primary)" : "var(--color-text-muted)" }} />
+                <button key={b} type="button" onClick={() => setBrush(b)} aria-label={`brush size ${b}`} aria-pressed={brush === b} style={{ width: Math.min(b, 24), height: Math.min(b, 24), borderRadius: "50%", border: "none", cursor: "pointer", background: brush === b ? "var(--color-text-primary)" : "var(--color-text-muted)" }} />
               ))}
             </div>
-            <button type="button" aria-pressed={erasing} style={chip(erasing)} onClick={() => setErasing((e) => !e)}>eraser</button>
-            <button type="button" style={chip(false)} onClick={doUndo}>undo</button>
-            <button type="button" style={chip(false)} onClick={doClear}>clear</button>
+            <button type="button" style={chip} onClick={fillTile}>fill tile</button>
+            <button type="button" style={chip} onClick={doUndo}>undo</button>
+            <button type="button" style={chip} onClick={doClear}>clear</button>
           </div>
+
           <button onClick={() => setPhase("story")} style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 16, fontWeight: 500, color: "var(--color-text-inverse)", background: "var(--palette-ink)", border: "none", borderRadius: 6, padding: 14, cursor: "pointer", width: "100%" }}>{isEditing ? "next — your story →" : "done — add your story →"}</button>
         </>
       ) : (

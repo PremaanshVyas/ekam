@@ -4,11 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import Canvas, { type RenderTile } from "@/components/Canvas";
 
-const PALETTE: [string, string][] = [
-  ["paper", "#F3EAD6"], ["ink", "#20201D"], ["clay", "#C76B4A"], ["rust", "#9C4A33"], ["honey", "#E0A33E"],
-  ["sage", "#8A9A5B"], ["pine", "#4F6F52"], ["sky", "#6E94BE"], ["dusk", "#4E5C8A"], ["plum", "#8A5A78"],
-];
-
 const overline: React.CSSProperties = {
   fontFamily: "var(--font-ui), sans-serif", textTransform: "uppercase", letterSpacing: "0.18em",
   fontSize: 11, fontWeight: 500, color: "var(--color-text-muted)",
@@ -42,12 +37,9 @@ export default function Explorer({ grid, cols, painted, total }: { grid: RenderT
           a collective self-portrait — painted one tile at a time by strangers around the world.
         </p>
         <hr style={rule} />
-        <span style={overline}>Palette — 10 colours</span>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12 }}>
-          {PALETTE.map(([name, hex]) => (
-            <div key={name} title={name} style={{ width: 26, height: 26, borderRadius: 4, background: hex, border: "1px solid rgba(0,0,0,0.08)" }} />
-          ))}
-        </div>
+        <span style={overline}>Palette — full spectrum</span>
+        <div style={{ marginTop: 12, height: 26, borderRadius: 4, border: "1px solid rgba(0,0,0,0.08)", background: "linear-gradient(90deg, #1A1A1A, #E03B3B, #F07A29, #F4C430, #2E8B57, #1FA6A6, #2D6CDF, #7A3FB0, #E0559E, #FFFFFF)" }} />
+        <p style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 12, color: "var(--color-text-muted)", margin: "8px 0 0", lineHeight: 1.5 }}>any colour — full creative freedom.</p>
         <hr style={rule} />
         <StatRow label="Completion" value={`${pct}%`} />
         <StatRow label="Tiles painted" value={`${painted}`} />
