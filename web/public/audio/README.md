@@ -20,8 +20,7 @@ That's it — the player picks it up after the next deploy. The "browse" menu in
 lists every entry here, in order.
 
 ## Notes
-- `src` can be a local file (`/audio/xxx.mp3`) **or** a stream URL (the defaults are
-  SomaFM ambient stations — commercial-free; the player shows a "via SomaFM" credit only
-  while one of those is playing).
+- `src` can be a local file (`/audio/xxx.mp3`) **or** a stream URL. The current playlist
+  is local lofi tracks from Pixabay (free for commercial use, no attribution required).
 - Keep files reasonably small (a few MB each). ~8–12 tracks is plenty.
 - Order in the JSON = order in the player.

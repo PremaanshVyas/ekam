@@ -7,10 +7,9 @@ type Track = { title: string; artist: string; src: string };
 // Fallback if /audio/playlist.json can't be read. The live playlist is curated in
 // web/public/audio/playlist.json (see the README there — add your own tracks easily).
 const DEFAULT: Track[] = [
-  { title: "Groove Salad", artist: "ambient · downtempo", src: "https://ice1.somafm.com/groovesalad-128-mp3" },
-  { title: "Fluid", artist: "instrumental hip-hop · lofi", src: "https://ice1.somafm.com/fluid-128-mp3" },
-  { title: "Drone Zone", artist: "atmospheric ambient", src: "https://ice1.somafm.com/dronezone-128-mp3" },
-  { title: "Lush", artist: "mellow · vocal chill", src: "https://ice1.somafm.com/lush-128-mp3" },
+  { title: "Good Night", artist: "FASSounds", src: "/audio/fassounds-good-night-lofi-cozy-chill-music-160166.mp3" },
+  { title: "Coverless Book", artist: "AmbientAudioVision", src: "/audio/ambientaudiovision-coverless-book-lofi-186307.mp3" },
+  { title: "Lofi Beats", artist: "Mirostar", src: "/audio/mirostar-lofi-beats-531504.mp3" },
 ];
 
 const iconBtn: React.CSSProperties = {

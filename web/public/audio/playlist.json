@@ -1,6 +1,22 @@
 [
-  { "title": "Groove Salad", "artist": "ambient · downtempo", "src": "https://ice1.somafm.com/groovesalad-128-mp3" },
-  { "title": "Fluid", "artist": "instrumental hip-hop · lofi", "src": "https://ice1.somafm.com/fluid-128-mp3" },
-  { "title": "Drone Zone", "artist": "atmospheric ambient", "src": "https://ice1.somafm.com/dronezone-128-mp3" },
-  { "title": "Lush", "artist": "mellow · vocal chill", "src": "https://ice1.somafm.com/lush-128-mp3" }
+  { "title": "Good Night", "artist": "FASSounds", "src": "/audio/fassounds-good-night-lofi-cozy-chill-music-160166.mp3" },
+  { "title": "Coverless Book", "artist": "AmbientAudioVision", "src": "/audio/ambientaudiovision-coverless-book-lofi-186307.mp3" },
+  { "title": "Study, Calm", "artist": "FASSounds", "src": "/audio/fassounds-lofi-study-calm-peaceful-chill-hop-112191.mp3" },
+  { "title": "Sentimental, Jazzy", "artist": "Sonican", "src": "/audio/sonican-lo-fi-music-loop-sentimental-jazzy-love-473154.mp3" },
+  { "title": "Lofi Chill", "artist": "MondaMusic", "src": "/audio/mondamusic-lofi-lofi-girl-lofi-chill-512853.mp3" },
+  { "title": "Mellow Chill", "artist": "MondaMusic", "src": "/audio/mondamusic-lofi-lofi-music-lofi-chill-529558.mp3" },
+  { "title": "Lofi Girl", "artist": "MondaMusic", "src": "/audio/mondamusic-lofi-lofi-girl-lofi-music-529555.mp3" },
+  { "title": "Lofi", "artist": "MondaMusic", "src": "/audio/mondamusic-lofi-lofi-music-529554.mp3" },
+  { "title": "Lofi Beats", "artist": "Mirostar", "src": "/audio/mirostar-lofi-beats-531504.mp3" },
+  { "title": "Lofi Chill II", "artist": "Mirostar", "src": "/audio/mirostar-lofi-lofi-girl-lofi-chill-2-531491.mp3" },
+  { "title": "Chill", "artist": "Watermello", "src": "/audio/watermello-lofi-chill-lofi-girl-lofi-488388.mp3" },
+  { "title": "Chill II", "artist": "Watermello", "src": "/audio/watermello-lofi-lofi-girl-lofi-chill-484610.mp3" },
+  { "title": "Lofi", "artist": "The Mountain", "src": "/audio/the_mountain-lofi-lofi-music-496553.mp3" },
+  { "title": "Hip-Hop", "artist": "Leberch", "src": "/audio/leberch-lofi-hip-hop-519408.mp3" },
+  { "title": "Hip-Hop", "artist": "Solarflex", "src": "/audio/solarflex-lofi-hiphop-541533.mp3" },
+  { "title": "Beats", "artist": "Prettyjohn", "src": "/audio/prettyjohn1-lofi-beats-533426.mp3" },
+  { "title": "Study Lofi", "artist": "Prettyjohn", "src": "/audio/prettyjohn1-lofi-lofi-girl-lofi-music-533424.mp3" },
+  { "title": "Lofi Music", "artist": "Prettyjohn", "src": "/audio/prettyjohn1-lofi-lofi-music-523178.mp3" },
+  { "title": "Lofi Music II", "artist": "Prettyjohn", "src": "/audio/prettyjohn1-lofi-lofi-music-525021.mp3" },
+  { "title": "Lofi Music III", "artist": "Prettyjohn", "src": "/audio/prettyjohn1-lofi-lofi-music-533423.mp3" }
 ]
