@@ -78,8 +78,10 @@ export default function MusicPlayer() {
     const data = new Uint8Array(an.frequencyBinCount);
     an.getByteFrequencyData(data);
     ctx.clearRect(0, 0, VIZ_W, VIZ_H);
-    const grad = ctx.createLinearGradient(0, 0, 0, VIZ_H);
-    grad.addColorStop(0, "#E0A33E"); grad.addColorStop(1, "#C76B4A");
+    // multi-colour spectrum across the bars (ekam's tile palette as a left→right rainbow)
+    const grad = ctx.createLinearGradient(0, 0, VIZ_W, 0);
+    const cols = ["#9C4A33", "#C76B4A", "#E0A33E", "#8A9A5B", "#4F6F52", "#6E94BE", "#4E5C8A", "#8A5A78"];
+    cols.forEach((c, i) => grad.addColorStop(i / (cols.length - 1), c));
     ctx.fillStyle = grad;
     const bw = VIZ_W / BARS;
     for (let i = 0; i < BARS; i++) {
