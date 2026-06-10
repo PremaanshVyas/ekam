@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { isAdmin } from "@/lib/admin-auth";
 import { approve, reject, removeTile } from "./actions";
 import AdminImage from "@/components/AdminImage";
+import Logo from "@/components/Logo";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   return (
     <main style={{ minHeight: "100%", display: "flex", justifyContent: "center", padding: "40px 24px 80px" }}>
       <div style={{ width: 640, maxWidth: "100%", display: "flex", flexDirection: "column", gap: 16 }}>
+        <Logo />
         <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 32, fontWeight: 500, color: "var(--color-text-primary)", margin: 0 }}>admin</h1>
 
         <div style={{ display: "flex", gap: 22, borderBottom: "1px solid var(--color-border-default)" }}>

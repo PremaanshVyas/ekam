@@ -10,6 +10,11 @@
   --ink:#efe9e1; --ink-2:#b3a89b; --ink-3:#7d7264;
   --line:rgba(239,233,225,0.11); --line-2:rgba(239,233,225,0.06);
   --accent:#e8643c;
+  /* legacy aliases — map the old cream-system tokens onto the current dark system (admin + error pages) */
+  --font-ui:var(--sans); --font-display:var(--serif);
+  --color-text-primary:var(--ink); --color-text-secondary:var(--ink-2); --color-text-muted:var(--ink-3); --color-text-inverse:#16110d;
+  --color-bg-elevated:var(--bg-1); --color-bg-surface:var(--bg-2); --color-border-default:var(--line);
+  --palette-ink:#16110d; --palette-honey:#e0a23a; --palette-pine:#2f9e6e; --palette-rust:#d3573f;
   --paper:#f4eee2;                       /* tile / studio "paper" */
   --serif:var(--font-serif),Georgia,serif;
   --sans:var(--font-sans),system-ui,-apple-system,sans-serif;
@@ -93,9 +98,10 @@ em{font-style:italic}
 .scroll-root{position:relative}
 .nav{position:fixed;top:0;left:0;right:0;z-index:60;height:66px;display:flex;align-items:center;
   justify-content:space-between;padding:0 clamp(20px,4vw,44px);transition:background .3s,border-color .3s,backdrop-filter .3s;
+  background:linear-gradient(180deg,rgba(18,13,9,0.9),rgba(18,13,9,0.5) 62%,rgba(18,13,9,0));backdrop-filter:blur(8px);
   border-bottom:1px solid transparent}
 .nav--solid{background:rgba(18,13,9,0.78);backdrop-filter:blur(16px) saturate(1.2);border-bottom-color:var(--line)}
-.nav__brand{display:flex;align-items:baseline;gap:14px}
+.nav__brand{display:flex;align-items:center;gap:14px}
 .nav__edition{font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:.04em}
 .nav__links{display:flex;gap:30px}
 .nav__links a{font-size:13.5px;color:var(--ink-2);transition:color .18s}

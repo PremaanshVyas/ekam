@@ -1,5 +1,7 @@
 "use client";
 
+import Logo from "@/components/Logo";
+
 export default function Error({
   error,
   reset,
@@ -15,9 +17,7 @@ export default function Error({
         textAlign: "center", fontFamily: "var(--font-ui), sans-serif",
       }}
     >
-      <div style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 30, color: "var(--color-text-primary)" }}>
-        ekam.ink
-      </div>
+      <Logo />
       <p style={{ color: "var(--color-text-secondary)", margin: 0, maxWidth: 440 }}>
         something hiccuped loading the canvas.
       </p>
@@ -35,7 +35,7 @@ export default function Error({
         onClick={() => reset()}
         style={{
           fontFamily: "var(--font-ui), sans-serif", fontSize: 15, fontWeight: 500,
-          color: "var(--color-text-inverse)", background: "var(--palette-ink)",
+          color: "#16110d", background: "var(--accent)",
           border: "none", borderRadius: 9999, padding: "10px 22px", cursor: "pointer",
         }}
       >
