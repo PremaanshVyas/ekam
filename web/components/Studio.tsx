@@ -274,6 +274,7 @@ export default function Studio({
         <button className="panel__x" onClick={onClose} aria-label="close studio">✕</button>
       </div>
 
+      <div className="studio-full__body">
       <div ref={stageRef} className="studio-full__stage">
         <canvas ref={dispRef} className="studio-full__canvas" />
         {loadingArt && <div className="studio-full__loading"><span className="studio-full__spin" /><span>loading your painting…</span></div>}
@@ -342,6 +343,7 @@ export default function Studio({
           </div>
           <button className="btn btn--primary" style={{ minWidth: 200 }} disabled={!dirtyRef.current || submitting} onClick={submit}>{submitting ? "submitting…" : dirtyRef.current ? "Submit your tile" : "Paint something first"}</button>
         </div>
+      </div>
       </div>
 
       <input ref={colorInputRef} type="color" value={color} onChange={(e) => { setColor(e.target.value); if (tool === "eraser" || tool === "eyedropper") setTool("brush"); }} aria-hidden tabIndex={-1} style={{ position: "fixed", width: 1, height: 1, opacity: 0, pointerEvents: "none", left: 16, bottom: 16 }} />
