@@ -43,6 +43,7 @@ export default function Studio({
   const [mirror, setMirror] = useState(false);
   const [note, setNote] = useState(initialNote);
   const [submitting, setSubmitting] = useState(false);
+  const [loadingArt, setLoadingArt] = useState<boolean>(!!initialArtUrl);
   const dirtyRef = useRef(false);
   const undoRef = useRef<ImageData[]>([]);
   const drawingRef = useRef(false);
@@ -122,9 +123,11 @@ export default function Studio({
   }, []);
 
   useEffect(() => {
-    if (!initialArtUrl) return;
+    if (!initialArtUrl) { setLoadingArt(false); return; }
+    setLoadingArt(true);
     const img = new Image(); img.crossOrigin = "anonymous";
-    img.onload = () => { const g = bufRef.current!.getContext("2d")!; g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high"; g.drawImage(img, 0, 0, DRAW_RES, DRAW_RES); dirtyRef.current = true; renderDisplay(); force((n) => n + 1); };
+    img.onload = () => { const g = bufRef.current!.getContext("2d")!; g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high"; g.drawImage(img, 0, 0, DRAW_RES, DRAW_RES); dirtyRef.current = true; renderDisplay(); setLoadingArt(false); force((n) => n + 1); };
+    img.onerror = () => setLoadingArt(false);
     img.src = initialArtUrl;
   }, [initialArtUrl]);
 
@@ -204,6 +207,7 @@ export default function Studio({
 
       <div ref={stageRef} className="studio-full__stage">
         <canvas ref={dispRef} className="studio-full__canvas" />
+        {loadingArt && <div className="studio-full__loading"><span className="studio-full__spin" /><span>loading your painting…</span></div>}
       </div>
 
       <div className="studio-full__dock">

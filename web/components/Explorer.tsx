@@ -220,7 +220,7 @@ function TileDetail({ wall, info, version, myTile, onClose, onZoom, onEdit }: {
   wall: Wall; info: TileInfo; version: number; myTile: MyTile | null;
   onClose: () => void; onZoom: () => void; onEdit: () => void;
 }) {
-  const mineArt = info.mine ? myTile?.artUrl ?? null : null;
+  const mineArt = info.mine ? (myTile?.draftUrl ?? myTile?.artUrl ?? null) : null; // show latest autosaved draft, not the older submitted image
   const published = info.handle && info.handle !== "—" && info.handle !== "you";
   return (
     <div className="panel panel--detail">
