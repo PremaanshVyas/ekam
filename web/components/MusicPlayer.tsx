@@ -166,19 +166,19 @@ export default function MusicPlayer() {
             {/* progress / seek */}
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 10, color: "var(--color-text-muted)", width: 28, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmt(cur)}</span>
-              <input type="range" min={0} max={dur && isFinite(dur) ? dur : 0} step={0.1} value={cur} onChange={(e) => seek(parseFloat(e.target.value))} aria-label="seek" style={{ flex: 1, accentColor: "var(--palette-clay)" }} />
+              <input type="range" min={0} max={dur && isFinite(dur) ? dur : 0} step={0.1} value={cur} onChange={(e) => seek(parseFloat(e.target.value))} aria-label="seek" style={{ flex: 1, accentColor: "var(--accent)" }} />
               <span style={{ fontSize: 10, color: "var(--color-text-muted)", width: 28, fontVariantNumeric: "tabular-nums" }}>{fmt(dur)}</span>
             </div>
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14 }}>
               <button onClick={prev} aria-label="previous" style={iconBtn} className="lift">‹‹</button>
-              <button onClick={toggle} aria-label={playing ? "pause" : "play"} style={{ ...iconBtn, width: 44, height: 44, background: "var(--palette-ink)", color: "var(--color-text-inverse)", border: "none", fontSize: 15 }} className="lift">{loading ? "…" : playing ? "❚❚" : "▶"}</button>
+              <button onClick={toggle} aria-label={playing ? "pause" : "play"} style={{ ...iconBtn, width: 44, height: 44, background: "var(--accent)", color: "#16110d", border: "none", fontSize: 15 }} className="lift">{loading ? "…" : playing ? "❚❚" : "▶"}</button>
               <button onClick={next} aria-label="next" style={iconBtn} className="lift">››</button>
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>vol</span>
-              <input type="range" min={0} max={1} step={0.01} value={vol} onChange={(e) => setVol(parseFloat(e.target.value))} aria-label="volume" style={{ flex: 1, accentColor: "var(--palette-ink)" }} />
+              <input type="range" min={0} max={1} step={0.01} value={vol} onChange={(e) => setVol(parseFloat(e.target.value))} aria-label="volume" style={{ flex: 1, accentColor: "var(--accent)" }} />
             </div>
 
             <button onClick={() => setShowList((s) => !s)} aria-expanded={showList} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-text-secondary)", fontSize: 12, fontFamily: "var(--font-ui), sans-serif", textAlign: "left", padding: 0 }}>
@@ -197,7 +197,7 @@ export default function MusicPlayer() {
           </div>
         </div>
       ) : (
-        <button onClick={() => setOpen(true)} aria-label="open music player" style={{ position: "fixed", right: 20, bottom: 20, zIndex: 60, width: 46, height: 46, borderRadius: "50%", background: "var(--palette-ink)", color: "var(--color-text-inverse)", border: "none", cursor: "pointer", boxShadow: "0 8px 24px rgba(26,24,19,.22)", fontSize: 18 }}>
+        <button onClick={() => setOpen(true)} aria-label="open music player" style={{ position: "fixed", right: 20, bottom: 20, zIndex: 60, width: 46, height: 46, borderRadius: "50%", background: "var(--accent)", color: "#16110d", border: "none", cursor: "pointer", boxShadow: "0 8px 24px rgba(0,0,0,.4)", fontSize: 18 }}>
           {playing ? "♪" : "♫"}
         </button>
       )}
