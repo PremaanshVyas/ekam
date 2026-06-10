@@ -281,46 +281,36 @@ export default function Studio({
       </div>
 
       <div className="studio-full__dock">
-        {recent.length > 0 && (
-          <div className="studio-full__recent">
-            <span className="studio-full__rlabel">recent</span>
-            {recent.map((c) => (
+        <div className="studio__group">
+          <div className="studio__glabel">Colour <span className="studio__current" style={{ background: color }} title="current colour" /></div>
+          {recent.length > 0 && (
+            <div className="studio-full__recent">
+              <span className="studio-full__rlabel">recent</span>
+              {recent.map((c) => (
+                <button key={c} className={"sw" + (color === c ? " sw--on" : "")} style={{ background: c }} onClick={() => pickColor(c)} />
+              ))}
+            </div>
+          )}
+          <div className="studio-full__palette">
+            {EDITOR_PALETTE.map((c) => (
               <button key={c} className={"sw" + (color === c ? " sw--on" : "")} style={{ background: c }} onClick={() => pickColor(c)} />
             ))}
+            <button type="button" className={"sw sw--custom" + (customActive ? " sw--on" : "")} title="custom colour"
+              style={{ background: customActive ? color : "conic-gradient(from 90deg,#f44,#fa3,#fd3,#6c3,#3bb,#36f,#a4f,#f49,#f44)" }}
+              onClick={() => colorInputRef.current?.click()}>
+              <span className="sw__plus">+</span>
+            </button>
           </div>
-        )}
-        <div className="studio-full__palette">
-          {EDITOR_PALETTE.map((c) => (
-            <button key={c} className={"sw" + (color === c ? " sw--on" : "")} style={{ background: c }} onClick={() => pickColor(c)} />
-          ))}
-          <button type="button" className={"sw sw--custom" + (customActive ? " sw--on" : "")} title="custom colour"
-            style={{ background: customActive ? color : "conic-gradient(from 90deg,#f44,#fa3,#fd3,#6c3,#3bb,#36f,#a4f,#f49,#f44)" }}
-            onClick={() => colorInputRef.current?.click()}>
-            <span className="sw__plus">+</span>
-          </button>
         </div>
 
-        <div className="studio-full__row">
+        <div className="studio__group">
+          <div className="studio__glabel">Brush</div>
+          <div className="studio__grow">
           {BRUSH_LIST.map((k) => (
             <button key={k} className={"tool" + (tool === "brush" && brushType === k ? " tool--on" : "")} title={BRUSHES[k].label} onClick={() => { setTool("brush"); setBrushType(k); }}><span className="tool__gl">{BRUSHES[k].gl}</span><span className="tool__l">{BRUSHES[k].label}</span></button>
           ))}
           <button className={"tool" + (tool === "eraser" ? " tool--on" : "")} title="Eraser" onClick={() => setTool("eraser")}><span className="tool__gl">⌫</span><span className="tool__l">Eraser</span></button>
-        </div>
-
-        <div className="studio-full__row">
-          <button className={"tool" + (tool === "fill" ? " tool--on" : "")} title="Fill" onClick={() => setTool("fill")}><span className="tool__gl">◧</span><span className="tool__l">Fill</span></button>
-          <button className={"tool" + (tool === "eyedropper" ? " tool--on" : "")} title="Pick" onClick={() => setTool("eyedropper")}><span className="tool__gl">⊙</span><span className="tool__l">Pick</span></button>
-          <button className={"tool" + (tool === "line" ? " tool--on" : "")} title="Line" onClick={() => setTool("line")}><span className="tool__gl">╱</span><span className="tool__l">Line</span></button>
-          <button className={"tool" + (tool === "rect" ? " tool--on" : "")} title="Rectangle" onClick={() => setTool("rect")}><span className="tool__gl">▭</span><span className="tool__l">Rect</span></button>
-          <button className={"tool" + (tool === "ellipse" ? " tool--on" : "")} title="Ellipse" onClick={() => setTool("ellipse")}><span className="tool__gl">◯</span><span className="tool__l">Oval</span></button>
-          <button className={"tool" + (tool === "hand" ? " tool--on" : "")} title="Pan — drag to move when zoomed in" onClick={() => setTool("hand")}><span className="tool__gl">✋</span><span className="tool__l">Pan</span></button>
-          <button className={"tool" + (mirror ? " tool--on" : "")} title="Mirror" onClick={() => setMirror((s) => !s)}><span className="tool__gl">◫</span><span className="tool__l">Mirror</span></button>
-          <button className="tool" title="Undo" onClick={undo}><span className="tool__gl">↺</span><span className="tool__l">Undo</span></button>
-          <button className="tool" title="Redo" onClick={redo}><span className="tool__gl">↻</span><span className="tool__l">Redo</span></button>
-          <button className="tool" title="Clear" onClick={clearAll}><span className="tool__gl">⌧</span><span className="tool__l">Clear</span></button>
-        </div>
-
-        <div className="studio-full__row">
+          </div>
           <label className="studio__ctl"><span className="studio__ctll">size</span>
             <input type="range" className="studio__range" min={4} max={180} value={brushPx} onChange={(e) => setBrushPx(+e.target.value)} />
             <span className="sizedot" style={{ width: Math.max(4, Math.round(brushPx / 180 * 22)), height: Math.max(4, Math.round(brushPx / 180 * 22)) }} />
@@ -329,19 +319,40 @@ export default function Studio({
             <input type="range" className="studio__range" min={10} max={100} value={Math.round(opacity * 100)} onChange={(e) => setOpacity(+e.target.value / 100)} />
             <span className="studio__ctlv">{Math.round(opacity * 100)}%</span>
           </label>
+        </div>
+
+        <div className="studio__group">
+          <div className="studio__glabel">Tools</div>
+          <div className="studio__grow">
+          <button className={"tool" + (tool === "fill" ? " tool--on" : "")} title="Fill" onClick={() => setTool("fill")}><span className="tool__gl">◧</span><span className="tool__l">Fill</span></button>
+          <button className={"tool" + (tool === "eyedropper" ? " tool--on" : "")} title="Pick" onClick={() => setTool("eyedropper")}><span className="tool__gl">⊙</span><span className="tool__l">Pick</span></button>
+          <button className={"tool" + (tool === "line" ? " tool--on" : "")} title="Line" onClick={() => setTool("line")}><span className="tool__gl">╱</span><span className="tool__l">Line</span></button>
+          <button className={"tool" + (tool === "rect" ? " tool--on" : "")} title="Rectangle" onClick={() => setTool("rect")}><span className="tool__gl">▭</span><span className="tool__l">Rect</span></button>
+          <button className={"tool" + (tool === "ellipse" ? " tool--on" : "")} title="Ellipse" onClick={() => setTool("ellipse")}><span className="tool__gl">◯</span><span className="tool__l">Oval</span></button>
+          <button className={"tool" + (mirror ? " tool--on" : "")} title="Mirror" onClick={() => setMirror((s) => !s)}><span className="tool__gl">◫</span><span className="tool__l">Mirror</span></button>
+          </div>
+        </div>
+
+        <div className="studio__group">
+          <div className="studio__glabel">Canvas</div>
+          <div className="studio__grow">
+          <button className={"tool" + (tool === "hand" ? " tool--on" : "")} title="Pan — drag to move when zoomed in" onClick={() => setTool("hand")}><span className="tool__gl">✋</span><span className="tool__l">Pan</span></button>
+          <button className="tool" title="Undo" onClick={undo}><span className="tool__gl">↺</span><span className="tool__l">Undo</span></button>
+          <button className="tool" title="Redo" onClick={redo}><span className="tool__gl">↻</span><span className="tool__l">Redo</span></button>
+          <button className="tool" title="Clear" onClick={clearAll}><span className="tool__gl">⌧</span><span className="tool__l">Clear</span></button>
+          </div>
           <label className="studio__ctl"><span className="studio__ctll">zoom</span>
             <input type="range" className="studio__range" min={1} max={6} step={0.1} value={zoom} onChange={(e) => applyZoom(+e.target.value)} />
             <button className="studio__reset" onClick={() => applyZoom(1)} title="Fit to screen">{zoom > 1.05 ? zoom.toFixed(1) + "×" : "fit"}</button>
           </label>
-          <div className="studio__current" style={{ background: color }} title="Current colour" />
         </div>
 
-        <div className="studio-full__row">
-          <div className="studio__note" style={{ flex: 1, maxWidth: 460, marginBottom: 0 }}>
+        <div className="studio__group">
+          <div className="studio__note" style={{ marginBottom: 0 }}>
             <input className="studio__noteinput" maxLength={140} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Say a line — where were you when home looked like this?" />
             <span className="studio__count">{note.length}/140</span>
           </div>
-          <button className="btn btn--primary" style={{ minWidth: 200 }} disabled={!dirtyRef.current || submitting} onClick={submit}>{submitting ? "submitting…" : dirtyRef.current ? "Submit your tile" : "Paint something first"}</button>
+          <button className="btn btn--primary btn--block" disabled={!dirtyRef.current || submitting} onClick={submit}>{submitting ? "submitting…" : dirtyRef.current ? "Submit your tile" : "Paint something first"}</button>
         </div>
       </div>
       </div>
