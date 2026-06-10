@@ -51,7 +51,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
             <span style={{ color: "#e8643c" }}>tile.</span>
           </div>
           {live && tt?.story ? (
-            <div style={{ fontFamily: "Spectral", fontSize: 27, fontStyle: "italic", marginTop: 22, color: "#b3a89b" }}>“{tt.story.slice(0, 90)}”</div>
+            <div style={{ fontFamily: "Spectral", fontSize: 27, fontStyle: "italic", marginTop: 22, color: "#b3a89b" }}>{`“${tt.story.slice(0, 90)}”`}</div>
           ) : (
             <div style={{ fontSize: 24, marginTop: 22, color: "#b3a89b" }}>576 strangers. One canvas.</div>
           )}
