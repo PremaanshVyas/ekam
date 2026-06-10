@@ -26,7 +26,7 @@ export default function Studio({
   tileLabel, initialArtUrl, initialNote = "", initialName = "", accent = "#e8643c", onClose, onSubmit, onSaveDraft,
 }: {
   tileLabel: string; initialArtUrl: string | null; initialNote?: string; initialName?: string; accent?: string;
-  onClose: () => void; onSubmit: (dataUrl: string, name: string, note: string) => Promise<void>;
+  onClose: () => void; onSubmit: (dataUrl: string, thumbUrl: string | null, name: string, note: string) => Promise<void>;
   onSaveDraft?: (dataUrl: string, note: string) => Promise<{ ok: boolean; updatedAt?: string }>;
 }) {
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -44,6 +44,7 @@ export default function Studio({
   const [note, setNote] = useState(initialNote);
   const [name, setName] = useState(initialName);
   const [submitting, setSubmitting] = useState(false);
+  const [submitErr, setSubmitErr] = useState("");
   const [loadingArt, setLoadingArt] = useState<boolean>(!!initialArtUrl);
   const [recent, setRecent] = useState<string[]>([]);
   const dirtyRef = useRef(false);
@@ -260,8 +261,12 @@ export default function Studio({
   const submit = async () => {
     if (!dirtyRef.current || !name.trim() || submitting) return;
     const out = document.createElement("canvas"); out.width = DRAW_RES; out.height = DRAW_RES; out.getContext("2d")!.drawImage(bufRef.current!, 0, 0);
-    setSubmitting(true);
-    try { await onSubmit(out.toDataURL("image/png"), name.trim(), note.trim()); } catch (err) { setSubmitting(false); alert("Couldn't submit — " + (err as Error).message); }
+    // small thumb for the wall composite — the wall loads these instead of full PNGs
+    const th = document.createElement("canvas"); th.width = 192; th.height = 192;
+    const tg = th.getContext("2d")!; tg.imageSmoothingEnabled = true; tg.imageSmoothingQuality = "high"; tg.drawImage(bufRef.current!, 0, 0, 192, 192);
+    setSubmitting(true); setSubmitErr("");
+    try { await onSubmit(out.toDataURL("image/png"), th.toDataURL("image/png"), name.trim(), note.trim()); }
+    catch (err) { setSubmitting(false); setSubmitErr("Couldn't submit: " + ((err as Error).message || "try again in a moment.")); }
   };
 
   const pickColor = (c: string) => { setColor(c); if (tool === "eraser" || tool === "eyedropper") setTool("brush"); };
@@ -349,12 +354,13 @@ export default function Studio({
         </div>
 
         <div className="studio__group">
-          <input className="studio__noteinput" style={{ marginBottom: 8, paddingRight: 13 }} maxLength={40} value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name — shown on your tile" />
+          <input className="studio__noteinput" style={{ marginBottom: 8, paddingRight: 13 }} maxLength={40} value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name, shown on your tile" />
           <div className="studio__note" style={{ marginBottom: 0 }}>
-            <input className="studio__noteinput" maxLength={140} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Say a line — where were you when home looked like this?" />
+            <input className="studio__noteinput" maxLength={140} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Say a line: where were you when home looked like this?" />
             <span className="studio__count">{note.length}/140</span>
           </div>
-          <button className="btn btn--primary btn--block" disabled={!dirtyRef.current || !name.trim() || submitting} onClick={submit}>{submitting ? "submitting…" : !dirtyRef.current ? "Paint something first" : !name.trim() ? "Add your name to submit" : "Submit your tile"}</button>
+          {submitErr && <p className="studio__err">{submitErr}</p>}
+          <button className="btn btn--primary btn--block" disabled={!dirtyRef.current || !name.trim() || submitting} onClick={submit}>{submitting ? "Submitting…" : !dirtyRef.current ? "Paint something first" : !name.trim() ? "Add your name to submit" : "Submit your tile"}</button>
         </div>
       </div>
       </div>

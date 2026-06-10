@@ -16,9 +16,10 @@ export async function claimTileAt(idx: number): Promise<ClaimResult> {
   const email = user.email.toLowerCase();
 
   const db = supabaseAdmin();
-  const { data: canvas } = await db.from("canvases").select("id, grid_cols").eq("slug", CANVAS_SLUG).maybeSingle();
+  const { data: canvas } = await db.from("canvases").select("id, grid_cols, grid_rows").eq("slug", CANVAS_SLUG).maybeSingle();
   if (!canvas) return { ok: false, error: "nocanvas" };
-  const cols = canvas.grid_cols ?? 24;
+  const cols = canvas.grid_cols ?? 24, gridRows = canvas.grid_rows ?? 24;
+  if (!Number.isInteger(idx) || idx < 0 || idx >= cols * gridRows) return { ok: false, error: "taken" };
   const x = idx % cols, y = Math.floor(idx / cols);
 
   // One tile per person — if they already have one, send them to it.

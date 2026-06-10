@@ -3,9 +3,10 @@
 import { usePathname } from "next/navigation";
 import MusicPlayer from "@/components/MusicPlayer";
 
-// Mount the player everywhere except the focused public share pages (/t/[id]).
+// The player stays MOUNTED everywhere (so music never stops on navigation) and is
+// only visually hidden on the focused share pages + the moderation tool.
 export default function MusicPlayerMount() {
   const pathname = usePathname();
-  if (pathname?.startsWith("/t/") || pathname?.startsWith("/admin")) return null;
-  return <MusicPlayer />;
+  const hidden = pathname?.startsWith("/t/") || pathname?.startsWith("/admin");
+  return <div style={hidden ? { display: "none" } : undefined}><MusicPlayer /></div>;
 }

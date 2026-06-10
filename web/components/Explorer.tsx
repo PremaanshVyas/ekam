@@ -2,13 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import MosaicCanvas, { type MosaicApi } from "@/components/MosaicCanvas";
+import MosaicCanvas, { type MosaicApi, type Insets } from "@/components/MosaicCanvas";
 import Studio from "@/components/Studio";
 import { createRealWall, type RealTileInput } from "@/lib/realWall";
 import type { Wall, TileInfo } from "@/lib/demoWall";
 import { createSupabaseBrowser } from "@/lib/auth-browser";
 import { claimTileAt } from "@/app/canvas/actions";
-import { submitTile, saveDraft } from "@/app/paint/actions";
+import { submitTile, saveDraft, type SubmitMode } from "@/app/paint/actions";
 import { signOut } from "@/app/actions";
 import SignInModal from "@/components/SignInModal";
 import ShareTile from "@/components/ShareTile";
@@ -23,7 +23,7 @@ function TileArt({ wall, idx, region = 1, version, artUrl, className }: { wall: 
   const ref = useRef<HTMLCanvasElement | null>(null);
   useEffect(() => {
     const cv = ref.current; if (!cv || !wall.hi) return;
-    const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+    const dpr = Math.min(2, window.devicePixelRatio || 1), W = cv.clientWidth, H = cv.clientHeight;
     cv.width = W * dpr; cv.height = H * dpr; const g = cv.getContext("2d"); if (!g) return;
     g.setTransform(dpr, 0, 0, dpr, 0, 0); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
     g.fillStyle = wall.bg; g.fillRect(0, 0, W, H);
@@ -42,7 +42,7 @@ function Tooltip({ hover }: { hover: { info: TileInfo; x: number; y: number } | 
   return (
     <div className="tip" style={{ left: x + (flip ? -16 : 16), top: y + 16, transform: flip ? "translateX(-100%)" : "none" }}>
       {info.claimed ? (
-        <><div className="tip__row"><span className="tip__handle">{info.mine ? "your tile" : info.handle && info.handle !== "—" ? info.handle : "claimed"}</span></div><div className="tip__meta">{info.id} · {info.handle === "—" ? "being painted" : "on the wall"}</div></>
+        <><div className="tip__row"><span className="tip__handle">{info.mine ? "Your tile" : info.handle && info.handle !== "—" ? info.handle : "Claimed"}</span></div><div className="tip__meta">{info.id} · {info.handle === "—" ? "being painted" : "on the wall"}</div></>
       ) : (
         <><div className="tip__row"><span className="tip__handle">Open tile</span></div><div className="tip__meta">{info.id}</div><div className="tip__cta">Click to claim →</div></>
       )}
@@ -50,11 +50,10 @@ function Tooltip({ hover }: { hover: { info: TileInfo; x: number; y: number } | 
   );
 }
 
-function Sidebar({ open, setOpen, claimed, total }: { open: boolean; setOpen: (v: boolean) => void; claimed: number; total: number }) {
+function Sidebar({ open, claimed, total }: { open: boolean; claimed: number; total: number }) {
   const pct = total ? (claimed / total) * 100 : 0;
   return (
-    <aside className={"side" + (open ? "" : " side--closed")}>
-      <button className="side__toggle" onClick={() => setOpen(!open)}>{open ? "‹" : "›"}</button>
+    <aside className={"side" + (open ? "" : " side--closed")} aria-hidden={!open}>
       <div className="side__scroll">
         <div className="side__head"><span className="kicker">Canvas Nº 001</span><h2 className="side__theme">what home looks like</h2><p className="side__by">a collaborative canvas</p></div>
         <div className="side__sec">
@@ -72,9 +71,9 @@ function Sidebar({ open, setOpen, claimed, total }: { open: boolean; setOpen: (v
         <div className="side__sec">
           <div className="side__label">Take part</div>
           <ol className="howmini">
-            <li><b>Tap an open tile</b> and verify your email with a one-time code.</li>
+            <li><b>Tap an open tile</b> and verify your email with a code.</li>
             <li><b>Paint what home looks like</b> on your blank tile.</li>
-            <li><b>Submit</b> — after a quick review it joins the wall with your name.</li>
+            <li><b>Submit.</b> After a quick review it joins the wall with your name.</li>
           </ol>
         </div>
         <div className="side__foot"><span className="freebadge">1 / 1</span><div className="side__collab"><span className="side__cname">One tile per person</span><span className="side__crole">verified by email, once</span></div></div>
@@ -87,9 +86,9 @@ function Dock({ api, viewMode, setViewMode, zoomLabel }: { api: React.MutableRef
   return (
     <div className="dock">
       <div className="dock__group">
-        <button className="dock__btn" onClick={() => api.current?.zoomOut()}>−</button>
+        <button className="dock__btn" aria-label="Zoom out" onClick={() => api.current?.zoomOut()}>−</button>
         <div className="dock__zoomlabel">{zoomLabel}</div>
-        <button className="dock__btn" onClick={() => api.current?.zoomIn()}>+</button>
+        <button className="dock__btn" aria-label="Zoom in" onClick={() => api.current?.zoomIn()}>+</button>
       </div>
       <div className="dock__divider" />
       <div className="dock__group dock__presets">
@@ -107,7 +106,7 @@ function Dock({ api, viewMode, setViewMode, zoomLabel }: { api: React.MutableRef
   );
 }
 
-const OTP_LEN = 8; // ekam's Supabase issues 8-digit email codes
+const OTP_LEN = 8; // ekam's Supabase issues 8 digit email codes
 function OTPInput({ onComplete }: { onComplete: (code: string) => void }) {
   const [vals, setVals] = useState<string[]>(() => Array(OTP_LEN).fill(""));
   const refs = useRef<(HTMLInputElement | null)[]>([]);
@@ -129,7 +128,7 @@ function OTPInput({ onComplete }: { onComplete: (code: string) => void }) {
   return (
     <div className="otp">
       {vals.map((v, i) => (
-        <input key={i} ref={(el) => { refs.current[i] = el; }} className="otp__box" inputMode="numeric"
+        <input key={i} ref={(el) => { refs.current[i] = el; }} className="otp__box" inputMode="numeric" aria-label={"Code digit " + (i + 1)}
           value={v} onChange={(e) => set(i, e.target.value)} onKeyDown={(e) => key(i, e)} autoFocus={i === 0} />
       ))}
     </div>
@@ -143,6 +142,7 @@ function ClaimFlow({ wall, info, version, accent, signedIn, userEmail, hasTile, 
   const [step, setStep] = useState<"confirm" | "email" | "code">(signedIn ? "confirm" : "email");
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
+  const [signedOk, setSignedOk] = useState(false);
   const [err, setErr] = useState("");
   const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
@@ -151,9 +151,9 @@ function ClaimFlow({ wall, info, version, accent, signedIn, userEmail, hasTile, 
     const res = await claimTileAt(info.idx);
     if (res.ok) { onClaimed(res.tileId); return; }
     setBusy(false);
-    if (res.error === "have-tile") setErr("you already have a tile — edit that one instead.");
-    else if (res.error === "taken") setErr("someone just claimed this tile — close this and pick another.");
-    else setErr("couldn't claim — try again.");
+    if (res.error === "have-tile") setErr("You already have a tile. Edit that one instead.");
+    else if (res.error === "taken") setErr("Someone just claimed this tile. Close this and pick another.");
+    else setErr("Couldn't claim. Try again.");
   };
   const send = async () => {
     if (!valid) return; setBusy(true); setErr("");
@@ -164,6 +164,7 @@ function ClaimFlow({ wall, info, version, accent, signedIn, userEmail, hasTile, 
     if (busy) return; setBusy(true); setErr("");
     const { error } = await createSupabaseBrowser().auth.verifyOtp({ email, token: code.trim(), type: "email" });
     if (error) { setBusy(false); setErr(error.message); return; }
+    setSignedOk(true);
     await doClaim();
   };
 
@@ -171,46 +172,46 @@ function ClaimFlow({ wall, info, version, accent, signedIn, userEmail, hasTile, 
     <div className="panel panel--claim">
       <div className="panel__head">
         <span className="panel__eyebrow"><span className="studio__dot" style={{ background: accent }} />Claim · {info.id}</span>
-        <button className="panel__x" onClick={onClose}>✕</button>
+        <button className="panel__x" onClick={onClose} aria-label="Close">✕</button>
       </div>
 
       {hasTile ? (
         <>
-          <div className="claim__art"><TileArt wall={wall} idx={info.idx} region={5} version={version} className="detail__nbcanvas" /></div>
           <h3 className="claim__t">You already have a tile.</h3>
-          <p className="claim__d">One tile per person — yours is at <b>{myLabel}</b>. Head there to paint or edit it.</p>
+          <p className="claim__d">One tile per person. Yours is at <b>{myLabel}</b>, head there to paint or edit it.</p>
           <button className="btn btn--primary btn--block" onClick={onZoomMine}>Go to your tile</button>
+          <div className="claim__art" style={{ marginTop: 18 }}><TileArt wall={wall} idx={info.idx} region={5} version={version} className="detail__nbcanvas" /></div>
         </>
       ) : step === "confirm" ? (
         <>
-          <div className="claim__art"><TileArt wall={wall} idx={info.idx} region={5} version={version} className="detail__nbcanvas" /></div>
           <h3 className="claim__t">This tile is open.</h3>
-          <p className="claim__d">Claim {info.id} as <b>{userEmail}</b> — it&apos;s yours to paint.</p>
+          <p className="claim__d">Claim {info.id} as <b>{userEmail}</b>. It&apos;s yours to paint.</p>
           {err && <p className="claim__err">{err}</p>}
-          <button className={"btn btn--primary btn--block" + (busy ? " btn--loading" : "")} disabled={busy} onClick={doClaim}>{busy ? "claiming…" : "Claim this tile"}</button>
+          <button className={"btn btn--primary btn--block" + (busy ? " btn--loading" : "")} disabled={busy} onClick={doClaim}>{busy ? "Claiming…" : "Claim this tile"}</button>
           <p className="claim__fine">One tile per person.</p>
+          <div className="claim__art" style={{ marginTop: 14 }}><TileArt wall={wall} idx={info.idx} region={5} version={version} className="detail__nbcanvas" /></div>
         </>
       ) : step === "email" ? (
         <>
-          <div className="claim__art"><TileArt wall={wall} idx={info.idx} region={5} version={version} className="detail__nbcanvas" /></div>
           <h3 className="claim__t">This tile is open.</h3>
-          <p className="claim__d">Claim it with your email — we&apos;ll send a one-time code to prove it&apos;s you. No password, no account.</p>
+          <p className="claim__d">Claim it with your email. We&apos;ll send a code to prove it&apos;s you, no password, no account.</p>
           <div className="co__field"><label>Email</label>
             <input className="co__input co__inputlive" type="email" placeholder="you@email.com" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} />
           </div>
           {err && <p className="claim__err">{err}</p>}
-          <button className={"btn btn--primary btn--block" + (busy ? " btn--loading" : "")} disabled={!valid || busy} onClick={send}>{busy ? "sending code…" : "send me a code"}</button>
+          <button className={"btn btn--primary btn--block" + (busy ? " btn--loading" : "")} disabled={!valid || busy} onClick={send}>{busy ? "Sending code…" : "Send me a code"}</button>
           <p className="claim__fine">We only use your email to verify this one tile.</p>
+          <div className="claim__art" style={{ marginTop: 14 }}><TileArt wall={wall} idx={info.idx} region={5} version={version} className="detail__nbcanvas" /></div>
         </>
       ) : (
         <>
           <button className="panel__back" onClick={() => setStep("email")}>‹ Back</button>
           <div className="claim__mail">✉</div>
           <h3 className="claim__t">Check your inbox.</h3>
-          <p className="claim__d">We sent a 6-digit code to <b>{email}</b>. Enter it to claim {info.id}.</p>
+          <p className="claim__d">We sent a code to <b>{email}</b>. Enter it to claim {info.id}.</p>
           <OTPInput onComplete={verify} />
           {err && <p className="claim__err">{err}</p>}
-          <p className="claim__fine">{busy ? "verifying…" : "the code auto-submits when you finish typing."}</p>
+          <p className="claim__fine">{signedOk ? "Signed in ✓ · claiming your tile…" : busy ? "Verifying…" : "The code submits itself when you finish typing."}</p>
         </>
       )}
     </div>
@@ -227,15 +228,23 @@ function TileDetail({ wall, info, version, myTile, onClose, onZoom, onEdit }: {
     <div className="panel panel--detail">
       <div className="panel__head">
         <span className="panel__eyebrow"><span className="studio__dot" style={{ background: wall.accent }} />{info.mine ? "Your tile" : "A tile"}</span>
-        <button className="panel__x" onClick={onClose}>✕</button>
+        <button className="panel__x" onClick={onClose} aria-label="Close">✕</button>
       </div>
       <div className="detail__art"><TileArt wall={wall} idx={info.idx} version={version} artUrl={mineArt} className="detail__canvas" /></div>
       <div className="detail__id">{info.id}<span className="detail__num">№ {info.num} of {wall.N_TOTAL}</span></div>
+      {/* primary action first — never below the scroll fold */}
+      {info.mine
+        ? <button className="btn btn--primary btn--block" style={{ marginTop: 0 }} onClick={onEdit}>{myTile?.status === "claimed" ? "Paint your tile" : "Edit your tile"}</button>
+        : <button className="btn btn--ghost btn--block" style={{ marginTop: 0 }} onClick={onZoom}>Zoom to this tile</button>}
+      {info.mine && myTile?.status === "published" && myTile.artUrl && (
+        <ShareTile url={`https://ekam.ink/t/${myTile.id}`} imageUrl={myTile.artUrl} title="my tile on ekam.ink · what home looks like" />
+      )}
+      {info.mine && myTile?.status === "pending" && <p className="detail__sharehint">In review. You can share it once it&apos;s live on the wall.</p>}
       <div className="owner">
         <div className="owner__avatar" style={{ background: wall.accent }}>{(info.handle || "?").slice(0, 1).toUpperCase()}</div>
         <div className="owner__meta">
           <span className="owner__handle">{info.mine ? "you" : info.handle || "someone"}</span>
-          <span className="owner__joined">{info.mine ? (myTile?.status === "published" ? "on the wall" : myTile?.status === "pending" ? "in review" : "claimed — not painted yet") : published ? "on the wall" : "being painted"}</span>
+          <span className="owner__joined">{info.mine ? (myTile?.status === "published" ? "on the wall" : myTile?.status === "pending" ? "in review" : "claimed · not painted yet") : published ? "on the wall" : "being painted"}</span>
         </div>
       </div>
       {info.note && <blockquote className="owner__note">“{info.note}”</blockquote>}
@@ -245,19 +254,19 @@ function TileDetail({ wall, info, version, myTile, onClose, onZoom, onEdit }: {
         <TileArt wall={wall} idx={info.idx} region={5} version={version} className="detail__nbcanvas" />
         <p className="detail__nbhint">Every painted tile here was made by a different person.</p>
       </div>
-      {info.mine
-        ? <button className="btn btn--primary btn--block" onClick={onEdit}>{myTile?.status === "claimed" ? "Paint your tile" : "Edit your tile"}</button>
-        : <button className="btn btn--ghost btn--block" onClick={onZoom}>Zoom to this tile</button>}
-      {info.mine && myTile?.status === "published" && myTile.artUrl && (
-        <ShareTile url={`https://ekam.ink/t/${myTile.id}`} imageUrl={myTile.artUrl} title="my tile on ekam.ink — what home looks like" />
-      )}
-      {info.mine && myTile?.status === "pending" && <p className="detail__sharehint">In review — you can share it once it’s live on the wall.</p>}
     </div>
   );
 }
 
-export default function Explorer({ cols, total, tiles, claimed, email, myTile, autoOpenMine }: {
-  cols: number; total: number; tiles: RealTileInput[]; claimed: number; email: string | null; myTile: MyTile | null; autoOpenMine?: boolean;
+const SUBMIT_COPY: Record<SubmitMode, { t: string; d: string }> = {
+  "new": { t: "It’s in the queue!", d: "Your tile is off for a quick review. Once approved it joins the wall with your name, and you can share it everywhere." },
+  "edit-pending": { t: "Updated.", d: "Your new version replaced the old one in the moderation queue. It joins the wall as soon as it’s approved." },
+  "edit-published": { t: "Update received.", d: "Your live tile stays on the wall while the new version waits for review. We swap them the moment it’s approved." },
+};
+const CONFETTI_N = 18;
+
+export default function Explorer({ cols, total, tiles, claimed, email, myTile, autoOpenMine, loadError }: {
+  cols: number; total: number; tiles: RealTileInput[]; claimed: number; email: string | null; myTile: MyTile | null; autoOpenMine?: boolean; loadError?: boolean;
 }) {
   const router = useRouter();
   const api = useRef<MosaicApi | null>(null);
@@ -267,8 +276,12 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
   const [hover, setHover] = useState<{ info: TileInfo; x: number; y: number } | null>(null);
   const [selected, setSelected] = useState<TileInfo | null>(null);
   const [panel, setPanel] = useState<Panel>(null);
+  const [desktop, setDesktop] = useState(true);
+  const [coarse, setCoarse] = useState(false);
+  const [vh, setVh] = useState(800);
   const [sideOpen, setSideOpen] = useState(true);
   const [zoomLabel, setZoomLabel] = useState("Wall");
+  const [submitMode, setSubmitMode] = useState<SubmitMode>("new");
   const studioTarget = useRef<{ tileId: string; idx: number; label: string; artUrl: string | null; note: string; name: string } | null>(null);
   const [signInOpen, setSignInOpen] = useState(false);
   const [lastArt, setLastArt] = useState<string | null>(null);
@@ -282,6 +295,23 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
     setWall(w); setVer((v) => v + 1);
   }, [cols, tiles, myIdx]);
 
+  // viewport class + pointer type; sidebar starts closed on small screens
+  useEffect(() => {
+    const measure = () => { setDesktop(window.innerWidth >= 900); setVh(window.innerHeight); };
+    measure();
+    setCoarse(window.matchMedia("(pointer: coarse)").matches);
+    if (window.innerWidth < 900) setSideOpen(false);
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
+  // while the explorer is up, kill pull-to-refresh / overscroll glow so panning never fights the browser
+  useEffect(() => {
+    const prev = document.documentElement.style.overscrollBehavior;
+    document.documentElement.style.overscrollBehavior = "none";
+    return () => { document.documentElement.style.overscrollBehavior = prev; };
+  }, []);
+
   useEffect(() => { const id = setInterval(() => { if (api.current) setZoomLabel(api.current.getZoomLabel()); }, 250); return () => clearInterval(id); }, []);
 
   const onHover = useCallback((info: TileInfo | null, x?: number, y?: number) => setHover(info ? { info, x: x ?? 0, y: y ?? 0 } : null), []);
@@ -292,7 +322,7 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
   const openMine = useCallback(() => {
     if (!myTile || !wall) return;
     setSelected(wall.infoFor(myTile.idx)); setPanel("detail"); setHover(null);
-    api.current?.zoomToTile(myTile.idx, 96);
+    setTimeout(() => api.current?.zoomToTile(myTile.idx, 96), 60); // after the insets recenter kicks in
   }, [myTile, wall]);
   useEffect(() => {
     if (!autoOpenMine || !myTile || !wall || openedMine.current) return;
@@ -304,8 +334,21 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
   const openStudioForClaim = (tileId: string) => { if (!selected) return; studioTarget.current = { tileId, idx: selected.idx, label: selected.id, artUrl: null, note: "", name: "" }; setPanel("studio"); };
   // Resume from the latest autosaved draft if there is one; else the submitted/published image.
   const openStudioForEdit = () => { if (!myTile || !wall) return; const label = wall.infoFor(myTile.idx).id; const def = email ? email.split("@")[0] : ""; studioTarget.current = { tileId: myTile.id, idx: myTile.idx, label, artUrl: myTile.draftUrl ?? myTile.artUrl, note: myTile.draftStory ?? myTile.story ?? "", name: myTile.name && myTile.name !== def ? myTile.name : "" }; setPanel("studio"); };
-  const onStudioSubmit = async (dataUrl: string, name: string, note: string) => { const t = studioTarget.current; if (!t) return; await submitTile(t.tileId, dataUrl, name, note); setLastArt(dataUrl); setPanel("submitted"); router.refresh(); };
+  const onStudioSubmit = async (dataUrl: string, thumbUrl: string | null, name: string, note: string) => {
+    const t = studioTarget.current; if (!t) return;
+    const res = await submitTile(t.tileId, dataUrl, thumbUrl, name, note);
+    setSubmitMode(res.mode); setLastArt(dataUrl); setPanel("submitted"); router.refresh();
+  };
   const onSaveDraft = async (dataUrl: string, note: string) => { const t = studioTarget.current; if (!t) return { ok: false }; return await saveDraft(t.tileId, dataUrl, note); };
+
+  // chrome-aware fit: the wall centers inside the space the topbar/sidebar/panel/dock leave free
+  const panelOpen = panel !== null && panel !== "studio";
+  const insets: Insets = {
+    top: 64,
+    left: desktop && sideOpen ? 348 : 14,
+    right: desktop && panelOpen ? 390 : 14,
+    bottom: !desktop && panelOpen ? Math.max(120, Math.round(vh * 0.52)) : 104,
+  };
 
   if (!wall) return (
     <div className="explorer ex__loading">
@@ -315,45 +358,64 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
     </div>
   );
 
+  const submitCopy = SUBMIT_COPY[submitMode];
+
   return (
     <div className="explorer">
       <div className="ex__canvas">
         <MosaicCanvas wall={wall} interactive grid viewMode={viewMode} version={ver} accent={accent}
-          apiRef={api} onHover={onHover} onSelect={onSelect}
+          apiRef={api} onHover={onHover} onSelect={onSelect} insets={insets}
           selectedIdx={selected ? selected.idx : -1} hoverIdx={hover ? hover.info.idx : -1} initialZoom="macro" />
         <div className="ex__grain" />
       </div>
 
       <div className="ex__topbar">
         <Logo sm />
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <span className="ex__edition">Canvas Nº 001 · <span className="ex__live"><span className="livedot" />live</span></span>
+        <div className="ex__topright">
+          <span className="ex__edition"><span className="ex__edno">Canvas Nº 001 · </span><span className="ex__live"><span className="livedot" />live</span></span>
           {email ? (
             <>
-              {myTile && <button className="linkbtn" onClick={openMine}>your tile</button>}
-              <form action={signOut} style={{ display: "inline" }}><button type="submit" className="linkbtn">sign out</button></form>
+              <span className="authchip" title={email}>{email}</span>
+              {myTile && <button className="linkbtn" onClick={openMine}>Your tile</button>}
+              <form action={signOut} style={{ display: "inline" }}><button type="submit" className="linkbtn">Sign out</button></form>
             </>
           ) : (
-            <button className="linkbtn" onClick={() => setSignInOpen(true)}>sign in</button>
+            <button className="linkbtn" onClick={() => setSignInOpen(true)}>Sign in</button>
           )}
         </div>
       </div>
 
-      <Sidebar open={sideOpen} setOpen={setSideOpen} claimed={claimed} total={total} />
+      {loadError && (
+        <button className="ex__retry" onClick={() => router.refresh()}>
+          Some tiles didn&apos;t load. <b>Tap to retry</b>
+        </button>
+      )}
+
+      {!desktop && sideOpen && <div className="side__backdrop" onClick={() => setSideOpen(false)} />}
+      <Sidebar open={sideOpen} claimed={claimed} total={total} />
+      <button
+        className={"side-fab" + (sideOpen ? " side-fab--open" : "")}
+        aria-label={sideOpen ? "Hide canvas info" : "Show canvas info"}
+        aria-expanded={sideOpen}
+        onClick={() => setSideOpen(!sideOpen)}
+      >{sideOpen ? "‹" : "›"}</button>
+
       <Tooltip hover={hover} />
-      <Dock api={api} viewMode={viewMode} setViewMode={setViewMode} zoomLabel={zoomLabel} />
+      {!(panelOpen && !desktop) && <Dock api={api} viewMode={viewMode} setViewMode={setViewMode} zoomLabel={zoomLabel} />}
 
       {panel && panel !== "studio" && selected && (
         <div className="panelwrap">
+          <div className="panel__grab" aria-hidden />
           {panel === "detail" && <TileDetail wall={wall} info={selected} version={ver} myTile={myTile} onClose={closeAll} onZoom={() => api.current?.zoomToTile(selected.idx, 96)} onEdit={openStudioForEdit} />}
           {panel === "claim" && <ClaimFlow wall={wall} info={selected} version={ver} accent={accent} signedIn={!!email} userEmail={email} hasTile={!!myTile} myLabel={myLabel} onClose={closeAll} onClaimed={openStudioForClaim} onZoomMine={openMine} />}
           {panel === "submitted" && (
-            <div className="panel">
-              <div className="panel__head"><span className="panel__eyebrow"><span className="studio__dot" style={{ background: accent }} />Submitted</span><button className="panel__x" onClick={() => { closeAll(); }}>✕</button></div>
+            <div className="panel panel--done">
+              <div className="confetti" aria-hidden>{Array.from({ length: CONFETTI_N }).map((_, i) => <i key={i} />)}</div>
+              <div className="panel__head"><span className="panel__eyebrow"><span className="studio__dot" style={{ background: accent }} />Submitted</span><button className="panel__x" onClick={() => { closeAll(); }} aria-label="Close">✕</button></div>
               <div className="done" style={{ paddingTop: 18 }}>
-                <div className="done__check">✓</div>
-                <h3 className="done__t">It&apos;s in the queue.</h3>
-                <p className="done__d">Your tile goes for a quick review, then appears on the wall with your name — and you can share it. Thank you for adding to the canvas.</p>
+                <div className="done__check done__check--pop">✓</div>
+                <h3 className="done__t">{submitCopy.t}</h3>
+                <p className="done__d">{submitCopy.d}</p>
                 {lastArt && <button className="btn btn--ghost btn--block" style={{ marginBottom: 10 }} onClick={() => { const a = document.createElement("a"); a.href = lastArt; a.download = "my-tile-ekam.png"; document.body.appendChild(a); a.click(); a.remove(); }}>Download your tile</button>}
                 <button className="btn btn--primary btn--block" onClick={() => { closeAll(); router.refresh(); }}>Back to the wall</button>
               </div>
@@ -366,7 +428,7 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
         <Studio tileLabel={studioTarget.current.label} initialArtUrl={studioTarget.current.artUrl} initialNote={studioTarget.current.note} initialName={studioTarget.current.name} accent={accent} onClose={() => setPanel(myTile ? "detail" : null)} onSubmit={onStudioSubmit} onSaveDraft={onSaveDraft} />
       )}
 
-      <div className="ex__hint">Scroll to zoom · drag to pan · click a tile</div>
+      <div className="ex__hint">{coarse ? "Pinch to zoom · drag to pan · tap a tile" : "Scroll to zoom · drag to pan · click a tile"}</div>
       {signInOpen && <SignInModal onClose={() => setSignInOpen(false)} />}
     </div>
   );

@@ -11,7 +11,7 @@ const DEFAULT: Track[] = [
 ];
 
 const iconBtn: React.CSSProperties = {
-  width: 32, height: 32, borderRadius: "50%", border: "1px solid var(--color-border-default)",
+  width: 36, height: 36, borderRadius: "50%", border: "1px solid var(--color-border-default)",
   background: "var(--color-bg-canvas)", color: "var(--color-text-primary)", cursor: "pointer",
   fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1,
 };
@@ -25,11 +25,12 @@ export default function MusicPlayer() {
   const vizRef = useRef<HTMLCanvasElement | null>(null);
   const acRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const gainRef = useRef<GainNode | null>(null);
   const srcNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const rafRef = useRef<number | null>(null);
 
   const [tracks, setTracks] = useState<Track[]>(DEFAULT);
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false); // opens on mount for desktop only — on phones the card would cover the canvas
   const [showList, setShowList] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -38,13 +39,24 @@ export default function MusicPlayer() {
   const [cur, setCur] = useState(0);
   const [dur, setDur] = useState(0);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const playingRef = useRef(false); playingRef.current = playing;
 
   useEffect(() => {
     fetch("/audio/playlist.json").then((r) => r.json())
       .then((d) => { if (Array.isArray(d) && d.length && d.every((t) => t?.src)) setTracks(d); })
       .catch(() => { /* keep DEFAULT */ });
+    try { const v = parseFloat(localStorage.getItem("ekam.vol") || ""); if (isFinite(v) && v >= 0 && v <= 1) setVol(v); } catch { /* default */ }
+    if (window.innerWidth >= 900) setOpen(true);
   }, []);
-  useEffect(() => { if (audioRef.current) audioRef.current.volume = vol; }, [vol]);
+
+  // Volume drives BOTH the element and a GainNode in the WebAudio graph. Once a
+  // MediaElementSource exists, some browsers (Safari/iOS) ignore element.volume —
+  // the gain node is the one that actually works everywhere.
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = vol;
+    if (gainRef.current && acRef.current) gainRef.current.gain.setTargetAtTime(vol, acRef.current.currentTime, 0.02);
+    try { localStorage.setItem("ekam.vol", String(vol)); } catch { /* fine */ }
+  }, [vol]);
 
   const track = tracks[idx] ?? tracks[0];
 
@@ -57,18 +69,37 @@ export default function MusicPlayer() {
       const ac = new AC();
       const src = ac.createMediaElementSource(audioRef.current);
       const an = ac.createAnalyser();
+      const gain = ac.createGain();
+      gain.gain.value = vol;
       an.fftSize = BARS * 2;
       an.smoothingTimeConstant = 0.8;
-      src.connect(an); an.connect(ac.destination);
-      acRef.current = ac; analyserRef.current = an; srcNodeRef.current = src;
+      src.connect(an); an.connect(gain); gain.connect(ac.destination);
+      acRef.current = ac; analyserRef.current = an; srcNodeRef.current = src; gainRef.current = gain;
     } catch { /* visualizer optional — audio still plays */ }
+  }, [vol]);
+
+  // "Shows playing but silent" fix: the AudioContext gets suspended when the tab is
+  // backgrounded or by autoplay policy. Resume it whenever we come back.
+  useEffect(() => {
+    const resume = () => {
+      const ac = acRef.current;
+      if (ac && ac.state === "suspended" && playingRef.current) ac.resume().catch(() => {});
+    };
+    document.addEventListener("visibilitychange", resume);
+    window.addEventListener("focus", resume);
+    window.addEventListener("pageshow", resume);
+    return () => {
+      document.removeEventListener("visibilitychange", resume);
+      window.removeEventListener("focus", resume);
+      window.removeEventListener("pageshow", resume);
+    };
   }, []);
 
   const drawIdle = useCallback(() => {
     const cv = vizRef.current; const ctx = cv?.getContext("2d"); if (!cv || !ctx) return;
     ctx.clearRect(0, 0, VIZ_W, VIZ_H);
     const bw = VIZ_W / BARS;
-    ctx.fillStyle = "rgba(26,24,19,0.13)";
+    ctx.fillStyle = "rgba(239,233,225,0.13)";
     for (let i = 0; i < BARS; i++) { const h = 4 + ((i * 7) % 5); ctx.fillRect(i * bw + 1, VIZ_H - h, bw - 2, h); }
   }, []);
 
@@ -101,14 +132,14 @@ export default function MusicPlayer() {
 
   const play = (i: number) => {
     const a = audioRef.current; if (!a) return;
-    ensureGraph(); acRef.current?.resume();
+    ensureGraph(); acRef.current?.resume().catch(() => {});
     setIdx(i); a.src = tracks[i].src; setCur(0);
     setLoading(true);
     a.play().then(() => { setPlaying(true); setLoading(false); }).catch(() => { setPlaying(false); setLoading(false); });
   };
   const toggle = () => {
     const a = audioRef.current; if (!a) return;
-    ensureGraph(); acRef.current?.resume();
+    ensureGraph(); acRef.current?.resume().catch(() => {});
     if (playing) { a.pause(); setPlaying(false); return; }
     if (!a.src) a.src = track.src;
     setLoading(true);
@@ -132,7 +163,7 @@ export default function MusicPlayer() {
     window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
   };
 
-  const place: React.CSSProperties = pos ? { left: pos.x, top: pos.y } : { right: 20, bottom: 20 };
+  const place: React.CSSProperties = pos ? { left: pos.x, top: pos.y } : { right: 14, bottom: "calc(14px + env(safe-area-inset-bottom))" };
 
   return (
     <>
@@ -148,10 +179,10 @@ export default function MusicPlayer() {
       />
 
       {open ? (
-        <div ref={cardRef} style={{ position: "fixed", ...place, zIndex: 60, width: 264, background: "var(--color-bg-elevated)", border: "1px solid var(--color-border-default)", borderRadius: 12, boxShadow: "0 14px 38px rgba(26,24,19,.20)", fontFamily: "var(--font-ui), sans-serif", overflow: "hidden" }}>
+        <div ref={cardRef} style={{ position: "fixed", ...place, zIndex: 27, width: "min(272px, calc(100vw - 20px))", background: "var(--color-bg-elevated)", border: "1px solid var(--color-border-default)", borderRadius: 12, boxShadow: "0 14px 38px rgba(0,0,0,.35)", fontFamily: "var(--font-ui), sans-serif", overflow: "hidden" }}>
           <div onPointerDown={onDragStart} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", cursor: "grab", borderBottom: "1px solid var(--color-border-default)", background: "var(--color-bg-surface)", touchAction: "none" }}>
             <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--color-text-muted)" }}>♪ studio radio</span>
-            <button onClick={() => setOpen(false)} aria-label="minimize player" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-text-muted)", fontSize: 18, lineHeight: 1, padding: "0 2px" }}>–</button>
+            <button onClick={() => setOpen(false)} aria-label="Minimize player" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-text-muted)", fontSize: 18, lineHeight: 1, padding: "2px 8px" }}>–</button>
           </div>
 
           {/* visualizer */}
@@ -166,28 +197,28 @@ export default function MusicPlayer() {
             {/* progress / seek */}
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 10, color: "var(--color-text-muted)", width: 28, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmt(cur)}</span>
-              <input type="range" min={0} max={dur && isFinite(dur) ? dur : 0} step={0.1} value={cur} onChange={(e) => seek(parseFloat(e.target.value))} aria-label="seek" style={{ flex: 1, accentColor: "var(--accent)" }} />
+              <input type="range" min={0} max={dur && isFinite(dur) ? dur : 0} step={0.1} value={cur} onChange={(e) => seek(parseFloat(e.target.value))} aria-label="Seek" style={{ flex: 1, accentColor: "var(--accent)", height: 24 }} />
               <span style={{ fontSize: 10, color: "var(--color-text-muted)", width: 28, fontVariantNumeric: "tabular-nums" }}>{fmt(dur)}</span>
             </div>
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14 }}>
-              <button onClick={prev} aria-label="previous" style={iconBtn} className="lift">‹‹</button>
-              <button onClick={toggle} aria-label={playing ? "pause" : "play"} style={{ ...iconBtn, width: 44, height: 44, background: "var(--accent)", color: "#16110d", border: "none", fontSize: 15 }} className="lift">{loading ? "…" : playing ? "❚❚" : "▶"}</button>
-              <button onClick={next} aria-label="next" style={iconBtn} className="lift">››</button>
+              <button onClick={prev} aria-label="Previous track" style={iconBtn} className="lift">‹‹</button>
+              <button onClick={toggle} aria-label={playing ? "Pause" : "Play"} style={{ ...iconBtn, width: 46, height: 46, background: "var(--accent)", color: "#16110d", border: "none", fontSize: 15 }} className="lift">{loading ? "…" : playing ? "❚❚" : "▶"}</button>
+              <button onClick={next} aria-label="Next track" style={iconBtn} className="lift">››</button>
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>vol</span>
-              <input type="range" min={0} max={1} step={0.01} value={vol} onChange={(e) => setVol(parseFloat(e.target.value))} aria-label="volume" style={{ flex: 1, accentColor: "var(--accent)" }} />
+              <input type="range" min={0} max={1} step={0.01} value={vol} onChange={(e) => setVol(parseFloat(e.target.value))} aria-label="Volume" style={{ flex: 1, accentColor: "var(--accent)", height: 24 }} />
             </div>
 
-            <button onClick={() => setShowList((s) => !s)} aria-expanded={showList} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-text-secondary)", fontSize: 12, fontFamily: "var(--font-ui), sans-serif", textAlign: "left", padding: 0 }}>
+            <button onClick={() => setShowList((s) => !s)} aria-expanded={showList} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-text-secondary)", fontSize: 12, fontFamily: "var(--font-ui), sans-serif", textAlign: "left", padding: "4px 0" }}>
               browse tracks ({tracks.length}) {showList ? "▴" : "▾"}
             </button>
             {showList && (
               <div style={{ maxHeight: 152, overflowY: "auto", display: "flex", flexDirection: "column", gap: 2, borderTop: "1px solid var(--color-border-default)", paddingTop: 6 }}>
                 {tracks.map((t, i) => (
-                  <button key={i} onClick={() => { play(i); setShowList(false); }} style={{ textAlign: "left", padding: "6px 8px", borderRadius: 6, border: "none", cursor: "pointer", background: i === idx ? "var(--color-bg-surface)" : "transparent" }}>
+                  <button key={i} onClick={() => { play(i); setShowList(false); }} style={{ textAlign: "left", padding: "8px 8px", borderRadius: 6, border: "none", cursor: "pointer", background: i === idx ? "var(--color-bg-surface)" : "transparent" }}>
                     <div style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, fontWeight: i === idx ? 600 : 400, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.title}</div>
                     <div style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 11, color: "var(--color-text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.artist}</div>
                   </button>
@@ -197,7 +228,7 @@ export default function MusicPlayer() {
           </div>
         </div>
       ) : (
-        <button onClick={() => setOpen(true)} aria-label="open music player" style={{ position: "fixed", right: 20, bottom: 20, zIndex: 60, width: 46, height: 46, borderRadius: "50%", background: "var(--accent)", color: "#16110d", border: "none", cursor: "pointer", boxShadow: "0 8px 24px rgba(0,0,0,.4)", fontSize: 18 }}>
+        <button onClick={() => setOpen(true)} aria-label="Open music player" style={{ position: "fixed", right: 14, bottom: "calc(14px + env(safe-area-inset-bottom))", zIndex: 27, width: 48, height: 48, borderRadius: "50%", background: "var(--accent)", color: "#16110d", border: "none", cursor: "pointer", boxShadow: "0 8px 24px rgba(0,0,0,.4)", fontSize: 18 }}>
           {playing ? "♪" : "♫"}
         </button>
       )}

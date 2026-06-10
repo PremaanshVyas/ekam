@@ -12,8 +12,11 @@ export async function approve(id: string) {
 
   if (tile.pending_image_path) {
     // Approving an edit to an already-published tile → promote the pending edit to live.
+    // The submit pipeline uploads `<image>.thumb.png` beside every image, so the new
+    // thumb path is derivable; the wall composite falls back to the full PNG if absent.
     await db.from("tiles").update({
       image_path: tile.pending_image_path,
+      thumb_path: tile.pending_image_path.replace(/\.png$/, ".thumb.png"),
       story: tile.pending_story,
       pending_image_path: null, pending_story: null, pending_submitted_at: null,
       published_at: new Date().toISOString(),

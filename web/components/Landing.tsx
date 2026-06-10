@@ -71,17 +71,17 @@ function TileThumb({ wall, idx }: { wall: Wall | null; idx: number }) {
 }
 
 const HOW_STEPS = [
-  { n: "01", t: "Claim a tile", d: "Open the canvas, tap any open tile, and enter your email. We send a one-time code; type it back and the tile is yours. No password, no account — just proof it's really you." },
-  { n: "02", t: "Paint what home looks like", d: "A tiny paint studio opens on your blank tile. Brushes, colours, your hand — a window, a kitchen, a feeling. The prompt is soft: where were you when home looked like this?" },
-  { n: "03", t: "Submit it", d: "Hit submit and your tile goes for a quick review, then joins the wall with your name beside it and a line about why you made it." },
-  { n: "04", t: "Watch it fill", d: "Zoom from the whole wall — hundreds of strangers' tiles at once — down to a single hand. The canvas is never the same twice." },
+  { n: "01", t: "Claim a tile", d: "Open the canvas, tap any open tile, and enter your email. We send you a code; type it back and the tile is yours. No password, no account, just proof it's really you." },
+  { n: "02", t: "Paint what home looks like", d: "A little paint studio opens on your blank tile. Brushes, colours, your hand. A window, a kitchen, a feeling. The prompt is soft: where were you when home looked like this?" },
+  { n: "03", t: "Submit it", d: "Hit submit and your tile goes in for a quick review, then joins the wall with your name beside it and a line about why you made it." },
+  { n: "04", t: "Watch it fill", d: "Zoom from the whole wall, hundreds of strangers' tiles at once, down to a single hand. The canvas is never the same twice." },
 ];
 
 const RULES = [
   { t: "One tile, one person", d: "Each email claims a single tile. Everyone is exactly the same size here." },
   { t: "One small square", d: "Every tile is the same tiny canvas. Constraint is what makes it beautiful together." },
-  { t: "Paint your answer", d: "What does home look like to you? No curation of style — your tile, your hand." },
-  { t: "It stays", d: "Once it's approved, your tile is part of the canvas — preserved when the wall completes." },
+  { t: "Paint your answer", d: "What does home look like to you? No curation of style. Your tile, your hand." },
+  { t: "It stays", d: "Once it's approved, your tile is part of the canvas, preserved when the wall completes." },
 ];
 
 export default function Landing({ total, claimed, published, email, myTile }: { total: number; claimed: number; published: number; email: string | null; myTile: { label: string } | null }) {
@@ -91,7 +91,8 @@ export default function Landing({ total, claimed, published, email, myTile }: { 
   const [signInOpen, setSignInOpen] = useState(false);
   const open = Math.max(0, total - claimed);
 
-  useEffect(() => { setWall(createDemoWall(24, 0.7)); setVer((v) => v + 1); }, []);
+  // smaller per-tile resolution on phones: same look at phone size, a fraction of the memory
+  useEffect(() => { setWall(createDemoWall(24, 0.7, window.innerWidth < 700 ? 56 : 96)); setVer((v) => v + 1); }, []);
   useEffect(() => {
     const onScroll = () => setSolid(window.scrollY > 40);
     window.addEventListener("scroll", onScroll); onScroll();
@@ -120,12 +121,12 @@ export default function Landing({ total, claimed, published, email, myTile }: { 
           {email ? (
             <>
               <span className="authchip" title={email}>{email}</span>
-              <form action={signOut} style={{ display: "inline" }}><button type="submit" className="linkbtn">sign out</button></form>
-              <Link className="btn btn--primary" href={myTile ? "/canvas?mine=1" : "/canvas"}>{myTile ? "your tile" : "claim a tile"}</Link>
+              <form action={signOut} style={{ display: "inline" }}><button type="submit" className="linkbtn">Sign out</button></form>
+              <Link className="btn btn--primary" href={myTile ? "/canvas?mine=1" : "/canvas"}>{myTile ? "Your tile" : "Claim a tile"}</Link>
             </>
           ) : (
             <>
-              <button className="linkbtn" onClick={() => setSignInOpen(true)}>sign in</button>
+              <button className="linkbtn" onClick={() => setSignInOpen(true)}>Sign in</button>
               <Link className="btn btn--primary" href="/canvas">Open the canvas</Link>
             </>
           )}
@@ -141,14 +142,14 @@ export default function Landing({ total, claimed, published, email, myTile }: { 
         </div>
         <div className="hero__inner">
           <div className="hero__eyebrow"><span className="livedot" /> {fmt(open)} tiles still open on this canvas</div>
-          <h1 className="hero__title">576 strangers.<br />One canvas.<br /><em>One moment in history.</em></h1>
-          <p className="hero__sub">Claim a tile with your email. Hand-paint what home looks like. Leave your mark on a canvas hundreds of strangers are making together — just your email and a few minutes.</p>
+          <h1 className="hero__title">Leave the words.<br />Draw the lines.<br /><em>Say what&apos;s in your mind.</em></h1>
+          <p className="hero__sub">Claim a tile with your email and paint what home looks like. Something surreal is forming here: one canvas, hundreds of strangers, each holding one small square. Just your email and a few minutes.</p>
           <div className="hero__cta">
             <Link className="btn btn--primary btn--lg" href="/canvas">Claim your tile</Link>
             <a className="btn btn--ghost btn--lg" href="#how">See how it works</a>
           </div>
           <div className="hero__ticker"><LiveCounter claimed={claimed} total={total} /></div>
-          <p className="hero__demo">✦ <b>The wall above is a demo preview</b> — a sense of what the canvas becomes. The live wall is just getting started; <Link href="/canvas" style={{ color: "var(--accent)" }}>open the canvas</Link> to claim a real tile.</p>
+          <p className="hero__demo">✦ <b>The wall above is a demo preview</b>, a sense of what the canvas becomes. The live wall is just getting started; <Link href="/canvas" style={{ color: "var(--accent)" }}>open the canvas</Link> to claim a real tile.</p>
         </div>
         <a className="hero__scrollhint" href="#how">Scroll<span className="hero__scrollline" /></a>
       </section>
@@ -166,7 +167,7 @@ export default function Landing({ total, claimed, published, email, myTile }: { 
       {/* manifesto */}
       <section className="band">
         <Reveal>
-          <p className="bigquote">This isn&apos;t a marketplace. It&apos;s a <em>wall</em> — {fmt(total)} little squares, each one painted by a different person, sitting side by side at exactly the same size.</p>
+          <p className="bigquote">This isn&apos;t a marketplace. It&apos;s a <em>wall</em>: {fmt(total)} little squares, each one painted by a different person, sitting side by side at exactly the same size.</p>
           <p className="bigquote__by">Claim one, paint what home looks like, and your mark stays. That&apos;s the whole thing.</p>
         </Reveal>
       </section>
@@ -188,7 +189,7 @@ export default function Landing({ total, claimed, published, email, myTile }: { 
       <section className="band" id="wall">
         <Reveal><div className="sectionhead"><span className="kicker">Three ways to look</span><h2 className="h2">From the whole wall<br />to a single hand</h2></div></Reveal>
         <div className="modes">
-          {([["macro", "The whole wall", `${fmt(total)} tiles at once — a quilt of strangers, all at the same scale.`], ["mid", "Neighbourhoods", "Pan around and find the little clusters where styles rhyme."], ["micro", "A single hand", "One tile: one person's painting, their name, and a line about it."]] as const).map(([kind, t, d]) => (
+          {([["macro", "The whole wall", `${fmt(total)} tiles at once: a quilt of strangers, all at the same scale.`], ["mid", "Neighbourhoods", "Pan around and find the little clusters where styles rhyme."], ["micro", "A single hand", "One tile: one person's painting, their name, and a line about it."]] as const).map(([kind, t, d]) => (
             <Reveal key={kind} className="mode">
               <div className="shot"><StaticShot wall={wall} kind={kind} /></div>
               <div className="mode__meta"><span className="mode__t">{t}</span><p className="mode__d">{d}</p></div>
@@ -226,7 +227,7 @@ export default function Landing({ total, claimed, published, email, myTile }: { 
             );
           })}
         </div>
-        <p className="hero__demo" style={{ marginTop: 28 }}>Demo tiles, for a sense of it — the live wall is yours to fill.</p>
+        <p className="hero__demo" style={{ marginTop: 28 }}>Demo tiles, for a sense of it. The live wall is yours to fill.</p>
       </section>
 
       {/* closer */}
@@ -240,7 +241,7 @@ export default function Landing({ total, claimed, published, email, myTile }: { 
 
       {/* footer */}
       <footer className="foot">
-        <div className="foot__brand"><Logo /><span className="foot__tag">576 strangers, one canvas.</span></div>
+        <div className="foot__brand"><Logo /><span className="foot__tag">Leave the words. Draw the lines. Say what&apos;s in your mind.</span></div>
         <div className="foot__cols">
           <div className="foot__col"><span className="foot__h">Canvas</span><Link href="/canvas">The wall</Link><a href="#how">How it works</a><a href="#rules">The rules</a></div>
           <div className="foot__col"><span className="foot__h">About</span><a href="#">Manifesto</a><a href="#wall">Three ways to look</a><a href="#">What home looks like</a></div>

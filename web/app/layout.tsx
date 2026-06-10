@@ -26,28 +26,34 @@ export const metadata: Metadata = {
   },
   title: "ekam.ink",
   description:
-    "576 strangers. One canvas. One moment in history. Claim a tile, hand-paint what home looks like, and your story lives on it forever.",
+    "Leave the words. Draw the lines. Say what's in your mind. Claim a tile, paint what home looks like, and your story lives on a canvas made by hundreds of strangers.",
   openGraph: {
-    title: "ekam.ink — 576 strangers. One canvas. One moment in history.",
+    title: "ekam.ink · Leave the words. Draw the lines.",
     description:
-      "Claim a tile. Hand-paint what home looks like. When it's complete, it becomes one artwork — and your story lives on it forever.",
+      "Say what's in your mind. Claim a tile, paint what home looks like, and when the wall completes it becomes one artwork with your story on it forever.",
     url: "https://ekam.ink",
     siteName: "ekam.ink",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "ekam.ink — 576 strangers. One canvas. One moment in history.",
-    description: "Claim a tile. Hand-paint what home looks like. Your story lives on it forever.",
+    title: "ekam.ink · Leave the words. Draw the lines.",
+    description: "Say what's in your mind. Claim a tile, paint what home looks like, and your story lives on the wall forever.",
   },
 };
 
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const supa = process.env.NEXT_PUBLIC_SUPABASE_URL;
   return (
     <html lang="en" className={`${serif.variable} ${sans.variable} ${mono.variable}`}>
-      <body>{children}<MusicPlayerMount /></body>
+      <body>
+        {supa && <link rel="preconnect" href={supa} crossOrigin="anonymous" />}
+        {supa && <link rel="dns-prefetch" href={supa} />}
+        {children}
+        <MusicPlayerMount />
+      </body>
     </html>
   );
 }

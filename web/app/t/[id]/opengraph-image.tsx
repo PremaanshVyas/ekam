@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { supabaseAnon } from "@/lib/supabase";
 
-export const alt = "A tile on ekam.ink — what home looks like";
+export const alt = "A tile on ekam.ink · what home looks like";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -53,7 +53,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
           {live && tt?.story ? (
             <div style={{ fontFamily: "Spectral", fontSize: 27, fontStyle: "italic", marginTop: 22, color: "#b3a89b" }}>{`“${tt.story.slice(0, 90)}”`}</div>
           ) : (
-            <div style={{ fontSize: 24, marginTop: 22, color: "#b3a89b" }}>576 strangers. One canvas.</div>
+            <div style={{ fontSize: 24, marginTop: 22, color: "#b3a89b" }}>Leave the words. Draw the lines.</div>
           )}
           <div style={{ fontSize: 22, marginTop: 30, color: "#7d7264", letterSpacing: 2 }}>ekam.ink</div>
         </div>

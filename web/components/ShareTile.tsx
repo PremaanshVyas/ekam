@@ -33,7 +33,7 @@ export default function ShareTile({ url, imageUrl, title }: { url: string; image
   // otherwise download the image so it can be posted to IG manually.
   const insta = async () => {
     if (typeof navigator !== "undefined" && navigator.share) { try { await navigator.share({ title, text: title, url }); return; } catch {} }
-    if (imageUrl) { await download(); alert("Image saved — open Instagram and post it 💛"); } else { copy(); }
+    if (imageUrl) { await download(); alert("Image saved. Open Instagram and post it 💛"); } else { copy(); }
   };
 
   return (

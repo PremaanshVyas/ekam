@@ -11,7 +11,7 @@ export default function Logo({ sm = false, link = true }: { sm?: boolean; link?:
     </>
   );
   return link ? (
-    <Link href="/" className="ekam-logo" aria-label="ekam.ink — home">{inner}</Link>
+    <Link href="/" className="ekam-logo" aria-label="ekam.ink, home">{inner}</Link>
   ) : (
     <span className="ekam-logo">{inner}</span>
   );
