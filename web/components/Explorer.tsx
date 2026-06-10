@@ -312,6 +312,14 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
     return () => { document.documentElement.style.overscrollBehavior = prev; };
   }, []);
 
+  // fixed-position roots are their own stacking contexts, so z-index can't layer the
+  // global music player under panels — hide its UI (audio keeps playing) while one is open
+  useEffect(() => {
+    if (panel) document.body.setAttribute("data-panel", "1");
+    else document.body.removeAttribute("data-panel");
+    return () => document.body.removeAttribute("data-panel");
+  }, [panel]);
+
   useEffect(() => { const id = setInterval(() => { if (api.current) setZoomLabel(api.current.getZoomLabel()); }, 250); return () => clearInterval(id); }, []);
 
   const onHover = useCallback((info: TileInfo | null, x?: number, y?: number) => setHover(info ? { info, x: x ?? 0, y: y ?? 0 } : null), []);

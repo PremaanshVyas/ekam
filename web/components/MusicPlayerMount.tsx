@@ -8,5 +8,5 @@ import MusicPlayer from "@/components/MusicPlayer";
 export default function MusicPlayerMount() {
   const pathname = usePathname();
   const hidden = pathname?.startsWith("/t/") || pathname?.startsWith("/admin");
-  return <div style={hidden ? { display: "none" } : undefined}><MusicPlayer /></div>;
+  return <div className="mp-root" style={hidden ? { display: "none" } : undefined}><MusicPlayer /></div>;
 }
