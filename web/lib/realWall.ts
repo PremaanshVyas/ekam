@@ -50,5 +50,6 @@ export function createRealWall(GRID: number, tiles: RealTileInput[], myIdx: numb
     return info;
   };
 
-  return { GRID, TILE_PX, HI, N_TOTAL, bg: BG, accent: ACCENT, PAPER, palette: [], hi, recent: null, claimedCount, isClaimed, infoFor };
+  const artUrlFor = (idx: number) => { const t = byIdx.get(idx); return t && t.status === "published" && t.img && !t.img.startsWith("#") ? t.img : null; };
+  return { GRID, TILE_PX, HI, N_TOTAL, bg: BG, accent: ACCENT, PAPER, palette: [], hi, recent: null, claimedCount, isClaimed, infoFor, artUrlFor };
 }

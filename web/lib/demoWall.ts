@@ -15,6 +15,7 @@ export type Wall = {
   claimedCount: number;
   isClaimed: (idx: number) => boolean;
   infoFor: (idx: number) => TileInfo;
+  artUrlFor?: (idx: number) => string | null; // full-res source for a published tile (real wall)
 };
 
 type Ctx = CanvasRenderingContext2D;

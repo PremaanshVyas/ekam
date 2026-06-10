@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { EDITOR_PALETTE } from "@/lib/demoWall";
 
-const DRAW_RES = 256;   // paint buffer resolution
+const DRAW_RES = 512;   // paint buffer resolution (higher = crisper tiles everywhere)
 const EDIT_CSS = 276;   // display size
 const PAPER = "#f4eee2";
-const BRUSH: Record<string, number> = { S: 7, M: 16, L: 30 };
+const BRUSH: Record<string, number> = { S: 14, M: 32, L: 60 }; // same relative feel at 512
+const DOT: Record<string, number> = { S: 7, M: 12, L: 18 };    // size-button indicator dots
 type Tool = "brush" | "eraser" | "fill" | "eyedropper";
 
 export default function Studio({
@@ -128,7 +129,7 @@ export default function Studio({
         <div className="studio__sizes">
           {["S", "M", "L"].map((s) => (
             <button key={s} className={"sizebtn" + (size === s ? " sizebtn--on" : "")} onClick={() => setSize(s)} title={"Brush " + s}>
-              <span className="sizedot" style={{ width: BRUSH[s] / 2 + 4, height: BRUSH[s] / 2 + 4 }} />
+              <span className="sizedot" style={{ width: DOT[s], height: DOT[s] }} />
             </button>
           ))}
         </div>

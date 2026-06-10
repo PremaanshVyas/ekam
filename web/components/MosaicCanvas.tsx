@@ -19,13 +19,13 @@ function scheduleFrame(cb: (t: number) => void): number {
 
 export default function MosaicCanvas({
   wall, version = 0, interactive = false, hero = false, viewMode = "claimed",
-  onHover, onSelect, selectedIdx = -1, hoverIdx = -1, initialZoom = "macro", apiRef, accent = "#e8643c",
+  onHover, onSelect, selectedIdx = -1, hoverIdx = -1, initialZoom = "macro", apiRef, accent = "#e8643c", grid = false,
 }: {
   wall: Wall; version?: number; interactive?: boolean; hero?: boolean; viewMode?: ViewMode;
   onHover?: (info: TileInfo | null, x?: number, y?: number) => void;
   onSelect?: (info: TileInfo) => void;
   selectedIdx?: number; hoverIdx?: number; initialZoom?: "macro" | "mid" | "micro";
-  apiRef?: React.MutableRefObject<MosaicApi | null>; accent?: string;
+  apiRef?: React.MutableRefObject<MosaicApi | null>; accent?: string; grid?: boolean;
 }) {
   const GRID = wall.GRID;
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -37,8 +37,8 @@ export default function MosaicCanvas({
   const animRef = useRef<{ from: { scale: number; ox: number; oy: number }; to: { scale: number; ox: number; oy: number }; start: number; dur: number } | null>(null);
   const heroRef = useRef(0);
   const pointer = useRef({ down: false, moved: false, sx: 0, sy: 0, lx: 0, ly: 0, everInteracted: false });
-  const stateRef = useRef({ viewMode, selectedIdx, hoverIdx, accent });
-  stateRef.current = { viewMode, selectedIdx, hoverIdx, accent };
+  const stateRef = useRef({ viewMode, selectedIdx, hoverIdx, accent, grid });
+  stateRef.current = { viewMode, selectedIdx, hoverIdx, accent, grid };
   const wallRef = useRef(wall); wallRef.current = wall;
 
   const draw = useCallback(() => {
@@ -46,28 +46,41 @@ export default function MosaicCanvas({
     const ctx = canvas.getContext("2d"); if (!ctx) return;
     const W = wallRef.current; const dpr = window.devicePixelRatio || 1;
     const { w, h } = sizeRef.current; const { scale, ox, oy } = view.current;
-    const { viewMode, selectedIdx, hoverIdx, accent } = stateRef.current;
+    const { viewMode, selectedIdx, hoverIdx, accent, grid } = stateRef.current;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = W.bg; ctx.fillRect(0, 0, w, h);
     const size = GRID * scale;
     ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
-    if (W.hi) ctx.drawImage(W.hi, ox, oy, size, size);
-    if (viewMode === "recent" && W.recent) { ctx.imageSmoothingEnabled = true; ctx.drawImage(W.recent, ox, oy, size, size); }
 
     const x0 = Math.max(0, Math.floor((0 - ox) / scale));
     const y0 = Math.max(0, Math.floor((0 - oy) / scale));
     const x1 = Math.min(GRID, Math.ceil((w - ox) / scale));
     const y1 = Math.min(GRID, Math.ceil((h - oy) / scale));
 
-    if (viewMode === "all" && scale > 8) {
-      ctx.lineWidth = 1; ctx.strokeStyle = "rgba(239,233,225,0.07)";
-      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) { const idx = y * GRID + x; if (!W.isClaimed(idx)) ctx.strokeRect(ox + x * scale + 0.5, oy + y * scale + 0.5, scale - 1, scale - 1); }
+    const complete = W.N_TOTAL > 0 && W.claimedCount >= W.N_TOTAL;
+    const gridded = grid && !complete && scale >= 5;
+    const gap = gridded ? Math.max(1, scale * 0.06) : 0;
+
+    if (!gridded) {
+      if (W.hi) ctx.drawImage(W.hi, ox, oy, size, size); // seamless: hero, far-out zoom, or complete
+    } else {
+      // distinct tiles with grout gaps (cream-style) — dark bg shows between them
+      const t = W.TILE_PX;
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+        const dx = ox + x * scale, dy = oy + y * scale;
+        if (W.hi) ctx.drawImage(W.hi, x * t, y * t, t, t, dx + gap / 2, dy + gap / 2, scale - gap, scale - gap);
+      }
     }
-    if (scale > 9) {
-      ctx.lineWidth = 1; ctx.strokeStyle = "rgba(10,8,6,0.45)"; ctx.beginPath();
-      for (let x = x0; x <= x1; x++) { const px = Math.round(ox + x * scale) + 0.5; ctx.moveTo(px, oy + y0 * scale); ctx.lineTo(px, oy + y1 * scale); }
-      for (let y = y0; y <= y1; y++) { const py = Math.round(oy + y * scale) + 0.5; ctx.moveTo(ox + x0 * scale, py); ctx.lineTo(ox + x1 * scale, py); }
-      ctx.stroke();
+    if (viewMode === "recent" && W.recent) ctx.drawImage(W.recent, ox, oy, size, size);
+
+    if (gridded) {
+      // light grout borders so every cell (even empty) reads as a tile in the grid
+      ctx.lineWidth = 1;
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+        const claimed = W.isClaimed(y * GRID + x);
+        ctx.strokeStyle = claimed ? "rgba(239,233,225,0.18)" : (viewMode === "all" ? "rgba(239,233,225,0.18)" : "rgba(239,233,225,0.10)");
+        ctx.strokeRect(ox + x * scale + gap / 2 + 0.5, oy + y * scale + gap / 2 + 0.5, scale - gap - 1, scale - gap - 1);
+      }
     }
     if (hoverIdx >= 0) {
       const hx = hoverIdx % GRID, hy = (hoverIdx / GRID) | 0; const px = ox + hx * scale, py = oy + hy * scale;

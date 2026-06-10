@@ -26,7 +26,9 @@ function TileArt({ wall, idx, region = 1, version, artUrl, className }: { wall: 
     cv.width = W * dpr; cv.height = H * dpr; const g = cv.getContext("2d"); if (!g) return;
     g.setTransform(dpr, 0, 0, dpr, 0, 0); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
     g.fillStyle = wall.bg; g.fillRect(0, 0, W, H);
-    if (region === 1 && artUrl) { const im = new Image(); im.onload = () => { g.fillStyle = wall.PAPER; g.fillRect(0, 0, W, H); g.drawImage(im, 0, 0, W, H); }; im.src = artUrl; return; }
+    // single tile → load the FULL-RES source (crisp), not the low-res composite crop
+    const url = region === 1 ? (artUrl ?? wall.artUrlFor?.(idx) ?? null) : null;
+    if (url) { const im = new Image(); im.onload = () => { g.fillStyle = wall.PAPER; g.fillRect(0, 0, W, H); g.drawImage(im, 0, 0, W, H); }; im.src = url; return; }
     const t = wall.TILE_PX, cx = idx % wall.GRID, cy = (idx / wall.GRID) | 0, half = (region - 1) / 2;
     g.drawImage(wall.hi, (cx - half) * t, (cy - half) * t, region * t, region * t, 0, 0, W, H);
     if (region > 1) { const cell = W / region; g.strokeStyle = wall.accent; g.lineWidth = 2; g.strokeRect(half * cell + 1, half * cell + 1, cell - 2, cell - 2); }
@@ -302,7 +304,7 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
   return (
     <div className="explorer">
       <div className="ex__canvas">
-        <MosaicCanvas wall={wall} interactive viewMode={viewMode} version={ver} accent={accent}
+        <MosaicCanvas wall={wall} interactive grid viewMode={viewMode} version={ver} accent={accent}
           apiRef={api} onHover={onHover} onSelect={onSelect}
           selectedIdx={selected ? selected.idx : -1} hoverIdx={hover ? hover.info.idx : -1} initialZoom="macro" />
         <div className="ex__grain" />

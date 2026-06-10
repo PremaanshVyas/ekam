@@ -3,6 +3,7 @@ import Link from "next/link";
 import { supabaseAdmin } from "@/lib/supabase";
 import { isAdmin } from "@/lib/admin-auth";
 import { approve, reject, removeTile } from "./actions";
+import AdminImage from "@/components/AdminImage";
 
 export const dynamic = "force-dynamic";
 
@@ -67,7 +68,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               const story = isEdit ? r.pending_story : r.story;
               return (
                 <div key={r.id} style={{ display: "flex", gap: 16, alignItems: "center", background: "var(--color-bg-elevated)", border: "1px solid var(--color-border-default)", borderRadius: 8, padding: 12 }}>
-                  <div style={{ width: 72, height: 72, flexShrink: 0, borderRadius: 4, border: "1px solid var(--color-border-default)", background: img ? `center/cover url("${base}${img}")` : "var(--palette-paper)" }} />
+                  <AdminImage img={img} base={base} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ display: "inline-block", fontFamily: "var(--font-ui), sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: isEdit ? "var(--palette-ink)" : "var(--color-text-inverse)", background: isEdit ? "var(--palette-honey)" : "var(--palette-pine)", borderRadius: 4, padding: "2px 7px", marginBottom: 5 }}>{isEdit ? "edit · live tile" : "new"}</span>
                     <div style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 18, color: "var(--color-text-primary)" }}>“{story}”</div>
@@ -92,7 +93,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             {painted.length === 0 && <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 20, color: "var(--color-text-secondary)" }}>nothing published yet.</p>}
             {painted.map((r) => (
               <div key={r.id} style={{ display: "flex", gap: 16, alignItems: "center", background: "var(--color-bg-elevated)", border: "1px solid var(--color-border-default)", borderRadius: 8, padding: 12 }}>
-                <div style={{ width: 72, height: 72, flexShrink: 0, borderRadius: 4, border: "1px solid var(--color-border-default)", background: r.image_path ? `center/cover url("${base}${r.image_path}")` : "var(--palette-paper)" }} />
+                <AdminImage img={r.image_path} base={base} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 18, color: "var(--color-text-primary)" }}>“{r.story}”</div>
                   <div style={meta}>{r.artist_name} · tile {r.x},{r.y}{r.artist_location ? ` · ${r.artist_location}` : ""}</div>
