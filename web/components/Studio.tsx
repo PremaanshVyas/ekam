@@ -5,8 +5,6 @@ import { EDITOR_PALETTE } from "@/lib/demoWall";
 
 const DRAW_RES = 1024;   // high-res paint buffer
 const PAPER = "#f4eee2";
-const SIZE: Record<string, number> = { S: 24, M: 56, L: 110 }; // base width in buffer px
-const DOT: Record<string, number> = { S: 7, M: 12, L: 18 };
 
 type BrushType = "pen" | "marker" | "highlighter" | "airbrush" | "pencil";
 type Tool = "brush" | "eraser" | "fill" | "eyedropper";
@@ -39,17 +37,20 @@ export default function Studio({
   const [color, setColor] = useState(accent);
   const [tool, setTool] = useState<Tool>("brush");
   const [brushType, setBrushType] = useState<BrushType>("pen");
-  const [size, setSize] = useState("M");
+  const [brushPx, setBrushPx] = useState(56);
+  const [opacity, setOpacity] = useState(1);
   const [mirror, setMirror] = useState(false);
   const [note, setNote] = useState(initialNote);
   const [submitting, setSubmitting] = useState(false);
   const [loadingArt, setLoadingArt] = useState<boolean>(!!initialArtUrl);
+  const [recent, setRecent] = useState<string[]>([]);
   const dirtyRef = useRef(false);
   const undoRef = useRef<ImageData[]>([]);
+  const redoRef = useRef<ImageData[]>([]);
   const drawingRef = useRef(false);
   const ptsRef = useRef<Pt[]>([]);
-  const live = useRef({ tool, color, size, mirror, brushType });
-  live.current = { tool, color, size, mirror, brushType };
+  const live = useRef({ tool, color, brushPx, opacity, mirror, brushType });
+  live.current = { tool, color, brushPx, opacity, mirror, brushType };
 
   if (!bufRef.current) {
     const b = document.createElement("canvas"); b.width = DRAW_RES; b.height = DRAW_RES;
@@ -66,7 +67,7 @@ export default function Studio({
     g.drawImage(bufRef.current!, 0, 0, cv.width, cv.height);
     if (drawingRef.current && live.current.tool === "brush") {
       const bp = BRUSHES[live.current.brushType];
-      g.globalAlpha = bp.alpha; g.globalCompositeOperation = bp.blend;
+      g.globalAlpha = bp.alpha * live.current.opacity; g.globalCompositeOperation = bp.blend;
       g.drawImage(strokeRef.current!, 0, 0, cv.width, cv.height);
       g.globalAlpha = 1; g.globalCompositeOperation = "source-over";
     }
@@ -131,7 +132,14 @@ export default function Studio({
     img.src = initialArtUrl;
   }, [initialArtUrl]);
 
-  const snapshot = () => { const g = bufRef.current!.getContext("2d")!; undoRef.current.push(g.getImageData(0, 0, DRAW_RES, DRAW_RES)); if (undoRef.current.length > 15) undoRef.current.shift(); };
+  // recent custom colours (persisted per device)
+  useEffect(() => { try { const r = JSON.parse(localStorage.getItem("ekam.recentColors") || "[]"); if (Array.isArray(r)) setRecent(r.slice(0, 8)); } catch {} }, []);
+  useEffect(() => {
+    if (EDITOR_PALETTE.includes(color)) return;
+    setRecent((prev) => { const next = [color, ...prev.filter((c) => c !== color)].slice(0, 8); try { localStorage.setItem("ekam.recentColors", JSON.stringify(next)); } catch {} return next; });
+  }, [color]);
+
+  const snapshot = () => { const g = bufRef.current!.getContext("2d")!; undoRef.current.push(g.getImageData(0, 0, DRAW_RES, DRAW_RES)); if (undoRef.current.length > 12) undoRef.current.shift(); redoRef.current = []; };
 
   useEffect(() => {
     const cv = dispRef.current!;
@@ -141,7 +149,7 @@ export default function Studio({
     const target = () => (isEraser() ? buf() : sc());
     const paintCol = () => (isEraser() ? PAPER : live.current.color);
     const bp = () => BRUSHES[live.current.brushType];
-    const widthOf = (pt: Pt) => SIZE[live.current.size] * (isEraser() ? 1 : bp().scale) * (0.4 + 0.6 * pt.p);
+    const widthOf = (pt: Pt) => live.current.brushPx * (isEraser() ? 1 : bp().scale) * (0.4 + 0.6 * pt.p);
     const prep = (g: CanvasRenderingContext2D, w: number) => { const c = paintCol(); g.strokeStyle = c; g.fillStyle = c; g.lineCap = "round"; g.lineJoin = "round"; g.lineWidth = w; g.shadowBlur = isEraser() ? 0 : bp().soft * w; g.shadowColor = c; };
     const toBuf = (e: PointerEvent): Pt => { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * DRAW_RES, y: (e.clientY - r.top) / r.height * DRAW_RES, p: e.pointerType === "pen" && e.pressure > 0 ? e.pressure : 1 }; };
     const dot = (pt: Pt) => { const g = target(), w = widthOf(pt); prep(g, w); g.beginPath(); g.arc(pt.x, pt.y, w / 2, 0, 7); g.fill(); if (live.current.mirror) { g.beginPath(); g.arc(DRAW_RES - pt.x, pt.y, w / 2, 0, 7); g.fill(); } g.shadowBlur = 0; };
@@ -157,7 +165,7 @@ export default function Studio({
       while (stack.length) { const i = stack.pop()!; if (seen[i]) continue; seen[i] = 1; const o = i * 4; if (Math.abs(data[o] - tr) + Math.abs(data[o + 1] - tg) + Math.abs(data[o + 2] - tb) > tol) continue; data[o] = nr; data[o + 1] = ng; data[o + 2] = nb; data[o + 3] = 255; const x = i % W, y = (i / W) | 0; if (x > 0) stack.push(i - 1); if (x < W - 1) stack.push(i + 1); if (y > 0) stack.push(i - W); if (y < W - 1) stack.push(i + W); }
       g.putImageData(img, 0, 0); dirtyRef.current = true;
     };
-    const commit = () => { if (isEraser()) return; const g = buf(); const p = BRUSHES[live.current.brushType]; g.save(); g.globalAlpha = p.alpha; g.globalCompositeOperation = p.blend; g.drawImage(strokeRef.current!, 0, 0); g.restore(); sc().clearRect(0, 0, DRAW_RES, DRAW_RES); };
+    const commit = () => { if (isEraser()) return; const g = buf(); const p = BRUSHES[live.current.brushType]; g.save(); g.globalAlpha = p.alpha * live.current.opacity; g.globalCompositeOperation = p.blend; g.drawImage(strokeRef.current!, 0, 0); g.restore(); sc().clearRect(0, 0, DRAW_RES, DRAW_RES); };
 
     const down = (e: PointerEvent) => {
       const t = live.current.tool, p = toBuf(e);
@@ -185,7 +193,9 @@ export default function Studio({
     return () => { cv.removeEventListener("pointerdown", down); cv.removeEventListener("pointermove", move); cv.removeEventListener("pointerup", up); cv.removeEventListener("pointerleave", up); cv.removeEventListener("pointercancel", up); };
   }, []);
 
-  const undo = () => { if (undoRef.current.length) { bufRef.current!.getContext("2d")!.putImageData(undoRef.current.pop()!, 0, 0); renderDisplay(); force((n) => n + 1); autosaveRef.current(); } };
+  const snapBuf = () => bufRef.current!.getContext("2d")!.getImageData(0, 0, DRAW_RES, DRAW_RES);
+  const undo = () => { if (!undoRef.current.length) return; redoRef.current.push(snapBuf()); bufRef.current!.getContext("2d")!.putImageData(undoRef.current.pop()!, 0, 0); renderDisplay(); force((n) => n + 1); autosaveRef.current(); };
+  const redo = () => { if (!redoRef.current.length) return; undoRef.current.push(snapBuf()); bufRef.current!.getContext("2d")!.putImageData(redoRef.current.pop()!, 0, 0); renderDisplay(); force((n) => n + 1); autosaveRef.current(); };
   const clearAll = () => { snapshot(); const g = bufRef.current!.getContext("2d")!; g.fillStyle = PAPER; g.fillRect(0, 0, DRAW_RES, DRAW_RES); dirtyRef.current = false; renderDisplay(); force((n) => n + 1); autosaveRef.current(); };
   const submit = async () => {
     if (!dirtyRef.current || submitting) return;
@@ -211,6 +221,14 @@ export default function Studio({
       </div>
 
       <div className="studio-full__dock">
+        {recent.length > 0 && (
+          <div className="studio-full__recent">
+            <span className="studio-full__rlabel">recent</span>
+            {recent.map((c) => (
+              <button key={c} className={"sw" + (color === c ? " sw--on" : "")} style={{ background: c }} onClick={() => pickColor(c)} />
+            ))}
+          </div>
+        )}
         <div className="studio-full__palette">
           {EDITOR_PALETTE.map((c) => (
             <button key={c} className={"sw" + (color === c ? " sw--on" : "")} style={{ background: c }} onClick={() => pickColor(c)} />
@@ -234,12 +252,19 @@ export default function Studio({
           <button className={"tool" + (tool === "eyedropper" ? " tool--on" : "")} title="Pick" onClick={() => setTool("eyedropper")}><span className="tool__gl">⊙</span><span className="tool__l">Pick</span></button>
           <button className={"tool" + (mirror ? " tool--on" : "")} title="Mirror" onClick={() => setMirror((s) => !s)}><span className="tool__gl">◫</span><span className="tool__l">Mirror</span></button>
           <button className="tool" title="Undo" onClick={undo}><span className="tool__gl">↺</span><span className="tool__l">Undo</span></button>
+          <button className="tool" title="Redo" onClick={redo}><span className="tool__gl">↻</span><span className="tool__l">Redo</span></button>
           <button className="tool" title="Clear" onClick={clearAll}><span className="tool__gl">⌧</span><span className="tool__l">Clear</span></button>
-          <div className="studio__sizes">
-            {["S", "M", "L"].map((s) => (
-              <button key={s} className={"sizebtn" + (size === s ? " sizebtn--on" : "")} onClick={() => setSize(s)} title={"Brush " + s}><span className="sizedot" style={{ width: DOT[s], height: DOT[s] }} /></button>
-            ))}
-          </div>
+        </div>
+
+        <div className="studio-full__row">
+          <label className="studio__ctl"><span className="studio__ctll">size</span>
+            <input type="range" className="studio__range" min={4} max={180} value={brushPx} onChange={(e) => setBrushPx(+e.target.value)} />
+            <span className="sizedot" style={{ width: Math.max(4, Math.round(brushPx / 180 * 22)), height: Math.max(4, Math.round(brushPx / 180 * 22)) }} />
+          </label>
+          <label className="studio__ctl"><span className="studio__ctll">opacity</span>
+            <input type="range" className="studio__range" min={10} max={100} value={Math.round(opacity * 100)} onChange={(e) => setOpacity(+e.target.value / 100)} />
+            <span className="studio__ctlv">{Math.round(opacity * 100)}%</span>
+          </label>
           <div className="studio__current" style={{ background: color }} title="Current colour" />
         </div>
 
