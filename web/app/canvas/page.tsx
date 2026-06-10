@@ -9,7 +9,8 @@ export const dynamic = "force-dynamic";
 const SUPA = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const artUrl = (p: string | null) => (p && !p.startsWith("#") ? `${SUPA}/storage/v1/object/public/tiles/${p}` : null);
 
-export default async function CanvasPage() {
+export default async function CanvasPage({ searchParams }: { searchParams: Promise<{ mine?: string }> }) {
+  const autoOpenMine = (await searchParams).mine === "1";
   const auth = await createSupabaseServer();
   const { data: { user } } = await auth.auth.getUser();
   const email = user?.email ?? null;
@@ -40,5 +41,5 @@ export default async function CanvasPage() {
     if (mt) myTile = { id: mt.id, idx: mt.y * cols + mt.x, status: mt.status, artUrl: artUrl(mt.pending_image_path || mt.image_path), story: mt.pending_story || mt.story };
   }
 
-  return <Explorer cols={cols} total={total} tiles={tiles} claimed={claimed} email={email} myTile={myTile} />;
+  return <Explorer cols={cols} total={total} tiles={tiles} claimed={claimed} email={email} myTile={myTile} autoOpenMine={autoOpenMine} />;
 }

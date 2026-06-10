@@ -1,9 +1,16 @@
 import Landing from "@/components/Landing";
-import { supabaseAnon, CANVAS_SLUG } from "@/lib/supabase";
+import { supabaseAnon, supabaseAdmin, CANVAS_SLUG } from "@/lib/supabase";
+import { createSupabaseServer } from "@/lib/auth-server";
+import { findMyTile } from "@/lib/tiles";
 
 export const dynamic = "force-dynamic";
+const pad = (n: number) => String(n).padStart(2, "0");
 
 export default async function Home() {
+  const auth = await createSupabaseServer();
+  const { data: { user } } = await auth.auth.getUser();
+  const email = user?.email ?? null;
+
   const db = supabaseAnon();
   const { data: canvas } = await db
     .from("canvases").select("id, grid_cols, grid_rows").eq("slug", CANVAS_SLUG).maybeSingle();
@@ -20,5 +27,11 @@ export default async function Home() {
     }
   }
 
-  return <Landing total={total} claimed={claimed} published={published} />;
+  let myTile: { label: string } | null = null;
+  if (email && canvas) {
+    const mt = await findMyTile(supabaseAdmin(), canvas.id, email);
+    if (mt) myTile = { label: "R" + pad(mt.y + 1) + "·C" + pad(mt.x + 1) };
+  }
+
+  return <Landing total={total} claimed={claimed} published={published} email={email} myTile={myTile} />;
 }

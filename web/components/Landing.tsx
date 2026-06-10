@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import MosaicCanvas from "@/components/MosaicCanvas";
 import { createDemoWall, type Wall } from "@/lib/demoWall";
+import SignInModal from "@/components/SignInModal";
+import { signOut } from "@/app/actions";
 
 const fmt = (n: number) => n.toLocaleString("en-US");
 
@@ -81,10 +83,11 @@ const RULES = [
   { t: "It stays", d: "Once it's approved, your tile is part of the canvas — preserved when the wall completes." },
 ];
 
-export default function Landing({ total, claimed, published }: { total: number; claimed: number; published: number }) {
+export default function Landing({ total, claimed, published, email, myTile }: { total: number; claimed: number; published: number; email: string | null; myTile: { label: string } | null }) {
   const [wall, setWall] = useState<Wall | null>(null);
   const [solid, setSolid] = useState(false);
   const [ver, setVer] = useState(0);
+  const [signInOpen, setSignInOpen] = useState(false);
   const open = Math.max(0, total - claimed);
 
   useEffect(() => { setWall(createDemoWall(24, 0.7)); setVer((v) => v + 1); }, []);
@@ -113,7 +116,18 @@ export default function Landing({ total, claimed, published }: { total: number; 
         </nav>
         <div className="nav__right">
           <span className="livepill"><span className="livedot" />{fmt(claimed)} / {fmt(total)} claimed</span>
-          <Link className="btn btn--primary" href="/canvas">Open the canvas</Link>
+          {email ? (
+            <>
+              <span className="authchip" title={email}>{email}</span>
+              <form action={signOut} style={{ display: "inline" }}><button type="submit" className="linkbtn">sign out</button></form>
+              <Link className="btn btn--primary" href={myTile ? "/canvas?mine=1" : "/canvas"}>{myTile ? "your tile" : "claim a tile"}</Link>
+            </>
+          ) : (
+            <>
+              <button className="linkbtn" onClick={() => setSignInOpen(true)}>sign in</button>
+              <Link className="btn btn--primary" href="/canvas">Open the canvas</Link>
+            </>
+          )}
         </div>
       </header>
 
@@ -233,6 +247,7 @@ export default function Landing({ total, claimed, published }: { total: number; 
         </div>
         <div className="foot__legal">© 2026 ekam.ink · a collaborative canvas · what home looks like.</div>
       </footer>
+      {signInOpen && <SignInModal onClose={() => setSignInOpen(false)} />}
     </div>
   );
 }

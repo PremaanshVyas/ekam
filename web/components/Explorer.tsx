@@ -10,6 +10,8 @@ import type { Wall, TileInfo } from "@/lib/demoWall";
 import { createSupabaseBrowser } from "@/lib/auth-browser";
 import { claimTileAt } from "@/app/canvas/actions";
 import { submitTile } from "@/app/paint/actions";
+import { signOut } from "@/app/actions";
+import SignInModal from "@/components/SignInModal";
 
 type MyTile = { id: string; idx: number; status: string; artUrl: string | null; story: string | null };
 type Panel = "detail" | "claim" | "studio" | "submitted" | null;
@@ -247,8 +249,8 @@ function TileDetail({ wall, info, version, myTile, onClose, onZoom, onEdit }: {
   );
 }
 
-export default function Explorer({ cols, total, tiles, claimed, email, myTile }: {
-  cols: number; total: number; tiles: RealTileInput[]; claimed: number; email: string | null; myTile: MyTile | null;
+export default function Explorer({ cols, total, tiles, claimed, email, myTile, autoOpenMine }: {
+  cols: number; total: number; tiles: RealTileInput[]; claimed: number; email: string | null; myTile: MyTile | null; autoOpenMine?: boolean;
 }) {
   const router = useRouter();
   const api = useRef<MosaicApi | null>(null);
@@ -261,6 +263,8 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile }:
   const [sideOpen, setSideOpen] = useState(true);
   const [zoomLabel, setZoomLabel] = useState("Wall");
   const studioTarget = useRef<{ tileId: string; idx: number; label: string; artUrl: string | null; note: string } | null>(null);
+  const [signInOpen, setSignInOpen] = useState(false);
+  const openedMine = useRef(false);
 
   const myIdx = myTile?.idx ?? -1;
   const accent = "#e8643c";
@@ -277,7 +281,17 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile }:
   const closeAll = () => { setPanel(null); setSelected(null); };
 
   const myLabel = myTile ? "R" + String((Math.floor(myTile.idx / cols)) + 1).padStart(2, "0") + "·C" + String((myTile.idx % cols) + 1).padStart(2, "0") : "";
-  const zoomMine = () => { if (myTile) { api.current?.zoomToTile(myTile.idx, 96); closeAll(); } };
+  const openMine = useCallback(() => {
+    if (!myTile || !wall) return;
+    setSelected(wall.infoFor(myTile.idx)); setPanel("detail"); setHover(null);
+    api.current?.zoomToTile(myTile.idx, 96);
+  }, [myTile, wall]);
+  useEffect(() => {
+    if (!autoOpenMine || !myTile || !wall || openedMine.current) return;
+    openedMine.current = true; const mi = myTile.idx;
+    setSelected(wall.infoFor(mi)); setPanel("detail");
+    setTimeout(() => api.current?.zoomToTile(mi, 96), 90);
+  }, [autoOpenMine, myTile, wall]);
 
   const openStudioForClaim = (tileId: string) => { if (!selected) return; studioTarget.current = { tileId, idx: selected.idx, label: selected.id, artUrl: null, note: "" }; setPanel("studio"); };
   const openStudioForEdit = () => { if (!myTile || !wall) return; const label = wall.infoFor(myTile.idx).id; studioTarget.current = { tileId: myTile.id, idx: myTile.idx, label, artUrl: myTile.artUrl, note: myTile.story ?? "" }; setPanel("studio"); };
@@ -296,7 +310,17 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile }:
 
       <div className="ex__topbar">
         <Link className="ex__home" href="/">‹ <span className="wordmark wordmark--sm">ekam.ink</span></Link>
-        <span className="ex__edition">Canvas Nº 001 · what home looks like · live</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <span className="ex__edition">Canvas Nº 001 · live</span>
+          {email ? (
+            <>
+              {myTile && <button className="linkbtn" onClick={openMine}>your tile</button>}
+              <form action={signOut} style={{ display: "inline" }}><button type="submit" className="linkbtn">sign out</button></form>
+            </>
+          ) : (
+            <button className="linkbtn" onClick={() => setSignInOpen(true)}>sign in</button>
+          )}
+        </div>
       </div>
 
       <Sidebar open={sideOpen} setOpen={setSideOpen} claimed={claimed} total={total} />
@@ -306,7 +330,7 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile }:
       {panel && selected && (
         <div className="panelwrap">
           {panel === "detail" && <TileDetail wall={wall} info={selected} version={ver} myTile={myTile} onClose={closeAll} onZoom={() => api.current?.zoomToTile(selected.idx, 96)} onEdit={openStudioForEdit} />}
-          {panel === "claim" && <ClaimFlow wall={wall} info={selected} version={ver} accent={accent} signedIn={!!email} userEmail={email} hasTile={!!myTile} myLabel={myLabel} onClose={closeAll} onClaimed={openStudioForClaim} onZoomMine={zoomMine} />}
+          {panel === "claim" && <ClaimFlow wall={wall} info={selected} version={ver} accent={accent} signedIn={!!email} userEmail={email} hasTile={!!myTile} myLabel={myLabel} onClose={closeAll} onClaimed={openStudioForClaim} onZoomMine={openMine} />}
           {panel === "studio" && studioTarget.current && <Studio tileLabel={studioTarget.current.label} initialArtUrl={studioTarget.current.artUrl} initialNote={studioTarget.current.note} accent={accent} onClose={() => setPanel(myTile ? "detail" : null)} onSubmit={onStudioSubmit} />}
           {panel === "submitted" && (
             <div className="panel">
@@ -323,6 +347,7 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile }:
       )}
 
       <div className="ex__hint">Scroll to zoom · drag to pan · click a tile</div>
+      {signInOpen && <SignInModal onClose={() => setSignInOpen(false)} />}
     </div>
   );
 }
