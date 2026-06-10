@@ -7,8 +7,9 @@ const DRAW_RES = 1024;   // high-res paint buffer
 const PAPER = "#f4eee2";
 
 type BrushType = "pen" | "marker" | "highlighter" | "airbrush" | "pencil";
-type Tool = "brush" | "eraser" | "fill" | "eyedropper";
+type Tool = "brush" | "eraser" | "fill" | "eyedropper" | "line" | "rect" | "ellipse";
 type Pt = { x: number; y: number; p: number };
+const SHAPES = new Set<Tool>(["line", "rect", "ellipse"]);
 
 // Each brush composites its whole stroke onto the canvas once, so translucent
 // brushes don't blotch where the stroke overlaps itself.
@@ -49,6 +50,7 @@ export default function Studio({
   const redoRef = useRef<ImageData[]>([]);
   const drawingRef = useRef(false);
   const ptsRef = useRef<Pt[]>([]);
+  const shapeStartRef = useRef<Pt | null>(null);
   const live = useRef({ tool, color, brushPx, opacity, mirror, brushType });
   live.current = { tool, color, brushPx, opacity, mirror, brushType };
 
@@ -65,9 +67,11 @@ export default function Studio({
     g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
     g.clearRect(0, 0, cv.width, cv.height);
     g.drawImage(bufRef.current!, 0, 0, cv.width, cv.height);
-    if (drawingRef.current && live.current.tool === "brush") {
-      const bp = BRUSHES[live.current.brushType];
-      g.globalAlpha = bp.alpha * live.current.opacity; g.globalCompositeOperation = bp.blend;
+    const pt = live.current.tool;
+    if (drawingRef.current && (pt === "brush" || SHAPES.has(pt))) {
+      const isShape = SHAPES.has(pt); const bp = BRUSHES[live.current.brushType];
+      g.globalAlpha = isShape ? live.current.opacity : bp.alpha * live.current.opacity;
+      g.globalCompositeOperation = isShape ? "source-over" : bp.blend;
       g.drawImage(strokeRef.current!, 0, 0, cv.width, cv.height);
       g.globalAlpha = 1; g.globalCompositeOperation = "source-over";
     }
@@ -166,24 +170,37 @@ export default function Studio({
       g.putImageData(img, 0, 0); dirtyRef.current = true;
     };
     const commit = () => { if (isEraser()) return; const g = buf(); const p = BRUSHES[live.current.brushType]; g.save(); g.globalAlpha = p.alpha * live.current.opacity; g.globalCompositeOperation = p.blend; g.drawImage(strokeRef.current!, 0, 0); g.restore(); sc().clearRect(0, 0, DRAW_RES, DRAW_RES); };
+    const drawShape = (a: Pt, b: Pt, kind: string) => {
+      const g = sc(); g.clearRect(0, 0, DRAW_RES, DRAW_RES); g.strokeStyle = live.current.color; g.lineCap = "round"; g.lineJoin = "round"; g.lineWidth = live.current.brushPx; g.shadowBlur = 0;
+      const seg = (ax: number, bx: number) => {
+        if (kind === "line") { g.beginPath(); g.moveTo(ax, a.y); g.lineTo(bx, b.y); g.stroke(); }
+        else if (kind === "rect") { g.strokeRect(Math.min(ax, bx), Math.min(a.y, b.y), Math.abs(bx - ax), Math.abs(b.y - a.y)); }
+        else { g.beginPath(); g.ellipse((ax + bx) / 2, (a.y + b.y) / 2, Math.abs(bx - ax) / 2, Math.abs(b.y - a.y) / 2, 0, 0, Math.PI * 2); g.stroke(); }
+      };
+      seg(a.x, b.x); if (live.current.mirror) seg(DRAW_RES - a.x, DRAW_RES - b.x);
+    };
+    const commitShape = () => { const g = buf(); g.save(); g.globalAlpha = live.current.opacity; g.globalCompositeOperation = "source-over"; g.drawImage(strokeRef.current!, 0, 0); g.restore(); sc().clearRect(0, 0, DRAW_RES, DRAW_RES); };
 
     const down = (e: PointerEvent) => {
       const t = live.current.tool, p = toBuf(e);
       if (t === "eyedropper") { pick(p); return; }
       snapshot();
       if (t === "fill") { fill(p); renderDisplay(); force((n) => n + 1); autosaveRef.current(); return; }
+      if (SHAPES.has(t)) { sc().clearRect(0, 0, DRAW_RES, DRAW_RES); shapeStartRef.current = p; drawingRef.current = true; ptsRef.current = [p]; try { cv.setPointerCapture(e.pointerId); } catch {} dirtyRef.current = true; return; }
       if (!isEraser()) sc().clearRect(0, 0, DRAW_RES, DRAW_RES);
       drawingRef.current = true; ptsRef.current = [p]; try { cv.setPointerCapture(e.pointerId); } catch {}
       dot(p); renderDisplay(); dirtyRef.current = true;
     };
     const move = (e: PointerEvent) => {
       if (!drawingRef.current) return;
+      if (SHAPES.has(live.current.tool)) { const a = shapeStartRef.current; if (a) { drawShape(a, toBuf(e), live.current.tool); renderDisplay(); } return; }
       const evs = (typeof e.getCoalescedEvents === "function" && e.getCoalescedEvents().length) ? e.getCoalescedEvents() : [e];
       for (const ev of evs) { const p = toBuf(ev); ptsRef.current.push(p); const n = ptsRef.current.length; if (n >= 3) curve(ptsRef.current[n - 3], ptsRef.current[n - 2], ptsRef.current[n - 1]); else if (n === 2) line(ptsRef.current[0], ptsRef.current[1]); }
       renderDisplay();
     };
     const up = () => {
       if (!drawingRef.current) return;
+      if (SHAPES.has(live.current.tool)) { commitShape(); shapeStartRef.current = null; drawingRef.current = false; ptsRef.current = []; renderDisplay(); force((nn) => nn + 1); autosaveRef.current(); return; }
       const n = ptsRef.current.length;
       if (n >= 2) { const a = ptsRef.current[n - 2], b = ptsRef.current[n - 1], g = target(), w = widthOf(b); const m1 = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; prep(g, w); g.beginPath(); g.moveTo(m1.x, m1.y); g.lineTo(b.x, b.y); g.stroke(); if (live.current.mirror) { g.beginPath(); g.moveTo(DRAW_RES - m1.x, m1.y); g.lineTo(DRAW_RES - b.x, b.y); g.stroke(); } g.shadowBlur = 0; }
       commit();
@@ -250,6 +267,9 @@ export default function Studio({
         <div className="studio-full__row">
           <button className={"tool" + (tool === "fill" ? " tool--on" : "")} title="Fill" onClick={() => setTool("fill")}><span className="tool__gl">◧</span><span className="tool__l">Fill</span></button>
           <button className={"tool" + (tool === "eyedropper" ? " tool--on" : "")} title="Pick" onClick={() => setTool("eyedropper")}><span className="tool__gl">⊙</span><span className="tool__l">Pick</span></button>
+          <button className={"tool" + (tool === "line" ? " tool--on" : "")} title="Line" onClick={() => setTool("line")}><span className="tool__gl">╱</span><span className="tool__l">Line</span></button>
+          <button className={"tool" + (tool === "rect" ? " tool--on" : "")} title="Rectangle" onClick={() => setTool("rect")}><span className="tool__gl">▭</span><span className="tool__l">Rect</span></button>
+          <button className={"tool" + (tool === "ellipse" ? " tool--on" : "")} title="Ellipse" onClick={() => setTool("ellipse")}><span className="tool__gl">◯</span><span className="tool__l">Oval</span></button>
           <button className={"tool" + (mirror ? " tool--on" : "")} title="Mirror" onClick={() => setMirror((s) => !s)}><span className="tool__gl">◫</span><span className="tool__l">Mirror</span></button>
           <button className="tool" title="Undo" onClick={undo}><span className="tool__gl">↺</span><span className="tool__l">Undo</span></button>
           <button className="tool" title="Redo" onClick={redo}><span className="tool__gl">↻</span><span className="tool__l">Redo</span></button>
