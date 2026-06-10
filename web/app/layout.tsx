@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import type { Viewport } from "next";
 import { Spectral, Inter, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
-import MusicPlayer from "@/components/MusicPlayer";
+import MusicPlayerMount from "@/components/MusicPlayerMount";
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 
@@ -39,7 +39,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${serif.variable} ${sans.variable} ${mono.variable}`}>
-      <body>{children}<MusicPlayer /></body>
+      <body>{children}<MusicPlayerMount /></body>
     </html>
   );
 }

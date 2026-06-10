@@ -12,6 +12,7 @@ import { claimTileAt } from "@/app/canvas/actions";
 import { submitTile, saveDraft } from "@/app/paint/actions";
 import { signOut } from "@/app/actions";
 import SignInModal from "@/components/SignInModal";
+import ShareTile from "@/components/ShareTile";
 
 type MyTile = { id: string; idx: number; status: string; artUrl: string | null; story: string | null; draftUrl: string | null; draftStory: string | null };
 type Panel = "detail" | "claim" | "studio" | "submitted" | null;
@@ -247,6 +248,10 @@ function TileDetail({ wall, info, version, myTile, onClose, onZoom, onEdit }: {
       {info.mine
         ? <button className="btn btn--primary btn--block" onClick={onEdit}>{myTile?.status === "claimed" ? "Paint your tile" : "Edit your tile"}</button>
         : <button className="btn btn--ghost btn--block" onClick={onZoom}>Zoom to this tile</button>}
+      {info.mine && myTile?.status === "published" && myTile.artUrl && (
+        <ShareTile url={`https://ekam.ink/t/${myTile.id}`} imageUrl={myTile.artUrl} title="my tile on ekam.ink — what home looks like" />
+      )}
+      {info.mine && myTile?.status === "pending" && <p className="detail__sharehint">In review — you can share it once it’s live on the wall.</p>}
     </div>
   );
 }
@@ -266,6 +271,7 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
   const [zoomLabel, setZoomLabel] = useState("Wall");
   const studioTarget = useRef<{ tileId: string; idx: number; label: string; artUrl: string | null; note: string } | null>(null);
   const [signInOpen, setSignInOpen] = useState(false);
+  const [lastArt, setLastArt] = useState<string | null>(null);
   const openedMine = useRef(false);
 
   const myIdx = myTile?.idx ?? -1;
@@ -298,7 +304,7 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
   const openStudioForClaim = (tileId: string) => { if (!selected) return; studioTarget.current = { tileId, idx: selected.idx, label: selected.id, artUrl: null, note: "" }; setPanel("studio"); };
   // Resume from the latest autosaved draft if there is one; else the submitted/published image.
   const openStudioForEdit = () => { if (!myTile || !wall) return; const label = wall.infoFor(myTile.idx).id; studioTarget.current = { tileId: myTile.id, idx: myTile.idx, label, artUrl: myTile.draftUrl ?? myTile.artUrl, note: myTile.draftStory ?? myTile.story ?? "" }; setPanel("studio"); };
-  const onStudioSubmit = async (dataUrl: string, note: string) => { const t = studioTarget.current; if (!t) return; await submitTile(t.tileId, dataUrl, note); setPanel("submitted"); router.refresh(); };
+  const onStudioSubmit = async (dataUrl: string, note: string) => { const t = studioTarget.current; if (!t) return; await submitTile(t.tileId, dataUrl, note); setLastArt(dataUrl); setPanel("submitted"); router.refresh(); };
   const onSaveDraft = async (dataUrl: string, note: string) => { const t = studioTarget.current; if (!t) return { ok: false }; return await saveDraft(t.tileId, dataUrl, note); };
 
   if (!wall) return <div className="explorer" style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ink-3)", fontFamily: "var(--mono)" }}>loading the wall…</div>;
@@ -341,7 +347,8 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
               <div className="done" style={{ paddingTop: 18 }}>
                 <div className="done__check">✓</div>
                 <h3 className="done__t">It&apos;s in the queue.</h3>
-                <p className="done__d">Your tile goes for a quick review, then appears on the wall with your name. Thank you for adding to the canvas.</p>
+                <p className="done__d">Your tile goes for a quick review, then appears on the wall with your name — and you can share it. Thank you for adding to the canvas.</p>
+                {lastArt && <button className="btn btn--ghost btn--block" style={{ marginBottom: 10 }} onClick={() => { const a = document.createElement("a"); a.href = lastArt; a.download = "my-tile-ekam.png"; document.body.appendChild(a); a.click(); a.remove(); }}>Download your tile</button>}
                 <button className="btn btn--primary btn--block" onClick={() => { closeAll(); router.refresh(); }}>Back to the wall</button>
               </div>
             </div>
