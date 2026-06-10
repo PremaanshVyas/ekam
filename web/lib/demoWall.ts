@@ -25,14 +25,26 @@ const PAPER = "#f4eee2";
 const BG = "#16110d";
 const ACCENT = "#e8643c";
 
+// Studio swatches: mainstream colours first (true black/white/greys + a full
+// primary→secondary spectrum), then curated earth & skin tones. Ordered so the
+// picker reads as a logical grid. The custom "+" covers anything beyond these.
 export const EDITOR_PALETTE = [
-  "#16110d", "#3a322b", "#6f6358", "#a89c8f", "#e7ded2", "#ffffff",
-  "#e8643c", "#f0913c", "#ffc861", "#fff0b8",
-  "#b23f55", "#e85d7a", "#ffa6b8",
-  "#6c5ce0", "#9b8cf0", "#cfc6ff",
-  "#2f8fae", "#54bcd6", "#bfeaf2",
-  "#2f9e6e", "#5fcf8f", "#bff0cf",
-  "#7a5a3a", "#c79a5e",
+  // neutrals
+  "#000000", "#555555", "#9a9a9a", "#c8c8c8", "#f4eee2", "#ffffff",
+  // reds & oranges
+  "#b3261e", "#e23b2e", "#e8643c", "#f5832a", "#f6a623",
+  // yellows
+  "#f7c948", "#ffe45e",
+  // greens
+  "#9bc53d", "#3fa34d", "#2e7d4f", "#176b5e",
+  // teal & blues
+  "#1aa6b7", "#3a9bdc", "#2a62cf", "#1e2f6b",
+  // purples
+  "#5a45c4", "#8e3fb8",
+  // pinks & magenta
+  "#c52a86", "#ef6fae", "#e8607a",
+  // earth & skin
+  "#6e4422", "#b07a3f", "#cf7a4f", "#e7b88c",
 ];
 
 // ── rng / noise ──
