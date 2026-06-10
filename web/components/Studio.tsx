@@ -23,10 +23,10 @@ const BRUSHES: Record<BrushType, { alpha: number; blend: GlobalCompositeOperatio
 const BRUSH_LIST = Object.keys(BRUSHES) as BrushType[];
 
 export default function Studio({
-  tileLabel, initialArtUrl, initialNote = "", accent = "#e8643c", onClose, onSubmit, onSaveDraft,
+  tileLabel, initialArtUrl, initialNote = "", initialName = "", accent = "#e8643c", onClose, onSubmit, onSaveDraft,
 }: {
-  tileLabel: string; initialArtUrl: string | null; initialNote?: string; accent?: string;
-  onClose: () => void; onSubmit: (dataUrl: string, note: string) => Promise<void>;
+  tileLabel: string; initialArtUrl: string | null; initialNote?: string; initialName?: string; accent?: string;
+  onClose: () => void; onSubmit: (dataUrl: string, name: string, note: string) => Promise<void>;
   onSaveDraft?: (dataUrl: string, note: string) => Promise<{ ok: boolean; updatedAt?: string }>;
 }) {
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -42,6 +42,7 @@ export default function Studio({
   const [opacity, setOpacity] = useState(1);
   const [mirror, setMirror] = useState(false);
   const [note, setNote] = useState(initialNote);
+  const [name, setName] = useState(initialName);
   const [submitting, setSubmitting] = useState(false);
   const [loadingArt, setLoadingArt] = useState<boolean>(!!initialArtUrl);
   const [recent, setRecent] = useState<string[]>([]);
@@ -260,7 +261,7 @@ export default function Studio({
     if (!dirtyRef.current || submitting) return;
     const out = document.createElement("canvas"); out.width = DRAW_RES; out.height = DRAW_RES; out.getContext("2d")!.drawImage(bufRef.current!, 0, 0);
     setSubmitting(true);
-    try { await onSubmit(out.toDataURL("image/png"), note.trim()); } catch (err) { setSubmitting(false); alert("Couldn't submit — " + (err as Error).message); }
+    try { await onSubmit(out.toDataURL("image/png"), name.trim(), note.trim()); } catch (err) { setSubmitting(false); alert("Couldn't submit — " + (err as Error).message); }
   };
 
   const pickColor = (c: string) => { setColor(c); if (tool === "eraser" || tool === "eyedropper") setTool("brush"); };
@@ -348,6 +349,7 @@ export default function Studio({
         </div>
 
         <div className="studio__group">
+          <input className="studio__noteinput" style={{ marginBottom: 8, paddingRight: 13 }} maxLength={40} value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name — shown on your tile" />
           <div className="studio__note" style={{ marginBottom: 0 }}>
             <input className="studio__noteinput" maxLength={140} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Say a line — where were you when home looked like this?" />
             <span className="studio__count">{note.length}/140</span>

@@ -14,7 +14,7 @@ import { signOut } from "@/app/actions";
 import SignInModal from "@/components/SignInModal";
 import ShareTile from "@/components/ShareTile";
 
-type MyTile = { id: string; idx: number; status: string; artUrl: string | null; story: string | null; draftUrl: string | null; draftStory: string | null };
+type MyTile = { id: string; idx: number; status: string; name: string | null; artUrl: string | null; story: string | null; draftUrl: string | null; draftStory: string | null };
 type Panel = "detail" | "claim" | "studio" | "submitted" | null;
 type ViewMode = "claimed" | "all";
 
@@ -269,7 +269,7 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
   const [panel, setPanel] = useState<Panel>(null);
   const [sideOpen, setSideOpen] = useState(true);
   const [zoomLabel, setZoomLabel] = useState("Wall");
-  const studioTarget = useRef<{ tileId: string; idx: number; label: string; artUrl: string | null; note: string } | null>(null);
+  const studioTarget = useRef<{ tileId: string; idx: number; label: string; artUrl: string | null; note: string; name: string } | null>(null);
   const [signInOpen, setSignInOpen] = useState(false);
   const [lastArt, setLastArt] = useState<string | null>(null);
   const openedMine = useRef(false);
@@ -301,10 +301,10 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
     setTimeout(() => api.current?.zoomToTile(mi, 96), 90);
   }, [autoOpenMine, myTile, wall]);
 
-  const openStudioForClaim = (tileId: string) => { if (!selected) return; studioTarget.current = { tileId, idx: selected.idx, label: selected.id, artUrl: null, note: "" }; setPanel("studio"); };
+  const openStudioForClaim = (tileId: string) => { if (!selected) return; studioTarget.current = { tileId, idx: selected.idx, label: selected.id, artUrl: null, note: "", name: email ? email.split("@")[0] : "" }; setPanel("studio"); };
   // Resume from the latest autosaved draft if there is one; else the submitted/published image.
-  const openStudioForEdit = () => { if (!myTile || !wall) return; const label = wall.infoFor(myTile.idx).id; studioTarget.current = { tileId: myTile.id, idx: myTile.idx, label, artUrl: myTile.draftUrl ?? myTile.artUrl, note: myTile.draftStory ?? myTile.story ?? "" }; setPanel("studio"); };
-  const onStudioSubmit = async (dataUrl: string, note: string) => { const t = studioTarget.current; if (!t) return; await submitTile(t.tileId, dataUrl, note); setLastArt(dataUrl); setPanel("submitted"); router.refresh(); };
+  const openStudioForEdit = () => { if (!myTile || !wall) return; const label = wall.infoFor(myTile.idx).id; studioTarget.current = { tileId: myTile.id, idx: myTile.idx, label, artUrl: myTile.draftUrl ?? myTile.artUrl, note: myTile.draftStory ?? myTile.story ?? "", name: myTile.name ?? "" }; setPanel("studio"); };
+  const onStudioSubmit = async (dataUrl: string, name: string, note: string) => { const t = studioTarget.current; if (!t) return; await submitTile(t.tileId, dataUrl, name, note); setLastArt(dataUrl); setPanel("submitted"); router.refresh(); };
   const onSaveDraft = async (dataUrl: string, note: string) => { const t = studioTarget.current; if (!t) return { ok: false }; return await saveDraft(t.tileId, dataUrl, note); };
 
   if (!wall) return <div className="explorer" style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ink-3)", fontFamily: "var(--mono)" }}>loading the wall…</div>;
@@ -357,7 +357,7 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
       )}
 
       {panel === "studio" && studioTarget.current && (
-        <Studio tileLabel={studioTarget.current.label} initialArtUrl={studioTarget.current.artUrl} initialNote={studioTarget.current.note} accent={accent} onClose={() => setPanel(myTile ? "detail" : null)} onSubmit={onStudioSubmit} onSaveDraft={onSaveDraft} />
+        <Studio tileLabel={studioTarget.current.label} initialArtUrl={studioTarget.current.artUrl} initialNote={studioTarget.current.note} initialName={studioTarget.current.name} accent={accent} onClose={() => setPanel(myTile ? "detail" : null)} onSubmit={onStudioSubmit} onSaveDraft={onSaveDraft} />
       )}
 
       <div className="ex__hint">Scroll to zoom · drag to pan · click a tile</div>

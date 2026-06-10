@@ -6,7 +6,7 @@ import { createSupabaseServer } from "@/lib/auth-server";
 
 export type SubmitMode = "new" | "edit-pending" | "edit-published";
 
-export async function submitTile(tileId: string, dataUrl: string, story: string): Promise<{ ok: true; mode: SubmitMode }> {
+export async function submitTile(tileId: string, dataUrl: string, name: string, story: string): Promise<{ ok: true; mode: SubmitMode }> {
   // Must be signed in and own this tile.
   const auth = await createSupabaseServer();
   const { data: { user } } = await auth.auth.getUser();
@@ -26,6 +26,7 @@ export async function submitTile(tileId: string, dataUrl: string, story: string)
   const bytes = Buffer.from(base64, "base64");
   if (bytes.length > 5_000_000) throw new Error("image too large");
   const cleanStory = story.slice(0, 140);
+  const cleanName = name.trim().slice(0, 40); // the display name the artist chose, replaces the email-derived default
 
   if (tile.status === "published") {
     // Editing a LIVE tile → stage as a pending edit; the published tile stays on the canvas.
@@ -34,6 +35,7 @@ export async function submitTile(tileId: string, dataUrl: string, story: string)
     if (up.error) throw new Error(up.error.message);
     const { error } = await db.from("tiles").update({
       pending_image_path: path, pending_story: cleanStory, pending_submitted_at: new Date().toISOString(),
+      ...(cleanName ? { artist_name: cleanName } : {}),
     }).eq("id", tileId).eq("status", "published");
     if (error) throw new Error(error.message);
     await clearDraft(db, tileId);
@@ -49,6 +51,7 @@ export async function submitTile(tileId: string, dataUrl: string, story: string)
   if (up.error) throw new Error(up.error.message);
   const { error } = await db.from("tiles").update({
     status: "pending", story: cleanStory, image_path: path,
+    ...(cleanName ? { artist_name: cleanName } : {}),
   }).eq("id", tileId).in("status", ["claimed", "pending"]);
   if (error) throw new Error(error.message);
   await clearDraft(db, tileId);

@@ -399,11 +399,17 @@ em{font-style:italic}
 .studio__reset:hover{border-color:var(--accent);color:var(--ink)}
 
 /* ── share tile ── */
-.share{display:flex;gap:8px;flex-wrap:wrap;width:100%;margin-top:14px}
+.share{display:flex;flex-direction:column;gap:10px;width:100%;margin-top:14px}
+.share__icons{display:flex;gap:10px}
+.share__ic{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#fff;cursor:pointer;border:none;padding:0;transition:.14s;text-decoration:none}
+.share__ic svg{width:21px;height:21px}
+.share__ic:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.share__ic--x{background:#0b0b0b;border:1px solid rgba(239,233,225,0.2)}
+.share__ic--ig{background:linear-gradient(45deg,#feda75,#fa7e1e,#d62976,#962fbf,#4f5bd5)}
+.share__ic--wa{background:#25d366}
+.share__util{display:flex;gap:8px}
 .share__btn{flex:1;min-width:96px;text-align:center;font-family:var(--mono);font-size:11px;letter-spacing:.04em;padding:9px 10px;border:1px solid var(--line);border-radius:9px;color:var(--ink-2);background:rgba(239,233,225,0.03);cursor:pointer;transition:.14s}
 .share__btn:hover{border-color:var(--accent);color:var(--ink)}
-.share__btn--x{background:var(--accent);color:#16110d;border-color:var(--accent);font-weight:600;text-decoration:none}
-.share__btn--x:hover{color:#16110d;filter:brightness(1.06)}
 .detail__sharehint{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);text-align:center;margin-top:10px}
 
 /* ── public share page /t/[id] ── */
