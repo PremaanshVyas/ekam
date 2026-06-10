@@ -52,6 +52,18 @@ em{font-style:italic}
 .ekam-logo:hover{opacity:.82}
 .ekam-logo__mark{width:26px;height:26px;display:block;flex:none}
 .ekam-logo__mark--sm{width:21px;height:21px}
+
+/* ── snappy navigation: instant route loader, page fade-in, tactile press ── */
+.pageload{position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:var(--bg);color:var(--ink-3);font-family:var(--mono);font-size:13px;letter-spacing:.08em}
+.pageload__mark{animation:ekampulse 1.6s ease-in-out infinite}
+.pageload__label{opacity:.85}
+@keyframes pagein{from{opacity:0}to{opacity:1}}
+.scroll-root,.explorer,.sharepage{animation:pagein .34s ease both}
+.btn,.linkbtn,.tool,.sizebtn,.dock__btn,.dock__chip,.seg__btn,.share__btn,.share__ic,.sw{transition:transform .12s ease,opacity .12s ease,filter .15s ease,background .18s ease,border-color .18s ease,box-shadow .14s ease,color .15s ease}
+.btn:active,.share__btn:active{transform:scale(.975)}
+.tool:active,.sizebtn:active,.dock__btn:active,.dock__chip:active,.seg__btn:active,.share__ic:active,.sw:active{transform:scale(.92)}
+.linkbtn:active{opacity:.55}
+@media(prefers-reduced-motion:reduce){.scroll-root,.explorer,.sharepage{animation:none}.pageload__mark{animation:none}}
 .ex__loading{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:var(--ink-3);font-family:var(--mono);font-size:13px;letter-spacing:.04em}
 .ex__loadmark{animation:ekampulse 1.8s ease-in-out infinite}
 @keyframes ekampulse{0%,100%{opacity:.4}50%{opacity:.92}}
