@@ -6,6 +6,7 @@ import MosaicCanvas from "@/components/MosaicCanvas";
 import { createDemoWall, type Wall } from "@/lib/demoWall";
 import SignInModal from "@/components/SignInModal";
 import { signOut } from "@/app/actions";
+import Wordmark from "@/components/Wordmark";
 
 const fmt = (n: number) => n.toLocaleString("en-US");
 
@@ -106,7 +107,7 @@ export default function Landing({ total, claimed, published, email, myTile }: { 
       {/* nav */}
       <header className={"nav" + (solid ? " nav--solid" : "")}>
         <div className="nav__brand">
-          <span className="wordmark">ekam.ink</span>
+          <Wordmark />
           <span className="nav__edition">Canvas Nº 001 · open now</span>
         </div>
         <nav className="nav__links">
@@ -239,7 +240,7 @@ export default function Landing({ total, claimed, published, email, myTile }: { 
 
       {/* footer */}
       <footer className="foot">
-        <div><span className="wordmark">ekam.ink</span><span className="foot__tag">576 strangers, one canvas.</span></div>
+        <div><Wordmark /><span className="foot__tag">576 strangers, one canvas.</span></div>
         <div className="foot__cols">
           <div className="foot__col"><span className="foot__h">Canvas</span><Link href="/canvas">The wall</Link><a href="#how">How it works</a><a href="#rules">The rules</a></div>
           <div className="foot__col"><span className="foot__h">About</span><a href="#">Manifesto</a><a href="#wall">Three ways to look</a><a href="#">What home looks like</a></div>

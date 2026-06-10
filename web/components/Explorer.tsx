@@ -13,6 +13,7 @@ import { submitTile, saveDraft } from "@/app/paint/actions";
 import { signOut } from "@/app/actions";
 import SignInModal from "@/components/SignInModal";
 import ShareTile from "@/components/ShareTile";
+import Wordmark from "@/components/Wordmark";
 
 type MyTile = { id: string; idx: number; status: string; name: string | null; artUrl: string | null; story: string | null; draftUrl: string | null; draftStory: string | null };
 type Panel = "detail" | "claim" | "studio" | "submitted" | null;
@@ -307,7 +308,13 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
   const onStudioSubmit = async (dataUrl: string, name: string, note: string) => { const t = studioTarget.current; if (!t) return; await submitTile(t.tileId, dataUrl, name, note); setLastArt(dataUrl); setPanel("submitted"); router.refresh(); };
   const onSaveDraft = async (dataUrl: string, note: string) => { const t = studioTarget.current; if (!t) return { ok: false }; return await saveDraft(t.tileId, dataUrl, note); };
 
-  if (!wall) return <div className="explorer" style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ink-3)", fontFamily: "var(--mono)" }}>loading the wall…</div>;
+  if (!wall) return (
+    <div className="explorer ex__loading">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/brand/ekam-mark.svg" width={46} height={46} alt="" className="ex__loadmark" />
+      <span>loading the wall…</span>
+    </div>
+  );
 
   return (
     <div className="explorer">
@@ -319,7 +326,7 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
       </div>
 
       <div className="ex__topbar">
-        <Link className="ex__home" href="/">‹ <span className="wordmark wordmark--sm">ekam.ink</span></Link>
+        <Link className="ex__home" href="/">‹ <Wordmark sm /></Link>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <span className="ex__edition">Canvas Nº 001 · live</span>
           {email ? (

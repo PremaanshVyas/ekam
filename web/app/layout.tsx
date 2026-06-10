@@ -4,7 +4,7 @@ import { Spectral, Inter, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import MusicPlayerMount from "@/components/MusicPlayerMount";
 
-export const viewport: Viewport = { width: "device-width", initialScale: 1 };
+export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#16110d" };
 
 // Editorial dark system: Spectral (display), Inter (UI), IBM Plex Mono (labels/data).
 const serif = Spectral({
@@ -16,6 +16,14 @@ const mono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500"], variabl
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://ekam.ink"),
+  icons: {
+    icon: [
+      { url: "/brand/favicon.svg", type: "image/svg+xml" },
+      { url: "/brand/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/brand/favicon-16.png", sizes: "16x16", type: "image/png" },
+    ],
+    apple: [{ url: "/brand/apple-touch-icon.png" }],
+  },
   title: "ekam.ink",
   description:
     "576 strangers. One canvas. One moment in history. Claim a tile, hand-paint what home looks like, and your story lives on it forever.",
