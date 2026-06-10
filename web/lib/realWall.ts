@@ -8,7 +8,7 @@ import type { Wall, TileInfo } from "@/lib/demoWall";
 const PAPER = "#f4eee2";
 const BG = "#16110d";
 const ACCENT = "#e8643c";
-const TILE_PX = 64;
+const TILE_PX = 128;
 
 export type RealTileInput = {
   x: number; y: number; status: string;

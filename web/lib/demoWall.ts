@@ -377,7 +377,7 @@ const NOTES = [
 
 // Build a demo wall at the given grid size (default 24×24 = our 576).
 export function createDemoWall(GRID = 24, fillPct = 0.7): Wall {
-  const TILE_PX = 64, HI = GRID * TILE_PX, N_TOTAL = GRID * GRID;
+  const TILE_PX = 96, HI = GRID * TILE_PX, N_TOTAL = GRID * GRID;
   const claimedCount = Math.round(fillPct * N_TOTAL);
 
   // organic claim ordering (clusters via noise)

@@ -24,7 +24,7 @@ export async function submitTile(tileId: string, dataUrl: string, story: string)
   const base64 = dataUrl.split(",")[1];
   if (!base64) throw new Error("bad image");
   const bytes = Buffer.from(base64, "base64");
-  if (bytes.length > 2_000_000) throw new Error("image too large");
+  if (bytes.length > 5_000_000) throw new Error("image too large");
   const cleanStory = story.slice(0, 140);
 
   if (tile.status === "published") {

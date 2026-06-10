@@ -329,11 +329,10 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
       <Tooltip hover={hover} />
       <Dock api={api} viewMode={viewMode} setViewMode={setViewMode} zoomLabel={zoomLabel} />
 
-      {panel && selected && (
+      {panel && panel !== "studio" && selected && (
         <div className="panelwrap">
           {panel === "detail" && <TileDetail wall={wall} info={selected} version={ver} myTile={myTile} onClose={closeAll} onZoom={() => api.current?.zoomToTile(selected.idx, 96)} onEdit={openStudioForEdit} />}
           {panel === "claim" && <ClaimFlow wall={wall} info={selected} version={ver} accent={accent} signedIn={!!email} userEmail={email} hasTile={!!myTile} myLabel={myLabel} onClose={closeAll} onClaimed={openStudioForClaim} onZoomMine={openMine} />}
-          {panel === "studio" && studioTarget.current && <Studio tileLabel={studioTarget.current.label} initialArtUrl={studioTarget.current.artUrl} initialNote={studioTarget.current.note} accent={accent} onClose={() => setPanel(myTile ? "detail" : null)} onSubmit={onStudioSubmit} />}
           {panel === "submitted" && (
             <div className="panel">
               <div className="panel__head"><span className="panel__eyebrow"><span className="studio__dot" style={{ background: accent }} />Submitted</span><button className="panel__x" onClick={() => { closeAll(); }}>✕</button></div>
@@ -346,6 +345,10 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
             </div>
           )}
         </div>
+      )}
+
+      {panel === "studio" && studioTarget.current && (
+        <Studio tileLabel={studioTarget.current.label} initialArtUrl={studioTarget.current.artUrl} initialNote={studioTarget.current.note} accent={accent} onClose={() => setPanel(myTile ? "detail" : null)} onSubmit={onStudioSubmit} />
       )}
 
       <div className="ex__hint">Scroll to zoom · drag to pan · click a tile</div>
