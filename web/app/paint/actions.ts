@@ -36,6 +36,7 @@ export async function submitTile(tileId: string, dataUrl: string, story: string)
       pending_image_path: path, pending_story: cleanStory, pending_submitted_at: new Date().toISOString(),
     }).eq("id", tileId).eq("status", "published");
     if (error) throw new Error(error.message);
+    await clearDraft(db, tileId);
     revalidatePath("/admin");
     return { ok: true, mode: "edit-published" };
   }
@@ -50,6 +51,43 @@ export async function submitTile(tileId: string, dataUrl: string, story: string)
     status: "pending", story: cleanStory, image_path: path,
   }).eq("id", tileId).in("status", ["claimed", "pending"]);
   if (error) throw new Error(error.message);
+  await clearDraft(db, tileId);
   revalidatePath("/admin");
   return { ok: true, mode: tile.status === "claimed" ? "new" : "edit-pending" };
+}
+
+// Drop the autosave draft once there's a real submission. Best-effort: if the draft_*
+// columns don't exist yet (migration 0004 not run) the update errors and we ignore it.
+async function clearDraft(db: ReturnType<typeof supabaseAdmin>, tileId: string) {
+  await db.from("tiles").update({ draft_image_path: null, draft_story: null, draft_updated_at: null }).eq("id", tileId);
+}
+
+// Autosave the in-progress canvas so the artist can resume on another device.
+// Private-by-obscurity (unguessable path, returned only to the owner); never public.
+export async function saveDraft(tileId: string, dataUrl: string, story: string): Promise<{ ok: boolean; updatedAt?: string }> {
+  const auth = await createSupabaseServer();
+  const { data: { user } } = await auth.auth.getUser();
+  if (!user?.email) return { ok: false };
+  const email = user.email.toLowerCase();
+
+  const db = supabaseAdmin();
+  const { data: tile } = await db.from("tiles").select("artist_email, status").eq("id", tileId).maybeSingle();
+  if (!tile || tile.artist_email !== email) return { ok: false };
+  if (!["claimed", "pending", "published"].includes(tile.status)) return { ok: false };
+
+  if (!dataUrl.startsWith("data:image/png;base64,")) return { ok: false };
+  const base64 = dataUrl.split(",")[1]; if (!base64) return { ok: false };
+  const bytes = Buffer.from(base64, "base64");
+  if (bytes.length > 5_000_000) return { ok: false };
+
+  const path = `draft-${tileId}.png`;
+  const up = await db.storage.from("tiles").upload(path, bytes, { contentType: "image/png", upsert: true });
+  if (up.error) return { ok: false };
+
+  const updatedAt = new Date().toISOString();
+  const { error } = await db.from("tiles")
+    .update({ draft_image_path: path, draft_story: story.slice(0, 140), draft_updated_at: updatedAt })
+    .eq("id", tileId);
+  if (error) return { ok: false }; // draft_* columns missing → migration 0004 not run yet
+  return { ok: true, updatedAt };
 }

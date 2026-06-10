@@ -9,11 +9,11 @@ import { createRealWall, type RealTileInput } from "@/lib/realWall";
 import type { Wall, TileInfo } from "@/lib/demoWall";
 import { createSupabaseBrowser } from "@/lib/auth-browser";
 import { claimTileAt } from "@/app/canvas/actions";
-import { submitTile } from "@/app/paint/actions";
+import { submitTile, saveDraft } from "@/app/paint/actions";
 import { signOut } from "@/app/actions";
 import SignInModal from "@/components/SignInModal";
 
-type MyTile = { id: string; idx: number; status: string; artUrl: string | null; story: string | null };
+type MyTile = { id: string; idx: number; status: string; artUrl: string | null; story: string | null; draftUrl: string | null; draftStory: string | null };
 type Panel = "detail" | "claim" | "studio" | "submitted" | null;
 type ViewMode = "claimed" | "all";
 
@@ -296,8 +296,10 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
   }, [autoOpenMine, myTile, wall]);
 
   const openStudioForClaim = (tileId: string) => { if (!selected) return; studioTarget.current = { tileId, idx: selected.idx, label: selected.id, artUrl: null, note: "" }; setPanel("studio"); };
-  const openStudioForEdit = () => { if (!myTile || !wall) return; const label = wall.infoFor(myTile.idx).id; studioTarget.current = { tileId: myTile.id, idx: myTile.idx, label, artUrl: myTile.artUrl, note: myTile.story ?? "" }; setPanel("studio"); };
+  // Resume from the latest autosaved draft if there is one; else the submitted/published image.
+  const openStudioForEdit = () => { if (!myTile || !wall) return; const label = wall.infoFor(myTile.idx).id; studioTarget.current = { tileId: myTile.id, idx: myTile.idx, label, artUrl: myTile.draftUrl ?? myTile.artUrl, note: myTile.draftStory ?? myTile.story ?? "" }; setPanel("studio"); };
   const onStudioSubmit = async (dataUrl: string, note: string) => { const t = studioTarget.current; if (!t) return; await submitTile(t.tileId, dataUrl, note); setPanel("submitted"); router.refresh(); };
+  const onSaveDraft = async (dataUrl: string, note: string) => { const t = studioTarget.current; if (!t) return { ok: false }; return await saveDraft(t.tileId, dataUrl, note); };
 
   if (!wall) return <div className="explorer" style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ink-3)", fontFamily: "var(--mono)" }}>loading the wall…</div>;
 
@@ -348,7 +350,7 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
       )}
 
       {panel === "studio" && studioTarget.current && (
-        <Studio tileLabel={studioTarget.current.label} initialArtUrl={studioTarget.current.artUrl} initialNote={studioTarget.current.note} accent={accent} onClose={() => setPanel(myTile ? "detail" : null)} onSubmit={onStudioSubmit} />
+        <Studio tileLabel={studioTarget.current.label} initialArtUrl={studioTarget.current.artUrl} initialNote={studioTarget.current.note} accent={accent} onClose={() => setPanel(myTile ? "detail" : null)} onSubmit={onStudioSubmit} onSaveDraft={onSaveDraft} />
       )}
 
       <div className="ex__hint">Scroll to zoom · drag to pan · click a tile</div>

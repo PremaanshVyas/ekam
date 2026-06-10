@@ -24,10 +24,11 @@ const BRUSHES: Record<BrushType, { alpha: number; blend: GlobalCompositeOperatio
 const BRUSH_LIST = Object.keys(BRUSHES) as BrushType[];
 
 export default function Studio({
-  tileLabel, initialArtUrl, initialNote = "", accent = "#e8643c", onClose, onSubmit,
+  tileLabel, initialArtUrl, initialNote = "", accent = "#e8643c", onClose, onSubmit, onSaveDraft,
 }: {
   tileLabel: string; initialArtUrl: string | null; initialNote?: string; accent?: string;
   onClose: () => void; onSubmit: (dataUrl: string, note: string) => Promise<void>;
+  onSaveDraft?: (dataUrl: string, note: string) => Promise<{ ok: boolean; updatedAt?: string }>;
 }) {
   const stageRef = useRef<HTMLDivElement | null>(null);
   const dispRef = useRef<HTMLCanvasElement | null>(null);
@@ -69,6 +70,41 @@ export default function Studio({
       g.globalAlpha = 1; g.globalCompositeOperation = "source-over";
     }
   };
+
+  // ── cross-device autosave drafts (debounced + periodic + on tab-hide) ──
+  const [saving, setSaving] = useState(false);
+  const [unsaved, setUnsaved] = useState(false);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [autosaveOff, setAutosaveOff] = useState(false);
+  const unsavedRef = useRef(false);
+  const savingRef = useRef(false);
+  const offRef = useRef(false);
+  const failsRef = useRef(0);
+  const saveTimer = useRef<number | null>(null);
+  const noteRef = useRef(note); noteRef.current = note;
+  const saveNowRef = useRef<() => void>(() => {});
+  const autosaveRef = useRef<() => void>(() => {});
+  saveNowRef.current = () => {
+    if (!onSaveDraft || savingRef.current || !unsavedRef.current || offRef.current) return;
+    savingRef.current = true; setSaving(true);
+    const out = document.createElement("canvas"); out.width = DRAW_RES; out.height = DRAW_RES; out.getContext("2d")!.drawImage(bufRef.current!, 0, 0);
+    onSaveDraft(out.toDataURL("image/png"), noteRef.current.trim())
+      .then((res) => { if (res && res.ok) { unsavedRef.current = false; setUnsaved(false); setSavedAt(Date.now()); failsRef.current = 0; } else if (++failsRef.current >= 2) { offRef.current = true; setAutosaveOff(true); } })
+      .catch(() => { if (++failsRef.current >= 2) { offRef.current = true; setAutosaveOff(true); } })
+      .finally(() => { savingRef.current = false; setSaving(false); });
+  };
+  autosaveRef.current = () => {
+    if (!onSaveDraft || offRef.current) return;
+    unsavedRef.current = true; setUnsaved(true);
+    if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => saveNowRef.current(), 3000);
+  };
+  useEffect(() => {
+    const iv = window.setInterval(() => { if (unsavedRef.current && !savingRef.current && !offRef.current) saveNowRef.current(); }, 20000);
+    const vis = () => { if (document.hidden && unsavedRef.current) saveNowRef.current(); };
+    document.addEventListener("visibilitychange", vis);
+    return () => { window.clearInterval(iv); document.removeEventListener("visibilitychange", vis); if (saveTimer.current) window.clearTimeout(saveTimer.current); };
+  }, []);
 
   useEffect(() => {
     const fit = () => {
@@ -124,7 +160,7 @@ export default function Studio({
       const t = live.current.tool, p = toBuf(e);
       if (t === "eyedropper") { pick(p); return; }
       snapshot();
-      if (t === "fill") { fill(p); renderDisplay(); force((n) => n + 1); return; }
+      if (t === "fill") { fill(p); renderDisplay(); force((n) => n + 1); autosaveRef.current(); return; }
       if (!isEraser()) sc().clearRect(0, 0, DRAW_RES, DRAW_RES);
       drawingRef.current = true; ptsRef.current = [p]; try { cv.setPointerCapture(e.pointerId); } catch {}
       dot(p); renderDisplay(); dirtyRef.current = true;
@@ -140,14 +176,14 @@ export default function Studio({
       const n = ptsRef.current.length;
       if (n >= 2) { const a = ptsRef.current[n - 2], b = ptsRef.current[n - 1], g = target(), w = widthOf(b); const m1 = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; prep(g, w); g.beginPath(); g.moveTo(m1.x, m1.y); g.lineTo(b.x, b.y); g.stroke(); if (live.current.mirror) { g.beginPath(); g.moveTo(DRAW_RES - m1.x, m1.y); g.lineTo(DRAW_RES - b.x, b.y); g.stroke(); } g.shadowBlur = 0; }
       commit();
-      drawingRef.current = false; ptsRef.current = []; renderDisplay(); force((nn) => nn + 1);
+      drawingRef.current = false; ptsRef.current = []; renderDisplay(); force((nn) => nn + 1); autosaveRef.current();
     };
     cv.addEventListener("pointerdown", down); cv.addEventListener("pointermove", move); cv.addEventListener("pointerup", up); cv.addEventListener("pointerleave", up); cv.addEventListener("pointercancel", up);
     return () => { cv.removeEventListener("pointerdown", down); cv.removeEventListener("pointermove", move); cv.removeEventListener("pointerup", up); cv.removeEventListener("pointerleave", up); cv.removeEventListener("pointercancel", up); };
   }, []);
 
-  const undo = () => { if (undoRef.current.length) { bufRef.current!.getContext("2d")!.putImageData(undoRef.current.pop()!, 0, 0); renderDisplay(); force((n) => n + 1); } };
-  const clearAll = () => { snapshot(); const g = bufRef.current!.getContext("2d")!; g.fillStyle = PAPER; g.fillRect(0, 0, DRAW_RES, DRAW_RES); dirtyRef.current = false; renderDisplay(); force((n) => n + 1); };
+  const undo = () => { if (undoRef.current.length) { bufRef.current!.getContext("2d")!.putImageData(undoRef.current.pop()!, 0, 0); renderDisplay(); force((n) => n + 1); autosaveRef.current(); } };
+  const clearAll = () => { snapshot(); const g = bufRef.current!.getContext("2d")!; g.fillStyle = PAPER; g.fillRect(0, 0, DRAW_RES, DRAW_RES); dirtyRef.current = false; renderDisplay(); force((n) => n + 1); autosaveRef.current(); };
   const submit = async () => {
     if (!dirtyRef.current || submitting) return;
     const out = document.createElement("canvas"); out.width = DRAW_RES; out.height = DRAW_RES; out.getContext("2d")!.drawImage(bufRef.current!, 0, 0);
@@ -162,7 +198,7 @@ export default function Studio({
     <div className="studio-full">
       <div className="studio-full__bar">
         <button className="ex__home" onClick={onClose}>‹ <span className="studio-full__title">studio · {tileLabel}</span></button>
-        <span className="studio-full__hint">paint what home looks like{mirror ? " · mirrored" : ""}</span>
+        <span className="studio-full__hint">{onSaveDraft ? (autosaveOff ? "autosave off" : saving ? "saving…" : unsaved ? "unsaved…" : savedAt ? "draft saved ✓ · resumes on any device" : "autosaves as you paint") : ("paint what home looks like" + (mirror ? " · mirrored" : ""))}</span>
         <button className="panel__x" onClick={onClose} aria-label="close studio">✕</button>
       </div>
 

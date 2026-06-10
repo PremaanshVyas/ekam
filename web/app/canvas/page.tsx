@@ -38,7 +38,11 @@ export default async function CanvasPage({ searchParams }: { searchParams: Promi
   let myTile = null;
   if (email && canvas) {
     const mt = await findMyTile(supabaseAdmin(), canvas.id, email);
-    if (mt) myTile = { id: mt.id, idx: mt.y * cols + mt.x, status: mt.status, artUrl: artUrl(mt.pending_image_path || mt.image_path), story: mt.pending_story || mt.story };
+    if (mt) {
+      // cache-bust the draft URL with its updated_at so a new device always pulls the latest
+      const draftUrl = mt.draft_image_path ? `${artUrl(mt.draft_image_path)}?v=${encodeURIComponent(mt.draft_updated_at ?? "")}` : null;
+      myTile = { id: mt.id, idx: mt.y * cols + mt.x, status: mt.status, artUrl: artUrl(mt.pending_image_path || mt.image_path), story: mt.pending_story || mt.story, draftUrl, draftStory: mt.draft_story ?? null };
+    }
   }
 
   return <Explorer cols={cols} total={total} tiles={tiles} claimed={claimed} email={email} myTile={myTile} autoOpenMine={autoOpenMine} />;
