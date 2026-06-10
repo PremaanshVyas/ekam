@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import MosaicCanvas, { type MosaicApi } from "@/components/MosaicCanvas";
 import Studio from "@/components/Studio";
 import { createRealWall, type RealTileInput } from "@/lib/realWall";
@@ -13,7 +12,7 @@ import { submitTile, saveDraft } from "@/app/paint/actions";
 import { signOut } from "@/app/actions";
 import SignInModal from "@/components/SignInModal";
 import ShareTile from "@/components/ShareTile";
-import Wordmark from "@/components/Wordmark";
+import Logo from "@/components/Logo";
 
 type MyTile = { id: string; idx: number; status: string; name: string | null; artUrl: string | null; story: string | null; draftUrl: string | null; draftStory: string | null };
 type Panel = "detail" | "claim" | "studio" | "submitted" | null;
@@ -326,7 +325,7 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
       </div>
 
       <div className="ex__topbar">
-        <Link className="ex__home" href="/">‹ <Wordmark sm /></Link>
+        <Logo sm />
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <span className="ex__edition">Canvas Nº 001 · live</span>
           {email ? (

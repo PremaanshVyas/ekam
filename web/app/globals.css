@@ -43,6 +43,10 @@ em{font-style:italic}
 .ekam-wordmark{display:inline-flex;align-items:baseline;font-family:var(--sans);font-weight:600;letter-spacing:.1em;text-transform:lowercase;font-size:16px;color:var(--ink)}
 .ekam-wordmark--sm{font-size:14px;letter-spacing:.08em}
 .ekam-wordmark__tile{width:.34em;height:.34em;background:var(--accent);display:inline-block;margin:0 .13em;transform:translateY(-0.02em)}
+.ekam-logo{display:inline-flex;align-items:center;gap:9px;text-decoration:none;transition:opacity .14s}
+.ekam-logo:hover{opacity:.82}
+.ekam-logo__mark{width:26px;height:26px;display:block;flex:none}
+.ekam-logo__mark--sm{width:21px;height:21px}
 .ex__loading{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:var(--ink-3);font-family:var(--mono);font-size:13px;letter-spacing:.04em}
 .ex__loadmark{animation:ekampulse 1.8s ease-in-out infinite}
 @keyframes ekampulse{0%,100%{opacity:.4}50%{opacity:.92}}

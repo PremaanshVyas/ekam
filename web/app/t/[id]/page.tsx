@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabaseAnon } from "@/lib/supabase";
 import ShareTile from "@/components/ShareTile";
-import Wordmark from "@/components/Wordmark";
+import Logo from "@/components/Logo";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +43,7 @@ export default async function TilePage({ params }: { params: Promise<{ id: strin
 
   return (
     <main className="sharepage">
-      <Link href="/" className="sharepage__home">‹ <Wordmark sm /></Link>
+      <div className="sharepage__home"><Logo sm /></div>
       <div className="sharepage__card">
         <div className="sharepage__eyebrow">Canvas Nº 001 · what home looks like</div>
         {img ? (
