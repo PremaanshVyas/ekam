@@ -19,6 +19,9 @@ build/
 # Claude Code local config
 .claude/
 
+# Superpowers brainstorm scratch (visual-companion mockups)
+.superpowers/
+
 # Private playbook — keep local; contains business strategy not for public repos.
 # (Delete this line if you make the repo PRIVATE and want the brief tracked.)
 CLAUDE_MASTER_BRIEF.md

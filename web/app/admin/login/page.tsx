@@ -15,7 +15,7 @@ export default async function AdminLogin({ searchParams }: { searchParams: Promi
           style={{ width: "100%", boxSizing: "border-box", fontFamily: "var(--font-ui), sans-serif", fontSize: 16, color: "var(--color-text-primary)", background: "var(--color-bg-surface)", border: "1.5px solid var(--color-border-default)", borderRadius: 8, padding: "12px 16px", outline: "none" }}
         />
         {error && <p style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: "var(--palette-rust)", margin: 0 }}>wrong passphrase — try again.</p>}
-        <button type="submit" style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 16, fontWeight: 500, color: "var(--color-text-inverse)", background: "var(--palette-ink)", border: "none", borderRadius: 8, padding: 14, cursor: "pointer" }}>enter</button>
+        <button type="submit" style={{ fontFamily: "var(--sans)", fontSize: 16, fontWeight: 600, color: "#16110d", background: "var(--accent)", border: "none", borderRadius: 8, padding: 14, cursor: "pointer" }}>enter</button>
       </form>
     </main>
   );
