@@ -327,7 +327,7 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
       <div className="ex__topbar">
         <Logo sm />
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <span className="ex__edition">Canvas Nº 001 · live</span>
+          <span className="ex__edition">Canvas Nº 001 · <span className="ex__live"><span className="livedot" />live</span></span>
           {email ? (
             <>
               {myTile && <button className="linkbtn" onClick={openMine}>your tile</button>}

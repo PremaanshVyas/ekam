@@ -116,7 +116,7 @@ export default function Landing({ total, claimed, published, email, myTile }: { 
           <a href="#wall">The wall</a>
         </nav>
         <div className="nav__right">
-          <span className="livepill"><span className="livedot" />{fmt(claimed)} / {fmt(total)} claimed</span>
+          <span className="livepill"><span className="livedot" /><span className="livepill__live">live</span><span className="livepill__count">{fmt(claimed)} / {fmt(total)} claimed</span></span>
           {email ? (
             <>
               <span className="authchip" title={email}>{email}</span>
