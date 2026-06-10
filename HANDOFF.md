@@ -5,7 +5,17 @@ non-obvious decision + **why**, the bugs that bit us + how they were fixed, conv
 how to do common tasks. Competition strategy/prize angles live in the gitignored
 `CLAUDE_MASTER_BRIEF.md`._
 
-**As of:** 2026-06-09 · **Live:** https://ekam.ink · **Repo:** github.com/PremaanshVyas/ekam (app in `web/`)
+**As of:** 2026-06-11 · **Live:** https://ekam.ink · **Repo:** github.com/PremaanshVyas/ekam (app in `web/`)
+
+> **⚠️ 2026-06-11 — large overhaul landed (`bb71efc` + `04e4f1c`); sections below that describe the old cream design or pre-overhaul behavior are historical.** Current state:
+> - **Design:** warm-dark editorial system (bg `#16110d`, ink `#efe9e1`, ember `#e8643c`; Spectral/Inter/IBM Plex Mono). Brand: Square Ensō mark + square-period wordmark (`/brand/`, `Logo`/`Wordmark` components). Tagline: **"Leave the words. Draw the lines. Say what's in your mind."** No hyphens/dashes in any user-facing sentence (user rule). Button labels start uppercase.
+> - **Explorer (`/canvas`):** `MosaicCanvas` is inset-aware (`insets` prop) so the wall centers in the space left free by topbar/sidebar/panel/dock and recenters on toggle; pinch zoom + 10px touch slop for taps; DPR capped at 2. Sidebar toggle is a separate `.side-fab` (never slides away); sidebar is an overlay sheet <900px. Panels: right column on desktop, bottom sheets on mobile, CTA-first ordering. Dock hides under open mobile sheets. `loadError` → retry pill. Pull-to-refresh disabled on the wall.
+> - **Studio:** 1024px buffer; brushes/shapes/sliders/zoom; cross-device autosave drafts (migration 0004); required name field; generates a **192px thumb** at submit; confetti + per-mode moderation messages.
+> - **Thumbs pipeline:** submit uploads `<id>-<ts>.png` + `<id>-<ts>.thumb.png`; queue path sets `thumb_path`; published-edit derives it on approve (`.png` → `.thumb.png`). Wall composite loads thumb → full PNG → paper fallback. Composite resolution adapts (64px/tile on small screens — fixes low-memory phone crashes).
+> - **Music player:** GainNode volume (element.volume unreliable through WebAudio), AudioContext resume on tab return, stays mounted across routes; UI hidden on `/t/` + `/admin` and while any panel/studio is open via `body[data-panel]` (fixed-position stacking contexts beat z-index). Starts minimized <900px.
+> - **Security:** timing-safe admin compares, PNG signature validation on uploads, claim idx bounds check, security headers in `next.config.ts`. RLS posture unchanged.
+> - **Perf:** parallel Supabase queries + head-only counts on `/` and `/canvas`, Supabase preconnect, route `loading.tsx` everywhere.
+> - **Verification:** `web/probe.mjs` (gitignored) + `puppeteer-core` — real mobile-emulation screenshots/rect probes. Raw `chrome --headless --screenshot` lies about mobile layout; don't trust it.
 
 ---
 
