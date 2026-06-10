@@ -390,5 +390,7 @@ em{font-style:italic}
 .studio__ctll{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
 .studio__ctlv{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);min-width:34px}
 .studio__range{width:120px;accent-color:var(--accent);cursor:pointer}
+.studio__reset{font-family:var(--mono);font-size:10px;color:var(--ink-2);border:1px solid var(--line);border-radius:6px;padding:3px 8px;min-width:36px;cursor:pointer}
+.studio__reset:hover{border-color:var(--accent);color:var(--ink)}
 .studio-full__row{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;width:100%;max-width:720px}
 @media(max-width:560px){.studio-full__stage{padding:10px}.studio-full__row{gap:7px}.studio-full__hint{display:none}}

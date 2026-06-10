@@ -7,7 +7,7 @@ const DRAW_RES = 1024;   // high-res paint buffer
 const PAPER = "#f4eee2";
 
 type BrushType = "pen" | "marker" | "highlighter" | "airbrush" | "pencil";
-type Tool = "brush" | "eraser" | "fill" | "eyedropper" | "line" | "rect" | "ellipse";
+type Tool = "brush" | "eraser" | "fill" | "eyedropper" | "line" | "rect" | "ellipse" | "hand";
 type Pt = { x: number; y: number; p: number };
 const SHAPES = new Set<Tool>(["line", "rect", "ellipse"]);
 
@@ -51,6 +51,12 @@ export default function Studio({
   const drawingRef = useRef(false);
   const ptsRef = useRef<Pt[]>([]);
   const shapeStartRef = useRef<Pt | null>(null);
+  const viewRef = useRef({ zoom: 1, ox: 0, oy: 0 }); // ox/oy = top-left of visible region in buffer px
+  const [zoom, setZoom] = useState(1);
+  const panningRef = useRef<{ x: number; y: number } | null>(null);
+  const pointersRef = useRef(new Map<number, { x: number; y: number }>());
+  const pinchRef = useRef<{ dist: number; cx: number; cy: number; zoom: number; ox: number; oy: number } | null>(null);
+  const applyZoomRef = useRef<(nz: number, fx?: number, fy?: number) => void>(() => {});
   const live = useRef({ tool, color, brushPx, opacity, mirror, brushType });
   live.current = { tool, color, brushPx, opacity, mirror, brushType };
 
@@ -65,14 +71,15 @@ export default function Studio({
     const cv = dispRef.current; if (!cv || !cv.width) return;
     const g = cv.getContext("2d")!; g.globalAlpha = 1; g.globalCompositeOperation = "source-over";
     g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
+    const v = viewRef.current; const srcW = DRAW_RES / v.zoom;
     g.clearRect(0, 0, cv.width, cv.height);
-    g.drawImage(bufRef.current!, 0, 0, cv.width, cv.height);
+    g.drawImage(bufRef.current!, v.ox, v.oy, srcW, srcW, 0, 0, cv.width, cv.height);
     const pt = live.current.tool;
     if (drawingRef.current && (pt === "brush" || SHAPES.has(pt))) {
       const isShape = SHAPES.has(pt); const bp = BRUSHES[live.current.brushType];
       g.globalAlpha = isShape ? live.current.opacity : bp.alpha * live.current.opacity;
       g.globalCompositeOperation = isShape ? "source-over" : bp.blend;
-      g.drawImage(strokeRef.current!, 0, 0, cv.width, cv.height);
+      g.drawImage(strokeRef.current!, v.ox, v.oy, srcW, srcW, 0, 0, cv.width, cv.height);
       g.globalAlpha = 1; g.globalCompositeOperation = "source-over";
     }
   };
@@ -155,7 +162,7 @@ export default function Studio({
     const bp = () => BRUSHES[live.current.brushType];
     const widthOf = (pt: Pt) => live.current.brushPx * (isEraser() ? 1 : bp().scale) * (0.4 + 0.6 * pt.p);
     const prep = (g: CanvasRenderingContext2D, w: number) => { const c = paintCol(); g.strokeStyle = c; g.fillStyle = c; g.lineCap = "round"; g.lineJoin = "round"; g.lineWidth = w; g.shadowBlur = isEraser() ? 0 : bp().soft * w; g.shadowColor = c; };
-    const toBuf = (e: PointerEvent): Pt => { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * DRAW_RES, y: (e.clientY - r.top) / r.height * DRAW_RES, p: e.pointerType === "pen" && e.pressure > 0 ? e.pressure : 1 }; };
+    const toBuf = (e: PointerEvent): Pt => { const r = cv.getBoundingClientRect(); const v = viewRef.current; const srcW = DRAW_RES / v.zoom; return { x: v.ox + (e.clientX - r.left) / r.width * srcW, y: v.oy + (e.clientY - r.top) / r.height * srcW, p: e.pointerType === "pen" && e.pressure > 0 ? e.pressure : 1 }; };
     const dot = (pt: Pt) => { const g = target(), w = widthOf(pt); prep(g, w); g.beginPath(); g.arc(pt.x, pt.y, w / 2, 0, 7); g.fill(); if (live.current.mirror) { g.beginPath(); g.arc(DRAW_RES - pt.x, pt.y, w / 2, 0, 7); g.fill(); } g.shadowBlur = 0; };
     const line = (a: Pt, b: Pt) => { const g = target(), w = widthOf(b); prep(g, w); g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke(); if (live.current.mirror) { g.beginPath(); g.moveTo(DRAW_RES - a.x, a.y); g.lineTo(DRAW_RES - b.x, b.y); g.stroke(); } g.shadowBlur = 0; };
     const curve = (a: Pt, b: Pt, c: Pt) => { const g = target(), w = widthOf(b); const m1 = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, m2 = { x: (b.x + c.x) / 2, y: (b.y + c.y) / 2 }; prep(g, w); g.beginPath(); g.moveTo(m1.x, m1.y); g.quadraticCurveTo(b.x, b.y, m2.x, m2.y); g.stroke(); if (live.current.mirror) { g.beginPath(); g.moveTo(DRAW_RES - m1.x, m1.y); g.quadraticCurveTo(DRAW_RES - b.x, b.y, DRAW_RES - m2.x, m2.y); g.stroke(); } g.shadowBlur = 0; };
@@ -181,8 +188,19 @@ export default function Studio({
     };
     const commitShape = () => { const g = buf(); g.save(); g.globalAlpha = live.current.opacity; g.globalCompositeOperation = "source-over"; g.drawImage(strokeRef.current!, 0, 0); g.restore(); sc().clearRect(0, 0, DRAW_RES, DRAW_RES); };
 
+    const ptrs = pointersRef.current;
     const down = (e: PointerEvent) => {
+      ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (ptrs.size === 2) { // two fingers → pinch-zoom; cancel any in-progress stroke
+        if (drawingRef.current) { drawingRef.current = false; ptsRef.current = []; shapeStartRef.current = null; sc().clearRect(0, 0, DRAW_RES, DRAW_RES); renderDisplay(); }
+        panningRef.current = null;
+        const [a, b] = [...ptrs.values()]; const v = viewRef.current;
+        pinchRef.current = { dist: Math.hypot(a.x - b.x, a.y - b.y) || 1, cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2, zoom: v.zoom, ox: v.ox, oy: v.oy };
+        return;
+      }
+      if (ptrs.size > 2) return;
       const t = live.current.tool, p = toBuf(e);
+      if (t === "hand") { panningRef.current = { x: e.clientX, y: e.clientY }; try { cv.setPointerCapture(e.pointerId); } catch {} return; }
       if (t === "eyedropper") { pick(p); return; }
       snapshot();
       if (t === "fill") { fill(p); renderDisplay(); force((n) => n + 1); autosaveRef.current(); return; }
@@ -192,13 +210,27 @@ export default function Studio({
       dot(p); renderDisplay(); dirtyRef.current = true;
     };
     const move = (e: PointerEvent) => {
+      if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinchRef.current && ptrs.size >= 2) { // pinch: keep the start centroid's buffer point under the moving centroid
+        const [a, b] = [...ptrs.values()]; const pr = pinchRef.current; const r = cv.getBoundingClientRect();
+        const dist = Math.hypot(a.x - b.x, a.y - b.y) || 1; const nz = Math.max(1, Math.min(6, pr.zoom * (dist / pr.dist)));
+        const startSrcW = DRAW_RES / pr.zoom; const bx = pr.ox + ((pr.cx - r.left) / r.width) * startSrcW, by = pr.oy + ((pr.cy - r.top) / r.height) * startSrcW;
+        const nsrc = DRAW_RES / nz; const ncx = (a.x + b.x) / 2, ncy = (a.y + b.y) / 2; const v = viewRef.current; v.zoom = nz;
+        v.ox = Math.max(0, Math.min(DRAW_RES - nsrc, bx - ((ncx - r.left) / r.width) * nsrc));
+        v.oy = Math.max(0, Math.min(DRAW_RES - nsrc, by - ((ncy - r.top) / r.height) * nsrc));
+        setZoom(nz); renderDisplay(); return;
+      }
+      if (panningRef.current) { const r = cv.getBoundingClientRect(); const v = viewRef.current; const srcW = DRAW_RES / v.zoom; v.ox = Math.max(0, Math.min(DRAW_RES - srcW, v.ox - (e.clientX - panningRef.current.x) / r.width * srcW)); v.oy = Math.max(0, Math.min(DRAW_RES - srcW, v.oy - (e.clientY - panningRef.current.y) / r.height * srcW)); panningRef.current = { x: e.clientX, y: e.clientY }; renderDisplay(); return; }
       if (!drawingRef.current) return;
       if (SHAPES.has(live.current.tool)) { const a = shapeStartRef.current; if (a) { drawShape(a, toBuf(e), live.current.tool); renderDisplay(); } return; }
       const evs = (typeof e.getCoalescedEvents === "function" && e.getCoalescedEvents().length) ? e.getCoalescedEvents() : [e];
       for (const ev of evs) { const p = toBuf(ev); ptsRef.current.push(p); const n = ptsRef.current.length; if (n >= 3) curve(ptsRef.current[n - 3], ptsRef.current[n - 2], ptsRef.current[n - 1]); else if (n === 2) line(ptsRef.current[0], ptsRef.current[1]); }
       renderDisplay();
     };
-    const up = () => {
+    const up = (e: PointerEvent) => {
+      ptrs.delete(e.pointerId);
+      if (ptrs.size < 2) pinchRef.current = null;
+      if (panningRef.current) { panningRef.current = null; return; }
       if (!drawingRef.current) return;
       if (SHAPES.has(live.current.tool)) { commitShape(); shapeStartRef.current = null; drawingRef.current = false; ptsRef.current = []; renderDisplay(); force((nn) => nn + 1); autosaveRef.current(); return; }
       const n = ptsRef.current.length;
@@ -206,9 +238,19 @@ export default function Studio({
       commit();
       drawingRef.current = false; ptsRef.current = []; renderDisplay(); force((nn) => nn + 1); autosaveRef.current();
     };
-    cv.addEventListener("pointerdown", down); cv.addEventListener("pointermove", move); cv.addEventListener("pointerup", up); cv.addEventListener("pointerleave", up); cv.addEventListener("pointercancel", up);
-    return () => { cv.removeEventListener("pointerdown", down); cv.removeEventListener("pointermove", move); cv.removeEventListener("pointerup", up); cv.removeEventListener("pointerleave", up); cv.removeEventListener("pointercancel", up); };
+    const wheel = (e: WheelEvent) => { e.preventDefault(); const r = cv.getBoundingClientRect(); applyZoomRef.current(viewRef.current.zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15), (e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height); };
+    cv.addEventListener("pointerdown", down); cv.addEventListener("pointermove", move); cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up); cv.addEventListener("wheel", wheel, { passive: false });
+    return () => { cv.removeEventListener("pointerdown", down); cv.removeEventListener("pointermove", move); cv.removeEventListener("pointerup", up); cv.removeEventListener("pointercancel", up); cv.removeEventListener("wheel", wheel); };
   }, []);
+
+  const applyZoom = (nz: number, fx = 0.5, fy = 0.5) => {
+    const v = viewRef.current; const srcW = DRAW_RES / v.zoom;
+    const bx = v.ox + fx * srcW, by = v.oy + fy * srcW;
+    const z = Math.max(1, Math.min(6, nz)); const nsrc = DRAW_RES / z;
+    v.zoom = z; v.ox = Math.max(0, Math.min(DRAW_RES - nsrc, bx - fx * nsrc)); v.oy = Math.max(0, Math.min(DRAW_RES - nsrc, by - fy * nsrc));
+    setZoom(z); renderDisplay();
+  };
+  applyZoomRef.current = applyZoom;
 
   const snapBuf = () => bufRef.current!.getContext("2d")!.getImageData(0, 0, DRAW_RES, DRAW_RES);
   const undo = () => { if (!undoRef.current.length) return; redoRef.current.push(snapBuf()); bufRef.current!.getContext("2d")!.putImageData(undoRef.current.pop()!, 0, 0); renderDisplay(); force((n) => n + 1); autosaveRef.current(); };
@@ -270,6 +312,7 @@ export default function Studio({
           <button className={"tool" + (tool === "line" ? " tool--on" : "")} title="Line" onClick={() => setTool("line")}><span className="tool__gl">╱</span><span className="tool__l">Line</span></button>
           <button className={"tool" + (tool === "rect" ? " tool--on" : "")} title="Rectangle" onClick={() => setTool("rect")}><span className="tool__gl">▭</span><span className="tool__l">Rect</span></button>
           <button className={"tool" + (tool === "ellipse" ? " tool--on" : "")} title="Ellipse" onClick={() => setTool("ellipse")}><span className="tool__gl">◯</span><span className="tool__l">Oval</span></button>
+          <button className={"tool" + (tool === "hand" ? " tool--on" : "")} title="Pan — drag to move when zoomed in" onClick={() => setTool("hand")}><span className="tool__gl">✋</span><span className="tool__l">Pan</span></button>
           <button className={"tool" + (mirror ? " tool--on" : "")} title="Mirror" onClick={() => setMirror((s) => !s)}><span className="tool__gl">◫</span><span className="tool__l">Mirror</span></button>
           <button className="tool" title="Undo" onClick={undo}><span className="tool__gl">↺</span><span className="tool__l">Undo</span></button>
           <button className="tool" title="Redo" onClick={redo}><span className="tool__gl">↻</span><span className="tool__l">Redo</span></button>
@@ -284,6 +327,10 @@ export default function Studio({
           <label className="studio__ctl"><span className="studio__ctll">opacity</span>
             <input type="range" className="studio__range" min={10} max={100} value={Math.round(opacity * 100)} onChange={(e) => setOpacity(+e.target.value / 100)} />
             <span className="studio__ctlv">{Math.round(opacity * 100)}%</span>
+          </label>
+          <label className="studio__ctl"><span className="studio__ctll">zoom</span>
+            <input type="range" className="studio__range" min={1} max={6} step={0.1} value={zoom} onChange={(e) => applyZoom(+e.target.value)} />
+            <button className="studio__reset" onClick={() => applyZoom(1)} title="Fit to screen">{zoom > 1.05 ? zoom.toFixed(1) + "×" : "fit"}</button>
           </label>
           <div className="studio__current" style={{ background: color }} title="Current colour" />
         </div>
