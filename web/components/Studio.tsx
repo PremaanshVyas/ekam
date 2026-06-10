@@ -258,7 +258,7 @@ export default function Studio({
   const redo = () => { if (!redoRef.current.length) return; undoRef.current.push(snapBuf()); bufRef.current!.getContext("2d")!.putImageData(redoRef.current.pop()!, 0, 0); renderDisplay(); force((n) => n + 1); autosaveRef.current(); };
   const clearAll = () => { snapshot(); const g = bufRef.current!.getContext("2d")!; g.fillStyle = PAPER; g.fillRect(0, 0, DRAW_RES, DRAW_RES); dirtyRef.current = false; renderDisplay(); force((n) => n + 1); autosaveRef.current(); };
   const submit = async () => {
-    if (!dirtyRef.current || submitting) return;
+    if (!dirtyRef.current || !name.trim() || submitting) return;
     const out = document.createElement("canvas"); out.width = DRAW_RES; out.height = DRAW_RES; out.getContext("2d")!.drawImage(bufRef.current!, 0, 0);
     setSubmitting(true);
     try { await onSubmit(out.toDataURL("image/png"), name.trim(), note.trim()); } catch (err) { setSubmitting(false); alert("Couldn't submit — " + (err as Error).message); }
@@ -354,7 +354,7 @@ export default function Studio({
             <input className="studio__noteinput" maxLength={140} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Say a line — where were you when home looked like this?" />
             <span className="studio__count">{note.length}/140</span>
           </div>
-          <button className="btn btn--primary btn--block" disabled={!dirtyRef.current || submitting} onClick={submit}>{submitting ? "submitting…" : dirtyRef.current ? "Submit your tile" : "Paint something first"}</button>
+          <button className="btn btn--primary btn--block" disabled={!dirtyRef.current || !name.trim() || submitting} onClick={submit}>{submitting ? "submitting…" : !dirtyRef.current ? "Paint something first" : !name.trim() ? "Add your name to submit" : "Submit your tile"}</button>
         </div>
       </div>
       </div>

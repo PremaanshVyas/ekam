@@ -301,9 +301,9 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
     setTimeout(() => api.current?.zoomToTile(mi, 96), 90);
   }, [autoOpenMine, myTile, wall]);
 
-  const openStudioForClaim = (tileId: string) => { if (!selected) return; studioTarget.current = { tileId, idx: selected.idx, label: selected.id, artUrl: null, note: "", name: email ? email.split("@")[0] : "" }; setPanel("studio"); };
+  const openStudioForClaim = (tileId: string) => { if (!selected) return; studioTarget.current = { tileId, idx: selected.idx, label: selected.id, artUrl: null, note: "", name: "" }; setPanel("studio"); };
   // Resume from the latest autosaved draft if there is one; else the submitted/published image.
-  const openStudioForEdit = () => { if (!myTile || !wall) return; const label = wall.infoFor(myTile.idx).id; studioTarget.current = { tileId: myTile.id, idx: myTile.idx, label, artUrl: myTile.draftUrl ?? myTile.artUrl, note: myTile.draftStory ?? myTile.story ?? "", name: myTile.name ?? "" }; setPanel("studio"); };
+  const openStudioForEdit = () => { if (!myTile || !wall) return; const label = wall.infoFor(myTile.idx).id; const def = email ? email.split("@")[0] : ""; studioTarget.current = { tileId: myTile.id, idx: myTile.idx, label, artUrl: myTile.draftUrl ?? myTile.artUrl, note: myTile.draftStory ?? myTile.story ?? "", name: myTile.name && myTile.name !== def ? myTile.name : "" }; setPanel("studio"); };
   const onStudioSubmit = async (dataUrl: string, name: string, note: string) => { const t = studioTarget.current; if (!t) return; await submitTile(t.tileId, dataUrl, name, note); setLastArt(dataUrl); setPanel("submitted"); router.refresh(); };
   const onSaveDraft = async (dataUrl: string, note: string) => { const t = studioTarget.current; if (!t) return { ok: false }; return await saveDraft(t.tileId, dataUrl, note); };
 
