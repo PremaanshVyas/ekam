@@ -25,6 +25,8 @@ export default async function CanvasPage({ searchParams }: { searchParams: Promi
   let email: string | null = null;
   let myTile = null;
   let loadError = false;
+  let notifs: { id: string; kind: string; title: string; body: string | null; created_at: string; read_at: string | null }[] = [];
+  let unread = 0;
 
   try {
     const auth = await createSupabaseServer();
@@ -57,6 +59,16 @@ export default async function CanvasPage({ searchParams }: { searchParams: Promi
       });
       if (tilesRes.error) loadError = true;
 
+      if (email) {
+        try {
+          const { data: nd } = await supabaseAdmin().from("notifications")
+            .select("id, kind, title, body, created_at, read_at")
+            .eq("artist_email", email.toLowerCase()).order("created_at", { ascending: false }).limit(12);
+          notifs = nd ?? [];
+          unread = notifs.filter((n) => !n.read_at).length;
+        } catch { /* migration 0006 not run yet */ }
+      }
+
       if (mt) {
         // cache-bust the draft URL with its updated_at so a new device always pulls the latest
         const draftUrl = mt.draft_image_path ? `${artUrl(mt.draft_image_path)}?v=${encodeURIComponent(mt.draft_updated_at ?? "")}` : null;
@@ -71,5 +83,5 @@ export default async function CanvasPage({ searchParams }: { searchParams: Promi
     loadError = true;
   }
 
-  return <Explorer cols={cols} total={cols * rows} tiles={tiles} claimed={claimed} email={email} myTile={myTile} autoOpenMine={autoOpenMine} loadError={loadError} />;
+  return <Explorer cols={cols} total={cols * rows} tiles={tiles} claimed={claimed} email={email} myTile={myTile} autoOpenMine={autoOpenMine} loadError={loadError} notifs={notifs} unread={unread} />;
 }

@@ -63,6 +63,9 @@ export async function submitTile(
     thumbOk = !tu.error;
   }
 
+  // fresh review cycle: clear the previous verdict so the client can watch this one land
+  await db.from("tiles").update({ ai_verdict: null, ai_reason: null, ai_checked_at: null, review_requested_at: null }).eq("id", tileId);
+
   if (tile.status === "published") {
     // Editing a LIVE tile → stage as a pending edit; the published tile stays on the canvas.
     const { error } = await db.from("tiles").update({
@@ -87,6 +90,43 @@ export async function submitTile(
   after(() => moderateTile(tileId)); // AI screen runs after the response is sent
   revalidatePath("/admin");
   return { ok: true, mode: tile.status === "claimed" ? "new" : "edit-pending" };
+}
+
+export type ReviewState = { state: "checking" | "live" | "returned" | "escalated" | "requested"; reason: string | null };
+
+// The artist's live view of their submission's review. Polled by the client after submit.
+export async function reviewStatus(tileId: string): Promise<ReviewState> {
+  const owned = await ownTile(tileId);
+  if (!owned) return { state: "checking", reason: null };
+  const { db } = owned;
+  const { data: t } = await db.from("tiles")
+    .select("status, pending_image_path, ai_verdict, ai_reason, ai_checked_at, review_requested_at")
+    .eq("id", tileId).maybeSingle();
+  if (!t) return { state: "checking", reason: null };
+  if (t.review_requested_at) return { state: "requested", reason: t.ai_reason ?? null };
+  if (!t.ai_checked_at) return { state: "checking", reason: null };
+  const v = t.ai_verdict;
+  if (v === "approve" && t.status === "published" && !t.pending_image_path) return { state: "live", reason: null };
+  if (v === "reject") return { state: "returned", reason: t.ai_reason ?? null };
+  // review verdict, or an AI error → it's sitting with the human moderator
+  return { state: "escalated", reason: v === "review" ? (t.ai_reason ?? null) : null };
+}
+
+// The artist disputes an AI return → put it in front of the human moderator.
+export async function requestManualReview(tileId: string): Promise<{ ok: boolean }> {
+  const owned = await ownTile(tileId);
+  if (!owned) return { ok: false };
+  const { db, tile } = owned;
+  const { data: t } = await db.from("tiles").select("status, pending_image_path, ai_verdict").eq("id", tileId).maybeSingle();
+  if (!t || t.ai_verdict !== "reject") return { ok: false };
+  if (!t.pending_image_path && t.status === "claimed") {
+    await db.from("tiles").update({ status: "pending" }).eq("id", tileId).eq("status", "claimed");
+  }
+  const { error } = await db.from("tiles").update({ review_requested_at: new Date().toISOString() }).eq("id", tileId);
+  if (error) return { ok: false }; // migration 0006 not run yet
+  await db.from("moderation_log").insert({ tile_id: tileId, action: "review-requested", reason: `artist (${tile.artist_email}) asked for a human review` });
+  revalidatePath("/admin");
+  return { ok: true };
 }
 
 // Drop the autosave draft once there's a real submission. Best-effort: if the draft_*

@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { isAdmin } from "@/lib/admin-auth";
 import { publishTile } from "@/lib/publish";
 import { broadcastWallChange } from "@/lib/broadcast";
+import { notify } from "@/lib/notify";
 
 // Re-run the AI screen on one tile (also handy as a one-click live test).
 export async function screenTile(id: string) {
@@ -22,22 +23,24 @@ export async function approve(id: string) {
   revalidatePath("/");
 }
 
+// Reject RETURNS the tile to its artist (they keep the tile + painting and can rework
+// it); it never un-claims — that's what "remove" is for. Rejected edits are dropped
+// while the live tile stays on the wall. The artist hears about it in their bell.
 export async function reject(id: string) {
   if (!(await isAdmin())) throw new Error("unauthorized");
   const db = supabaseAdmin();
-  const { data: tile } = await db.from("tiles").select("pending_image_path").eq("id", id).maybeSingle();
+  const { data: tile } = await db.from("tiles").select("pending_image_path, artist_email, x, y, status").eq("id", id).maybeSingle();
   if (!tile) return;
+  const lbl = `R${String(tile.y + 1).padStart(2, "0")}·C${String(tile.x + 1).padStart(2, "0")}`;
 
   if (tile.pending_image_path) {
-    // Rejecting an edit → drop the pending edit; the live published tile stays untouched.
     await db.from("tiles").update({ pending_image_path: null, pending_story: null, pending_submitted_at: null }).eq("id", id);
+    await notify(db, tile.artist_email, "mod-rejected", `Your update to ${lbl} was rejected`, "The moderator reviewed your new version and rejected it. Your previously approved tile stays live on the wall. You can paint a different update anytime.");
   } else {
-    // Rejecting a new tile → reopen it (clears artist data so it's claimable again).
-    await db.from("tiles").update({
-      status: "open", artist_name: null, artist_email: null, artist_location: null,
-      story: null, image_path: null, claimed_at: null, claim_expires_at: null,
-    }).eq("id", id).eq("status", "pending");
+    await db.from("tiles").update({ status: "claimed" }).eq("id", id).eq("status", "pending");
+    await notify(db, tile.artist_email, "mod-rejected", `Your tile ${lbl} was rejected`, "The moderator reviewed your tile manually and rejected it. The tile is still yours. Paint something new and submit again.");
   }
+  await db.from("tiles").update({ review_requested_at: null }).eq("id", id); // best-effort (0006)
   await db.from("moderation_log").insert({ tile_id: id, action: "rejected" });
   await broadcastWallChange();
   revalidatePath("/admin");

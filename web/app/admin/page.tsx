@@ -13,22 +13,30 @@ type Row = {
   id: string; x: number; y: number; status: string;
   story: string | null; artist_name: string | null; artist_email: string | null; artist_location: string | null;
   image_path: string | null; pending_image_path: string | null; pending_story: string | null;
-  ai_verdict: string | null; ai_reason: string | null;
+  ai_verdict: string | null; ai_reason: string | null; review_requested_at: string | null;
 };
 
-const QUEUE_COLS = "id,x,y,status,story,artist_name,artist_email,artist_location,image_path,pending_image_path,pending_story,ai_verdict,ai_reason";
+const QUEUE_COLS = "id,x,y,status,story,artist_name,artist_email,artist_location,image_path,pending_image_path,pending_story,ai_verdict,ai_reason,review_requested_at";
 const MID_COLS = "id,x,y,status,story,artist_name,artist_email,artist_location,image_path,pending_image_path,pending_story";
 const SAFE_COLS = "id,x,y,status,story,artist_name,artist_email,artist_location,image_path";
 
-// Tolerant of migrations 0003/0005 not being run: fall back to progressively safer column sets.
+// Tolerant of migrations 0003/0005/0006 not being run: fall back to progressively safer column sets.
 async function fetchQueue(db: ReturnType<typeof supabaseAdmin>): Promise<Row[]> {
-  const blank = { pending_image_path: null, pending_story: null, ai_verdict: null, ai_reason: null };
-  const full = await db.from("tiles").select(QUEUE_COLS).or("status.eq.pending,pending_image_path.not.is.null").order("claimed_at", { ascending: true });
-  if (!full.error) return (full.data as Row[]) ?? [];
-  const mid = await db.from("tiles").select(MID_COLS).or("status.eq.pending,pending_image_path.not.is.null").order("claimed_at", { ascending: true });
-  if (!mid.error) return ((mid.data as Omit<Row, "ai_verdict" | "ai_reason">[]) ?? []).map((r) => ({ ...blank, ...r }));
-  const safe = await db.from("tiles").select(SAFE_COLS).eq("status", "pending").order("claimed_at", { ascending: true });
-  return ((safe.data as Omit<Row, "pending_image_path" | "pending_story" | "ai_verdict" | "ai_reason">[]) ?? []).map((r) => ({ ...blank, ...r }));
+  const blank = { pending_image_path: null, pending_story: null, ai_verdict: null, ai_reason: null, review_requested_at: null };
+  const grab = async (cols: string) => db.from("tiles").select(cols).or("status.eq.pending,pending_image_path.not.is.null").order("claimed_at", { ascending: true });
+  let rows: Partial<Row>[] | null = null;
+  for (const cols of [QUEUE_COLS, MID_COLS]) {
+    const res = await grab(cols);
+    if (!res.error) { rows = (res.data as unknown as Partial<Row>[]) ?? []; break; }
+  }
+  if (!rows) {
+    const safe = await db.from("tiles").select(SAFE_COLS).eq("status", "pending").order("claimed_at", { ascending: true });
+    rows = (safe.data as unknown as Partial<Row>[]) ?? [];
+  }
+  return rows
+    .map((r) => ({ ...blank, ...r } as Row))
+    // AI-returned edits stay hidden until the artist asks for a human review
+    .filter((r) => r.status === "pending" || !r.pending_image_path || r.ai_verdict !== "reject" || !!r.review_requested_at);
 }
 
 // AI verdict chip: at-a-glance triage colour + the model's one-line reason.
@@ -122,6 +130,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                     <div style={meta}>{r.artist_name} · tile {r.x},{r.y}{r.artist_location ? ` · ${r.artist_location}` : ""}</div>
                     <div style={emailStyle}>{r.artist_email}</div>
                     <AiChip verdict={r.ai_verdict} reason={r.ai_reason} />
+                    {r.review_requested_at && <div style={{ marginTop: 6 }}><span style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--accent)", border: "1px solid var(--accent)", borderRadius: 4, padding: "2px 7px" }}>artist requested review</span></div>}
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8, width: 96 }}>
                     <form action={approve.bind(null, r.id)}>

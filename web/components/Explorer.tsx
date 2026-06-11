@@ -8,14 +8,15 @@ import { createRealWall, type RealTileInput } from "@/lib/realWall";
 import type { Wall, TileInfo } from "@/lib/demoWall";
 import { createSupabaseBrowser } from "@/lib/auth-browser";
 import { claimTileAt } from "@/app/canvas/actions";
-import { submitTile, saveDraft, type SubmitMode } from "@/app/paint/actions";
-import { signOut } from "@/app/actions";
+import { submitTile, saveDraft, reviewStatus, requestManualReview, type ReviewState } from "@/app/paint/actions";
+import { signOut, markNotificationsRead } from "@/app/actions";
 import SignInModal from "@/components/SignInModal";
 import ShareTile from "@/components/ShareTile";
 import Logo from "@/components/Logo";
 
 type MyTile = { id: string; idx: number; status: string; name: string | null; artUrl: string | null; story: string | null; draftUrl: string | null; draftStory: string | null; aiVerdict: string | null; aiReason: string | null };
-type Panel = "detail" | "claim" | "studio" | "submitted" | null;
+type Panel = "detail" | "claim" | "studio" | "reviewing" | null;
+type Notif = { id: string; kind: string; title: string; body: string | null; created_at: string; read_at: string | null };
 type ViewMode = "claimed" | "all";
 
 // ── crisp tile / neighborhood render ──
@@ -263,15 +264,10 @@ function TileDetail({ wall, info, version, myTile, onClose, onZoom, onEdit }: {
   );
 }
 
-const SUBMIT_COPY: Record<SubmitMode, { t: string; d: string }> = {
-  "new": { t: "It’s in the queue!", d: "Your tile is off for a quick review. Once approved it joins the wall with your name, and you can share it everywhere." },
-  "edit-pending": { t: "Updated.", d: "Your new version replaced the old one in the moderation queue. It joins the wall as soon as it’s approved." },
-  "edit-published": { t: "Update received.", d: "Your live tile stays on the wall while the new version waits for review. We swap them the moment it’s approved." },
-};
 const CONFETTI_N = 18;
 
-export default function Explorer({ cols, total, tiles, claimed, email, myTile, autoOpenMine, loadError }: {
-  cols: number; total: number; tiles: RealTileInput[]; claimed: number; email: string | null; myTile: MyTile | null; autoOpenMine?: boolean; loadError?: boolean;
+export default function Explorer({ cols, total, tiles, claimed, email, myTile, autoOpenMine, loadError, notifs = [], unread = 0 }: {
+  cols: number; total: number; tiles: RealTileInput[]; claimed: number; email: string | null; myTile: MyTile | null; autoOpenMine?: boolean; loadError?: boolean; notifs?: Notif[]; unread?: number;
 }) {
   const router = useRouter();
   const api = useRef<MosaicApi | null>(null);
@@ -286,7 +282,9 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
   const [vh, setVh] = useState(800);
   const [sideOpen, setSideOpen] = useState(true);
   const [zoomLabel, setZoomLabel] = useState("Wall");
-  const [submitMode, setSubmitMode] = useState<SubmitMode>("new");
+  const [review, setReview] = useState<ReviewState>({ state: "checking", reason: null });
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [reqBusy, setReqBusy] = useState(false);
   const studioTarget = useRef<{ tileId: string; idx: number; label: string; artUrl: string | null; note: string; name: string } | null>(null);
   const [signInOpen, setSignInOpen] = useState(false);
   const [lastArt, setLastArt] = useState<string | null>(null);
@@ -369,8 +367,38 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
   const openStudioForEdit = () => { if (!myTile || !wall) return; const label = wall.infoFor(myTile.idx).id; const def = email ? email.split("@")[0] : ""; studioTarget.current = { tileId: myTile.id, idx: myTile.idx, label, artUrl: myTile.draftUrl ?? myTile.artUrl, note: myTile.draftStory ?? myTile.story ?? "", name: myTile.name && myTile.name !== def ? myTile.name : "" }; setPanel("studio"); };
   const onStudioSubmit = async (dataUrl: string, thumbUrl: string | null, name: string, note: string) => {
     const t = studioTarget.current; if (!t) return;
-    const res = await submitTile(t.tileId, dataUrl, thumbUrl, name, note);
-    setSubmitMode(res.mode); setLastArt(dataUrl); setPanel("submitted"); router.refresh();
+    await submitTile(t.tileId, dataUrl, thumbUrl, name, note);
+    setLastArt(dataUrl); setReview({ state: "checking", reason: null }); setPanel("reviewing"); router.refresh();
+  };
+  // watch the AI review land in real time after a submit
+  useEffect(() => {
+    if (panel !== "reviewing" || review.state !== "checking") return;
+    const started = Date.now(); let stop = false; let timer = 0;
+    const tick = async () => {
+      if (stop) return;
+      const t = studioTarget.current; if (!t) return;
+      try {
+        const r = await reviewStatus(t.tileId);
+        if (stop) return;
+        if (r.state !== "checking") { setReview(r); router.refresh(); return; }
+      } catch { /* transient; keep polling */ }
+      if (Date.now() - started > 75000) { setReview({ state: "escalated", reason: null }); router.refresh(); return; }
+      timer = window.setTimeout(tick, 2500);
+    };
+    timer = window.setTimeout(tick, 1800);
+    return () => { stop = true; window.clearTimeout(timer); };
+  }, [panel, review.state, router]);
+  const askHuman = async () => {
+    const t = studioTarget.current; if (!t || reqBusy) return;
+    setReqBusy(true);
+    const r = await requestManualReview(t.tileId);
+    setReqBusy(false);
+    if (r.ok) setReview((v) => ({ state: "requested", reason: v.reason }));
+  };
+  const redrawReturned = () => {
+    const t = studioTarget.current; if (!t) return;
+    studioTarget.current = { ...t, artUrl: lastArt ?? t.artUrl };
+    setPanel("studio");
   };
   const onSaveDraft = async (dataUrl: string, note: string) => { const t = studioTarget.current; if (!t) return { ok: false }; return await saveDraft(t.tileId, dataUrl, note); };
 
@@ -391,8 +419,6 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
     </div>
   );
 
-  const submitCopy = SUBMIT_COPY[submitMode];
-
   return (
     <div className="explorer">
       <div className="ex__canvas">
@@ -408,6 +434,10 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
           <span className="ex__edition"><span className="ex__edno">Canvas Nº 001 · </span><span className="ex__live"><span className="livedot" />live</span></span>
           {email ? (
             <>
+              <button className="bell" aria-label="Notifications" aria-expanded={notifOpen} onClick={() => { setNotifOpen((o) => !o); if (!notifOpen && unread > 0) markNotificationsRead(); }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
+                {unread > 0 && <span className="bell__dot" />}
+              </button>
               <span className="authchip" title={email}>{email}</span>
               {myTile && <button className="linkbtn" onClick={openMine}>Your tile</button>}
               <form action={signOut} style={{ display: "inline" }}><button type="submit" className="linkbtn">Sign out</button></form>
@@ -417,6 +447,24 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
           )}
         </div>
       </div>
+
+      {notifOpen && (
+        <>
+          <div className="notif__scrim" onClick={() => setNotifOpen(false)} />
+          <div className="notif" role="dialog" aria-label="Notifications">
+            <div className="notif__head">Notifications</div>
+            {notifs.length === 0
+              ? <p className="notif__empty">Nothing yet. Claim a tile and it&apos;ll show up here.</p>
+              : notifs.map((n) => (
+                <div key={n.id} className={"notif__row" + (!n.read_at ? " notif__row--new" : "")}>
+                  <span className="notif__t">{n.title}</span>
+                  {n.body && <span className="notif__b">{n.body}</span>}
+                  <span className="notif__time">{n.created_at.slice(5, 16).replace("T", " · ")}</span>
+                </div>
+              ))}
+          </div>
+        </>
+      )}
 
       {loadError && (
         <button className="ex__retry" onClick={() => router.refresh()}>
@@ -441,16 +489,49 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
           <div className="panel__grab" aria-hidden />
           {panel === "detail" && <TileDetail wall={wall} info={selected} version={ver} myTile={myTile} onClose={closeAll} onZoom={() => api.current?.zoomToTile(selected.idx, 96)} onEdit={openStudioForEdit} />}
           {panel === "claim" && <ClaimFlow wall={wall} info={selected} version={ver} accent={accent} signedIn={!!email} userEmail={email} hasTile={!!myTile} myLabel={myLabel} onClose={closeAll} onClaimed={openStudioForClaim} onZoomMine={openMine} />}
-          {panel === "submitted" && (
+          {panel === "reviewing" && (
             <div className="panel panel--done">
-              <div className="confetti" aria-hidden>{Array.from({ length: CONFETTI_N }).map((_, i) => <i key={i} />)}</div>
-              <div className="panel__head"><span className="panel__eyebrow"><span className="studio__dot" style={{ background: accent }} />Submitted</span><button className="panel__x" onClick={() => { closeAll(); }} aria-label="Close">✕</button></div>
+              {review.state === "live" && <div className="confetti" aria-hidden>{Array.from({ length: CONFETTI_N }).map((_, i) => <i key={i} />)}</div>}
+              <div className="panel__head">
+                <span className="panel__eyebrow"><span className="studio__dot" style={{ background: accent }} />
+                  {review.state === "checking" ? "Reviewing" : review.state === "live" ? "Live" : review.state === "returned" ? "Returned" : review.state === "requested" ? "With the moderator" : "In review"}
+                </span>
+                <button className="panel__x" onClick={() => { closeAll(); }} aria-label="Close">✕</button>
+              </div>
               <div className="done" style={{ paddingTop: 18 }}>
-                <div className="done__check done__check--pop">✓</div>
-                <h3 className="done__t">{submitCopy.t}</h3>
-                <p className="done__d">{submitCopy.d}</p>
-                {lastArt && <button className="btn btn--ghost btn--block" style={{ marginBottom: 10 }} onClick={() => { const a = document.createElement("a"); a.href = lastArt; a.download = "my-tile-ekam.png"; document.body.appendChild(a); a.click(); a.remove(); }}>Download your tile</button>}
-                <button className="btn btn--primary btn--block" onClick={() => { closeAll(); router.refresh(); }}>Back to the wall</button>
+                {review.state === "checking" && (<>
+                  <div className="review__spin" aria-hidden />
+                  <h3 className="done__t">Reviewing your tile…</h3>
+                  <p className="done__d">Our reviewer is taking a look right now. This usually takes under half a minute.</p>
+                </>)}
+                {review.state === "live" && (<>
+                  <div className="done__check done__check--pop">✓</div>
+                  <h3 className="done__t">It&apos;s live!</h3>
+                  <p className="done__d">Your tile cleared review and just joined the wall with your name. Share it from your tile panel.</p>
+                  {lastArt && <button className="btn btn--ghost btn--block" style={{ marginBottom: 10 }} onClick={() => { const a = document.createElement("a"); a.href = lastArt; a.download = "my-tile-ekam.png"; document.body.appendChild(a); a.click(); a.remove(); }}>Download your tile</button>}
+                  <button className="btn btn--primary btn--block" onClick={() => { closeAll(); router.refresh(); }}>Back to the wall</button>
+                </>)}
+                {review.state === "returned" && (<>
+                  <div className="done__warn">!</div>
+                  <h3 className="done__t">Returned by review.</h3>
+                  <p className="done__d">{review.reason ?? "It didn&apos;t pass the wall&apos;s content review."}</p>
+                  <button className="btn btn--primary btn--block" onClick={redrawReturned}>Draw something new</button>
+                  <button className={"btn btn--ghost btn--block" + (reqBusy ? " btn--loading" : "")} disabled={reqBusy} onClick={askHuman}>{reqBusy ? "Sending…" : "Request a human review"}</button>
+                  <p className="claim__fine">The tile stays yours either way.</p>
+                </>)}
+                {review.state === "requested" && (<>
+                  <div className="done__check done__check--pop">✓</div>
+                  <h3 className="done__t">With the moderator.</h3>
+                  <p className="done__d">A human will review your tile and you&apos;ll get the decision in your notifications here.</p>
+                  <button className="btn btn--primary btn--block" onClick={() => { closeAll(); router.refresh(); }}>Back to the wall</button>
+                </>)}
+                {review.state === "escalated" && (<>
+                  <div className="done__check done__check--pop" style={{ background: "transparent", border: "2px solid var(--accent)", color: "var(--accent)" }}>👁</div>
+                  <h3 className="done__t">Needs a human look.</h3>
+                  <p className="done__d">{review.reason ? review.reason + " " : ""}The moderator will review it shortly and you&apos;ll get the decision in your notifications.</p>
+                  <button className="btn btn--ghost btn--block" onClick={redrawReturned}>Edit and resubmit</button>
+                  <button className="btn btn--primary btn--block" onClick={() => { closeAll(); router.refresh(); }}>Back to the wall</button>
+                </>)}
               </div>
             </div>
           )}
