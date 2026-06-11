@@ -53,7 +53,13 @@ export async function submitTile(
 
   const up = await db.storage.from("tiles").upload(path, bytes, { contentType: "image/png", upsert: true });
   if (up.error) throw new Error(up.error.message);
-  if (thumbBytes) await db.storage.from("tiles").upload(thumbPath, thumbBytes, { contentType: "image/png", upsert: true });
+  // only record the thumb if its upload actually succeeded — a thumb_path pointing at
+  // a missing object makes every wall load 400 before falling back to the full PNG
+  let thumbOk = false;
+  if (thumbBytes) {
+    const tu = await db.storage.from("tiles").upload(thumbPath, thumbBytes, { contentType: "image/png", upsert: true });
+    thumbOk = !tu.error;
+  }
 
   if (tile.status === "published") {
     // Editing a LIVE tile → stage as a pending edit; the published tile stays on the canvas.
@@ -70,7 +76,7 @@ export async function submitTile(
   // New tile, or edit of an un-approved one → goes (back) into the queue.
   const { error } = await db.from("tiles").update({
     status: "pending", story: cleanStory, image_path: path,
-    ...(thumbBytes ? { thumb_path: thumbPath } : {}),
+    ...(thumbOk ? { thumb_path: thumbPath } : {}),
     ...(cleanName ? { artist_name: cleanName } : {}),
   }).eq("id", tileId).in("status", ["claimed", "pending"]);
   if (error) throw new Error(error.message);

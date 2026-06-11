@@ -12,11 +12,13 @@ export async function approve(id: string) {
 
   if (tile.pending_image_path) {
     // Approving an edit to an already-published tile → promote the pending edit to live.
-    // The submit pipeline uploads `<image>.thumb.png` beside every image, so the new
-    // thumb path is derivable; the wall composite falls back to the full PNG if absent.
+    // The submit pipeline uploads `<image>.thumb.png` beside every image; verify the
+    // thumb actually exists before pointing at it (a dangling thumb_path 400s on the wall).
+    const thumbPath = tile.pending_image_path.replace(/\.png$/, ".thumb.png");
+    const probe = await db.storage.from("tiles").download(thumbPath);
     await db.from("tiles").update({
       image_path: tile.pending_image_path,
-      thumb_path: tile.pending_image_path.replace(/\.png$/, ".thumb.png"),
+      thumb_path: probe.error ? null : thumbPath,
       story: tile.pending_story,
       pending_image_path: null, pending_story: null, pending_submitted_at: null,
       published_at: new Date().toISOString(),
