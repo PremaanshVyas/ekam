@@ -582,31 +582,31 @@ body[data-panel] .mp-root{display:none}
 }
 
 /* ---- finale: the complete artwork ---- */
-.fseg{position:absolute;top:74px;left:50%;transform:translateX(-50%);z-index:30;display:flex;align-items:center;gap:2px;padding:3px;
+.fseg{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:31;display:flex;align-items:center;gap:2px;padding:3px;
   background:rgba(28,22,17,.88);border:1px solid rgba(239,233,225,.14);border-radius:11px;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 10px 30px rgba(0,0,0,.38)}
 .fseg__b{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;white-space:nowrap;color:var(--ink-2);
   background:transparent;border:none;border-radius:8px;padding:9px 17px;cursor:pointer;transition:color .15s ease,background .15s ease}
 .fseg__b:hover{color:var(--ink)}
 .fseg__b--on{background:var(--accent);color:#16110d;font-weight:700}
-.fcap{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));z-index:30;
-  display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;padding:14px 22px 16px;max-width:min(94vw,600px);
+.fcap{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));z-index:30;
+  display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center;padding:10px 18px 12px;max-width:min(94vw,520px);
   background:rgba(28,22,17,.86);border:1px solid rgba(224,162,58,.22);border-radius:18px;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
   box-shadow:0 14px 44px rgba(0,0,0,.42);animation:fcapin .6s cubic-bezier(.2,.9,.3,1.08) both}
 @keyframes fcapin{from{opacity:0;transform:translate(-50%,16px)}to{opacity:1;transform:translate(-50%,0)}}
-.fcap__title{font-family:var(--serif);font-size:clamp(20px,3.2vw,26px);font-weight:500;color:var(--ink);letter-spacing:-.01em;line-height:1.15}
-.fcap__meta{font-family:var(--mono);font-size:11px;color:var(--ink-2);letter-spacing:.03em;line-height:1.5}
-.fcap__credits{width:min(82vw,460px);overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 14%,#000 86%,transparent);mask-image:linear-gradient(90deg,transparent,#000 14%,#000 86%,transparent)}
-.fcap__reel{display:inline-flex;white-space:nowrap;font-family:var(--mono);font-size:10.5px;color:var(--ink-3);letter-spacing:.05em;animation:freel linear infinite}
+.fcap__title{font-family:var(--serif);font-size:clamp(17px,2.4vw,21px);font-weight:500;color:var(--ink);letter-spacing:-.01em;line-height:1.15}
+.fcap__meta{font-family:var(--mono);font-size:10.5px;color:var(--ink-2);letter-spacing:.03em;line-height:1.45}
+.fcap__credits{width:min(78vw,400px);overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 14%,#000 86%,transparent);mask-image:linear-gradient(90deg,transparent,#000 14%,#000 86%,transparent)}
+.fcap__reel{display:inline-flex;white-space:nowrap;font-family:var(--mono);font-size:10px;color:var(--ink-3);letter-spacing:.05em;animation:freel linear infinite}
 @keyframes freel{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-.fcap__actions{display:flex;gap:10px;margin-top:5px}
-.fcap__actions .btn{padding:10px 20px;font-size:13.5px}
+.fcap__actions{display:flex;gap:8px;margin-top:4px}
+.fcap__actions .btn{padding:8px 16px;font-size:12.5px}
 .finale{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;
   background:radial-gradient(120% 120% at 50% 28%,rgba(22,17,13,.9),rgba(22,17,13,.975));backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);animation:finalein .55s ease}
 @keyframes finalein{from{opacity:0}to{opacity:1}}
 .csky{position:fixed;inset:0;z-index:40;pointer-events:none;overflow:hidden}
 .csky i{position:absolute;top:-3vh;opacity:0;animation-name:csky;animation-timing-function:linear;animation-fill-mode:both}
 @keyframes csky{0%{opacity:0;transform:translate(0,-3vh) rotate(0)}6%{opacity:1}94%{opacity:.9}100%{opacity:0;transform:translate(var(--dx),107vh) rotate(var(--rot))}}
-.fspark{position:absolute;inset:118px 14px 170px;z-index:24;pointer-events:none}
+.fspark{position:absolute;inset:64px 14px 128px;z-index:24;pointer-events:none}
 .fspark span{position:absolute;color:#e0a23a;font-size:14px;opacity:0;animation:ftwinkle 4.4s ease-in-out infinite;text-shadow:0 0 12px rgba(224,162,58,.5)}
 @keyframes ftwinkle{0%,100%{opacity:0;transform:scale(.55) rotate(0deg)}50%{opacity:.9;transform:scale(1.2) rotate(45deg)}}
 .finale__card{position:relative;z-index:41;display:flex;flex-direction:column;align-items:center;text-align:center;max-width:460px;padding:30px 26px}
@@ -620,5 +620,5 @@ body[data-panel] .mp-root{display:none}
 .finale__t{font-family:var(--serif);font-size:clamp(27px,5.4vw,40px);font-weight:500;color:var(--ink);margin:14px 0 0;letter-spacing:-.012em}
 .finale__d{font-family:var(--sans);font-size:14.5px;color:var(--ink-2);line-height:1.6;margin:8px 0 22px;max-width:36ch}
 .finale__card .btn{padding:13px 28px}
-@media(max-width:899px){.fspark{inset:118px 14px 204px}}
+@media(max-width:899px){.fseg{top:62px}.fspark{inset:106px 14px 152px}}
 @media(prefers-reduced-motion:reduce){.csky i,.fspark span,.fcap,.finale,.finale__card>*,.fcap__reel{animation:none}.csky i{opacity:0}.fspark span{opacity:.5}}

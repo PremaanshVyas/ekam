@@ -528,9 +528,9 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
   // chrome-aware fit: the wall centers inside the space the topbar/sidebar/panel/dock leave free
   const panelOpen = panel !== null && panel !== "studio";
   const insets: Insets = artMode ? {
-    top: 118, left: 14, right: 14, bottom: desktop ? 170 : 204,
+    top: desktop ? 64 : 106, left: 14, right: 14, bottom: desktop ? 128 : 152,
   } : {
-    top: complete ? 118 : 64,
+    top: complete && !desktop ? 106 : 64,
     left: desktop && sideOpen ? 348 : 14,
     right: desktop && panelOpen ? 390 : 14,
     bottom: !desktop && panelOpen ? Math.max(120, Math.round(vh * 0.52)) : 104,
