@@ -12,7 +12,10 @@ const artUrl = (p: string | null) => (p && !p.startsWith("#") ? `${SUPA}/storage
 
 type Tile = { id: string; x: number; y: number; status: string; artist_name: string | null; artist_location: string | null; story: string | null; image_path: string | null };
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 async function getTile(id: string): Promise<Tile | null> {
+  if (!UUID.test(id)) return null; // malformed link → clean 404, no query
   // public_tiles nulls all content for non-published rows, so nothing unapproved leaks.
   const { data } = await supabaseAnon().from("public_tiles").select("id, x, y, status, artist_name, artist_location, story, image_path").eq("id", id).maybeSingle();
   return (data as Tile) ?? null;
@@ -20,6 +23,7 @@ async function getTile(id: string): Promise<Tile | null> {
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  if (!UUID.test(id)) notFound();
   const t = await getTile(id);
   const live = t?.status === "published";
   const who = live && t?.artist_name ? `${t.artist_name}’s tile` : "A tile";
