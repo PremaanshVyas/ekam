@@ -5,6 +5,8 @@ import { findMyTile } from "@/lib/tiles";
 import type { RealTileInput } from "@/lib/realWall";
 
 export const dynamic = "force-dynamic";
+// submit's server action runs through this route — give the post-response AI screen room
+export const maxDuration = 60;
 
 const SUPA = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const artUrl = (p: string | null) => (p && !p.startsWith("#") ? `${SUPA}/storage/v1/object/public/tiles/${p}` : null);

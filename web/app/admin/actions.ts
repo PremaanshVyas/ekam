@@ -3,31 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase";
 import { isAdmin } from "@/lib/admin-auth";
+import { publishTile } from "@/lib/publish";
 
 export async function approve(id: string) {
   if (!(await isAdmin())) throw new Error("unauthorized");
-  const db = supabaseAdmin();
-  const { data: tile } = await db.from("tiles").select("pending_image_path, pending_story").eq("id", id).maybeSingle();
-  if (!tile) return;
-
-  if (tile.pending_image_path) {
-    // Approving an edit to an already-published tile → promote the pending edit to live.
-    // The submit pipeline uploads `<image>.thumb.png` beside every image; verify the
-    // thumb actually exists before pointing at it (a dangling thumb_path 400s on the wall).
-    const thumbPath = tile.pending_image_path.replace(/\.png$/, ".thumb.png");
-    const probe = await db.storage.from("tiles").download(thumbPath);
-    await db.from("tiles").update({
-      image_path: tile.pending_image_path,
-      thumb_path: probe.error ? null : thumbPath,
-      story: tile.pending_story,
-      pending_image_path: null, pending_story: null, pending_submitted_at: null,
-      published_at: new Date().toISOString(),
-    }).eq("id", id);
-  } else {
-    // Approving a new tile.
-    await db.from("tiles").update({ status: "published", published_at: new Date().toISOString() }).eq("id", id).eq("status", "pending");
-  }
-  await db.from("moderation_log").insert({ tile_id: id, action: "approved" });
+  await publishTile(supabaseAdmin(), id, "admin");
   revalidatePath("/admin");
   revalidatePath("/");
 }

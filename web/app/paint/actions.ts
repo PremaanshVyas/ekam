@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createSupabaseServer } from "@/lib/auth-server";
+import { moderateTile } from "@/lib/moderate";
 
 export type SubmitMode = "new" | "edit-pending" | "edit-published";
 
@@ -69,6 +71,7 @@ export async function submitTile(
     }).eq("id", tileId).eq("status", "published");
     if (error) throw new Error(error.message);
     await clearDraft(db, tileId);
+    after(() => moderateTile(tileId)); // AI screen runs after the response is sent
     revalidatePath("/admin");
     return { ok: true, mode: "edit-published" };
   }
@@ -81,6 +84,7 @@ export async function submitTile(
   }).eq("id", tileId).in("status", ["claimed", "pending"]);
   if (error) throw new Error(error.message);
   await clearDraft(db, tileId);
+  after(() => moderateTile(tileId)); // AI screen runs after the response is sent
   revalidatePath("/admin");
   return { ok: true, mode: tile.status === "claimed" ? "new" : "edit-pending" };
 }
