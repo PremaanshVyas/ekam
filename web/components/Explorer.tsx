@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import MosaicCanvas, { type MosaicApi, type Insets } from "@/components/MosaicCanvas";
 import Studio from "@/components/Studio";
@@ -58,7 +58,7 @@ function Sidebar({ open, claimed, total, loved, onLoved }: { open: boolean; clai
   return (
     <aside className={"side" + (open ? "" : " side--closed")} aria-hidden={!open}>
       <div className="side__scroll">
-        <div className="side__head"><span className="kicker">Canvas Nº 001</span><h2 className="side__theme">what home looks like</h2><p className="side__by">a collaborative canvas</p></div>
+        <div className="side__head"><span className="kicker">Canvas Nº 001</span><h2 className="side__theme">many hands, one canvas</h2><p className="side__by">a collaborative canvas</p></div>
         <div className="side__sec">
           <div className="side__label">Completion</div>
           <div className="side__bar"><div className="side__fill" style={{ width: pct + "%" }} /></div>
@@ -92,7 +92,7 @@ function Sidebar({ open, claimed, total, loved, onLoved }: { open: boolean; clai
           <div className="side__label">Take part</div>
           <ol className="howmini">
             <li><b>Tap an open tile</b> and verify your email with a code.</li>
-            <li><b>Paint what home looks like</b> on your blank tile.</li>
+            <li><b>Paint what&apos;s in your mind</b> on your blank tile.</li>
             <li><b>Submit.</b> After a quick review it joins the wall with your name.</li>
           </ol>
         </div>
@@ -280,7 +280,7 @@ function TileDetail({ wall, info, version, myTile, signedIn, onNeedSignIn, onClo
       {!info.mine && info.uuid && <VoteButton uuid={info.uuid} votes={info.votes ?? 0} voted={!!info.voted} signedIn={signedIn} onNeedSignIn={onNeedSignIn} />}
       {info.mine && (info.votes ?? 0) > 0 && <p className="vote__mine">♥ {info.votes} {info.votes === 1 ? "person loves" : "people love"} your tile</p>}
       {info.mine && myTile?.status === "published" && myTile.artUrl && (
-        <ShareTile url={`https://ekam.ink/t/${myTile.id}`} imageUrl={myTile.artUrl} title="my tile on ekam.ink · what home looks like" />
+        <ShareTile url={`https://ekam.ink/t/${myTile.id}`} imageUrl={myTile.artUrl} title="my tile on ekam.ink · many hands, one canvas" />
       )}
       {info.mine && myTile?.status === "pending" && <p className="detail__sharehint">In review. You can share it once it&apos;s live on the wall.</p>}
       {info.mine && myTile?.status !== "pending" && myTile?.aiVerdict === "reject" && (
@@ -309,9 +309,40 @@ function TileDetail({ wall, info, version, myTile, signedIn, onNeedSignIn, onClo
 const CONFETTI_N = 18;
 const fmtDay = (s: string | null) => (s ? new Date(s).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "");
 
-export default function Explorer({ cols, total, tiles, claimed, email, myTile, autoOpenMine, loadError, notifs = [], unread = 0, complete = false, finalePreview = false, published = 0, finaleFrom = null, finaleTo = null }: {
+const CELEBRATE_COLORS = ["#e8643c", "#e0a23a", "#3fa34d", "#3a9bdc", "#ef6fae", "#f4eee2"];
+function ConfettiSky({ n, once = false }: { n: number; once?: boolean }) {
+  // rendered only after mount (behind state flags), so Math.random never hits hydration
+  const pieces = useMemo(() => Array.from({ length: n }, (_, i) => {
+    const w = 6 + Math.random() * 8;
+    return {
+      left: Math.random() * 100,
+      delay: Math.random() * (once ? 0.9 : 2.8),
+      dur: 2.8 + Math.random() * 2.2,
+      w, h: Math.random() < 0.3 ? w : w * (1.4 + Math.random()),
+      color: CELEBRATE_COLORS[i % CELEBRATE_COLORS.length],
+      dx: (Math.random() - 0.5) * 28,
+      rot: 320 + Math.random() * 580,
+      round: Math.random() < 0.25,
+    };
+  }), [n, once]);
+  return (
+    <div className="csky" aria-hidden>
+      {pieces.map((p, i) => (
+        <i key={i} style={{
+          left: `${p.left}%`, width: p.w, height: p.h, background: p.color,
+          borderRadius: p.round ? "50%" : 2,
+          animationDelay: `${p.delay}s`, animationDuration: `${p.dur}s`,
+          animationIterationCount: once ? 1 : "infinite",
+          ["--dx" as string]: `${p.dx}vw`, ["--rot" as string]: `${p.rot}deg`,
+        }} />
+      ))}
+    </div>
+  );
+}
+
+export default function Explorer({ cols, total, tiles, claimed, email, myTile, autoOpenMine, loadError, notifs = [], unread = 0, complete = false, published = 0, finaleFrom = null, finaleTo = null }: {
   cols: number; total: number; tiles: RealTileInput[]; claimed: number; email: string | null; myTile: MyTile | null; autoOpenMine?: boolean; loadError?: boolean; notifs?: Notif[]; unread?: number;
-  complete?: boolean; finalePreview?: boolean; published?: number; finaleFrom?: string | null; finaleTo?: string | null;
+  complete?: boolean; published?: number; finaleFrom?: string | null; finaleTo?: string | null;
 }) {
   const router = useRouter();
   const api = useRef<MosaicApi | null>(null);
@@ -338,6 +369,7 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
   const [celebrate, setCelebrate] = useState(false);
   const [stitching, setStitching] = useState(0); // 0 idle, else percent
   const [shared, setShared] = useState(false);
+  const [burst, setBurst] = useState(false); // one confetti rain over the artwork right after the celebration
 
   const myIdx = myTile?.idx ?? -1;
   const accent = "#e8643c";
@@ -461,13 +493,18 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
   const artMode = complete && finaleMode === "art";
   useEffect(() => {
     if (!complete) return;
-    try { if (finalePreview || !localStorage.getItem("ekam.finale.seen")) setCelebrate(true); } catch { setCelebrate(true); }
-  }, [complete, finalePreview]);
+    try { if (!localStorage.getItem("ekam.finale.seen")) setCelebrate(true); } catch { setCelebrate(true); }
+  }, [complete]);
   const dismissCelebrate = useCallback(() => {
     setCelebrate(false); setFinaleMode("art"); setPanel(null); setSelected(null); setHover(null);
-    if (!finalePreview) { try { localStorage.setItem("ekam.finale.seen", "1"); } catch { /* private mode */ } }
+    setBurst(true); window.setTimeout(() => setBurst(false), 5200);
+    try { localStorage.setItem("ekam.finale.seen", "1"); } catch { /* private mode */ }
     setTimeout(() => api.current?.fit(), 90);
-  }, [finalePreview]);
+  }, []);
+  const credits = useMemo(() => {
+    if (!complete) return [] as string[];
+    return tiles.filter((t) => t.status === "published").map((t) => (t.name || "someone").trim()).filter(Boolean);
+  }, [complete, tiles]);
   const switchFinale = useCallback((m: "art" | "tiles") => {
     setFinaleMode(m); setPanel(null); setSelected(null); setHover(null);
     setTimeout(() => api.current?.fit(), 90);
@@ -477,13 +514,13 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
     try {
       const st = tiles.filter((t) => t.status === "published" && t.img).map((t) => ({ x: t.x, y: t.y, img: t.img }));
       const blob = await stitchWall(st, cols, Math.round(total / cols), 384, (d, n) => setStitching(Math.max(1, Math.round((d / n) * 100))));
-      downloadBlob(blob, "ekam-what-home-looks-like.png");
+      downloadBlob(blob, "ekam-canvas-001.png");
     } catch { /* button resets below */ }
     setStitching(0);
   };
   const shareArtwork = async () => {
     const url = window.location.origin + "/canvas";
-    const text = `what home looks like · one canvas painted by ${published} people · ekam.ink`;
+    const text = `many hands, one canvas · painted by ${published} strangers · ekam.ink`;
     if (navigator.share) { try { await navigator.share({ title: "ekam.ink", text, url }); } catch { /* cancelled */ } return; }
     try { await navigator.clipboard.writeText(url); setShared(true); setTimeout(() => setShared(false), 1800); } catch { /* fine */ }
   };
@@ -491,9 +528,9 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
   // chrome-aware fit: the wall centers inside the space the topbar/sidebar/panel/dock leave free
   const panelOpen = panel !== null && panel !== "studio";
   const insets: Insets = artMode ? {
-    top: 64, left: 14, right: 14, bottom: desktop ? 178 : 206,
+    top: 118, left: 14, right: 14, bottom: desktop ? 170 : 204,
   } : {
-    top: 64,
+    top: complete ? 118 : 64,
     left: desktop && sideOpen ? 348 : 14,
     right: desktop && panelOpen ? 390 : 14,
     bottom: !desktop && panelOpen ? Math.max(120, Math.round(vh * 0.52)) : 104,
@@ -642,11 +679,31 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
       )}
 
       {artMode && (
+        <div className="fspark" aria-hidden>
+          <span style={{ left: "11%", top: "16%" }}>✦</span>
+          <span style={{ left: "86%", top: "22%", animationDelay: "1.2s" }}>✦</span>
+          <span style={{ left: "21%", top: "74%", animationDelay: ".6s" }}>✦</span>
+          <span style={{ left: "79%", top: "66%", animationDelay: "1.8s" }}>✦</span>
+          <span style={{ left: "52%", top: "10%", animationDelay: "2.5s" }}>✦</span>
+          <span style={{ left: "7%", top: "44%", animationDelay: "3.1s" }}>✦</span>
+        </div>
+      )}
+      {artMode && burst && <ConfettiSky n={56} once />}
+
+      {artMode && (
         <div className="fcap">
-          <div className="fcap__title">what home looks like</div>
+          <div className="fcap__title">many hands, one canvas</div>
           <div className="fcap__meta">
             Made by {published} {published === 1 ? "person" : "people"}{finaleFrom && finaleTo ? (fmtDay(finaleFrom) === fmtDay(finaleTo) ? `, ${fmtDay(finaleTo)}` : `, ${fmtDay(finaleFrom)} to ${fmtDay(finaleTo)}`) : ""}
           </div>
+          {credits.length > 1 && (
+            <div className="fcap__credits">
+              <div className="fcap__reel" style={{ animationDuration: `${Math.max(20, credits.length * 2.4)}s` }}>
+                <span>{credits.join("  ✦  ")}&nbsp;&nbsp;✦&nbsp;&nbsp;</span>
+                <span aria-hidden>{credits.join("  ✦  ")}&nbsp;&nbsp;✦&nbsp;&nbsp;</span>
+              </div>
+            </div>
+          )}
           <div className="fcap__actions">
             <button className="btn btn--primary" disabled={stitching > 0} onClick={downloadArtwork}>{stitching > 0 ? `Stitching… ${stitching}%` : "Download"}</button>
             <button className="btn btn--ghost" onClick={shareArtwork}>{shared ? "Link copied ✓" : "Share"}</button>
@@ -656,7 +713,7 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
 
       {celebrate && (
         <div className="finale" role="dialog" aria-label="The wall is complete">
-          <div className="confetti confetti--sky" aria-hidden>{Array.from({ length: CONFETTI_N }).map((_, i) => <i key={i} />)}</div>
+          <ConfettiSky n={72} />
           <div className="finale__card">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/brand/ekam-mark.svg" width={52} height={52} alt="" />

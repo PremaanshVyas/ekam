@@ -17,7 +17,7 @@ import { publishTile, aiRejectTile } from "@/lib/publish";
  * Fails soft at every step: no API key, missing columns, or a model error never
  * affects the artist's submit — things just wait for a human as before. */
 
-const MOD_SYSTEM = `You are the moderation reviewer for ekam.ink, a public collaborative art wall. Strangers each paint one small tile answering the soft prompt "what home looks like", and approved tiles appear on a family friendly public canvas with the artist's display name and an optional one line story.
+const MOD_SYSTEM = `You are the moderation reviewer for ekam.ink, a public collaborative art wall. Strangers each paint one small tile answering the soft prompt "say what's in your mind", and approved tiles appear on a family friendly public canvas with the artist's display name and an optional one line story.
 
 You will be shown the submitted painting plus the artist's display name and story text. Judge ALL three.
 

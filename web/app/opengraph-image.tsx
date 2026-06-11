@@ -45,7 +45,7 @@ export default async function Image() {
       >
         <div style={{ display: "flex", flexDirection: "column", maxWidth: 640 }}>
           <div style={{ fontFamily: "Inter", fontSize: 18, letterSpacing: 4, textTransform: "uppercase", color: "#7d7264" }}>
-            Canvas Nº 001 · what home looks like
+            Canvas Nº 001 · many hands, one canvas
           </div>
           <div style={{ fontFamily: "Spectral", fontSize: 62, lineHeight: 1.02, marginTop: 26, letterSpacing: -1, display: "flex", flexWrap: "wrap" }}>
             <span style={{ color: "#efe9e1" }}>Leave the words. Draw the lines.&nbsp;</span>

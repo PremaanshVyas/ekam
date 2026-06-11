@@ -52,9 +52,9 @@ export default function StitchPreview({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <canvas ref={ref} style={{ width: "100%", aspectRatio: "1 / 1", borderRadius: 10, border: "1px solid var(--color-border-default)", background: "#f4eee2", display: "block" }} />
+      <canvas ref={ref} style={{ width: "100%", aspectRatio: "1 / 1", border: "1px solid var(--color-border-default)", background: "#f4eee2", display: "block" }} />
       <div style={{ textAlign: "center" }}>
-        <div style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 21, color: "var(--color-text-primary)" }}>what home looks like</div>
+        <div style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 21, color: "var(--color-text-primary)" }}>many hands, one canvas</div>
         <div style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: "var(--color-text-muted)", marginTop: 4 }}>
           Canvas Nº 001 · {people} {people === 1 ? "person" : "people"} so far{from && to ? ` · ${from === to ? from : `${from} to ${to}`}` : ""}
         </div>

@@ -72,7 +72,7 @@ function TileThumb({ wall, idx }: { wall: Wall | null; idx: number }) {
 
 const HOW_STEPS = [
   { n: "01", t: "Claim a tile", d: "Open the canvas, tap any open tile, and enter your email. We send you a code; type it back and the tile is yours. No password, no account, just proof it's really you." },
-  { n: "02", t: "Paint what home looks like", d: "A little paint studio opens on your blank tile. Brushes, colours, your hand. A window, a kitchen, a feeling. The prompt is soft: where were you when home looked like this?" },
+  { n: "02", t: "Paint what's in your mind", d: "A little paint studio opens on your blank tile. Brushes, colours, your hand. A window, a kitchen, a feeling. No curation of style, just your mark." },
   { n: "03", t: "Submit it", d: "Hit submit and your tile goes in for a quick review, then joins the wall with your name beside it and a line about why you made it." },
   { n: "04", t: "Watch it fill", d: "Zoom from the whole wall, hundreds of strangers' tiles at once, down to a single hand. The canvas is never the same twice." },
 ];
@@ -80,7 +80,7 @@ const HOW_STEPS = [
 const RULES = [
   { t: "One tile, one person", d: "Each email claims a single tile. Everyone is exactly the same size here." },
   { t: "One small square", d: "Every tile is the same tiny canvas. Constraint is what makes it beautiful together." },
-  { t: "Paint your answer", d: "What does home look like to you? No curation of style. Your tile, your hand." },
+  { t: "Paint your answer", d: "Say what's in your mind. One square of one canvas, in your hand." },
   { t: "It stays", d: "Once it's approved, your tile is part of the canvas, preserved when the wall completes." },
 ];
 
@@ -143,7 +143,7 @@ export default function Landing({ total, claimed, published, email, myTile }: { 
         <div className="hero__inner">
           <div className="hero__eyebrow"><span className="livedot" /> {fmt(open)} tiles still open on this canvas</div>
           <h1 className="hero__title">Leave the words.<br />Draw the lines.<br /><em>Say what&apos;s in your mind.</em></h1>
-          <p className="hero__sub">Claim a tile with your email and paint what home looks like. Something surreal is forming here: one canvas, hundreds of strangers, each holding one small square. Just your email and a few minutes.</p>
+          <p className="hero__sub">Claim a tile with your email and paint what's in your mind. Something surreal is forming here: one canvas, hundreds of strangers, each holding one small square. Just your email and a few minutes.</p>
           <div className="hero__cta">
             <Link className="btn btn--primary btn--lg" href="/canvas">Claim your tile</Link>
             <a className="btn btn--ghost btn--lg" href="#how">See how it works</a>
@@ -168,7 +168,7 @@ export default function Landing({ total, claimed, published, email, myTile }: { 
       <section className="band" id="manifesto">
         <Reveal>
           <p className="bigquote">This isn&apos;t a marketplace. It&apos;s a <em>wall</em>: {fmt(total)} little squares, each one painted by a different person, sitting side by side at exactly the same size.</p>
-          <p className="bigquote__by">Claim one, paint what home looks like, and your mark stays. That&apos;s the whole thing.</p>
+          <p className="bigquote__by">Claim one, paint what's in your mind, and your mark stays. That&apos;s the whole thing.</p>
         </Reveal>
       </section>
 
@@ -244,10 +244,10 @@ export default function Landing({ total, claimed, published, email, myTile }: { 
         <div className="foot__brand"><Logo /><span className="foot__tag">Leave the words. Draw the lines. Say what&apos;s in your mind.</span></div>
         <div className="foot__cols">
           <div className="foot__col"><span className="foot__h">Canvas</span><Link href="/canvas">The wall</Link><a href="#how">How it works</a><a href="#rules">The rules</a></div>
-          <div className="foot__col"><span className="foot__h">About</span><a href="#manifesto">Manifesto</a><a href="#wall">Three ways to look</a><a href="#how">What home looks like</a></div>
+          <div className="foot__col"><span className="foot__h">About</span><a href="#manifesto">Manifesto</a><a href="#wall">Three ways to look</a><a href="#how">How it works</a></div>
           <div className="foot__col"><span className="foot__h">More</span><a href="/admin">Moderation</a></div>
         </div>
-        <div className="foot__legal">© 2026 ekam.ink · a collaborative canvas · what home looks like.</div>
+        <div className="foot__legal">© 2026 ekam.ink · many hands, one canvas.</div>
       </footer>
       {signInOpen && <SignInModal onClose={() => setSignInOpen(false)} />}
     </div>

@@ -38,7 +38,7 @@ export async function claimTileAt(idx: number): Promise<ClaimResult> {
     .eq("canvas_id", canvas.id).eq("x", x).eq("y", y).eq("status", "open")
     .select("id");
   if (!rows || rows.length === 0) return { ok: false, error: "taken", x, y };
-  await notify(db, email, "claim", `Tile R${String(y + 1).padStart(2, "0")}·C${String(x + 1).padStart(2, "0")} is yours ✦`, "Paint what home looks like and submit when you're ready.");
+  await notify(db, email, "claim", `Tile R${String(y + 1).padStart(2, "0")}·C${String(x + 1).padStart(2, "0")} is yours ✦`, "Paint what's in your mind and submit when you're ready.");
   await broadcastWallChange();
   return { ok: true, tileId: rows[0].id, x, y };
 }

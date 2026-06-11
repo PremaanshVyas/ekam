@@ -26,11 +26,11 @@ export const metadata: Metadata = {
   },
   title: "ekam.ink",
   description:
-    "Leave the words. Draw the lines. Say what's in your mind. Claim a tile, paint what home looks like, and your story lives on a canvas made by hundreds of strangers.",
+    "Leave the words. Draw the lines. Say what's in your mind. Claim a tile, paint your piece of one canvas, and your story lives on a canvas made by hundreds of strangers.",
   openGraph: {
     title: "ekam.ink · Leave the words. Draw the lines.",
     description:
-      "Say what's in your mind. Claim a tile, paint what home looks like, and when the wall completes it becomes one artwork with your story on it forever.",
+      "Say what's in your mind. Claim a tile, paint your piece of one canvas, and when the wall completes it becomes one artwork with your story on it forever.",
     url: "https://ekam.ink",
     siteName: "ekam.ink",
     type: "website",
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "ekam.ink · Leave the words. Draw the lines.",
-    description: "Say what's in your mind. Claim a tile, paint what home looks like, and your story lives on the wall forever.",
+    description: "Say what's in your mind. Claim a tile, paint your piece of one canvas, and your story lives on the wall forever.",
   },
 };
 

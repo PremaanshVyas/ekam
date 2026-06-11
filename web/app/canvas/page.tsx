@@ -1,7 +1,6 @@
 import Explorer from "@/components/Explorer";
 import { supabaseAnon, supabaseAdmin, CANVAS_SLUG } from "@/lib/supabase";
 import { createSupabaseServer } from "@/lib/auth-server";
-import { isAdmin } from "@/lib/admin-auth";
 import { findMyTile } from "@/lib/tiles";
 import type { RealTileInput } from "@/lib/realWall";
 
@@ -17,11 +16,8 @@ type Row = {
   story: string | null; image_path: string | null; thumb_path: string | null; published_at: string | null;
 };
 
-export default async function CanvasPage({ searchParams }: { searchParams: Promise<{ mine?: string; finale?: string }> }) {
-  const sp = await searchParams;
-  const autoOpenMine = sp.mine === "1";
-  // the finale can be previewed before completion, but only by the moderator
-  const finalePreview = sp.finale === "1" && (await isAdmin());
+export default async function CanvasPage({ searchParams }: { searchParams: Promise<{ mine?: string }> }) {
+  const autoOpenMine = (await searchParams).mine === "1";
 
   let cols = 24, rows = 24;
   let tiles: RealTileInput[] = [];
@@ -108,6 +104,7 @@ export default async function CanvasPage({ searchParams }: { searchParams: Promi
     loadError = true;
   }
 
-    const complete = published >= cols * rows;
-  return <Explorer cols={cols} total={cols * rows} tiles={tiles} claimed={claimed} email={email} myTile={myTile} autoOpenMine={autoOpenMine} loadError={loadError} notifs={notifs} unread={unread} complete={complete || finalePreview} finalePreview={finalePreview} published={published} finaleFrom={finaleFrom} finaleTo={finaleTo} />;
+    // FINALE_FORCE is a local-only test knob (never set in prod): forces the reveal at partial fill
+  const complete = published >= cols * rows || process.env.FINALE_FORCE === "1";
+  return <Explorer cols={cols} total={cols * rows} tiles={tiles} claimed={claimed} email={email} myTile={myTile} autoOpenMine={autoOpenMine} loadError={loadError} notifs={notifs} unread={unread} complete={complete} published={published} finaleFrom={finaleFrom} finaleTo={finaleTo} />;
 }

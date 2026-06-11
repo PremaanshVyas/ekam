@@ -73,12 +73,11 @@ export default function MosaicCanvas({
     const x1 = Math.min(GRID, Math.ceil((w - ox) / scale));
     const y1 = Math.min(GRID, Math.ceil((h - oy) / scale));
 
-    const complete = W.N_TOTAL > 0 && W.claimedCount >= W.N_TOTAL;
-    const gridded = grid && !seamless && !complete && scale >= 5;
+    const gridded = grid && !seamless && scale >= 5;
     const gap = gridded ? Math.max(1, scale * 0.06) : 0;
 
     if (!gridded) {
-      if (W.hi) ctx.drawImage(W.hi, ox, oy, size, size); // seamless: hero, far-out zoom, or complete
+      if (W.hi) ctx.drawImage(W.hi, ox, oy, size, size); // seamless: hero, far-out zoom, or the artwork view
     } else {
       // distinct tiles with grout gaps (cream-style) — dark bg shows between them
       const t = W.TILE_PX;

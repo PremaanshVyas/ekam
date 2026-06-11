@@ -276,7 +276,7 @@ export default function Studio({
     <div className="studio-full">
       <div className="studio-full__bar">
         <button className="ex__home" onClick={onClose}>‹ <span className="studio-full__title">studio · {tileLabel}</span></button>
-        <span className="studio-full__hint">{onSaveDraft ? (autosaveOff ? "autosave off" : saving ? "saving…" : unsaved ? "unsaved…" : savedAt ? "draft saved ✓ · resumes on any device" : "autosaves as you paint") : ("paint what home looks like" + (mirror ? " · mirrored" : ""))}</span>
+        <span className="studio-full__hint">{onSaveDraft ? (autosaveOff ? "autosave off" : saving ? "saving…" : unsaved ? "unsaved…" : savedAt ? "draft saved ✓ · resumes on any device" : "autosaves as you paint") : ("paint what's in your mind" + (mirror ? " · mirrored" : ""))}</span>
         <button className="panel__x" onClick={onClose} aria-label="close studio">✕</button>
       </div>
 

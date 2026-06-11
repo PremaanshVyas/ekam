@@ -23,8 +23,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const t = await getTile(id);
   const live = t?.status === "published";
   const who = live && t?.artist_name ? `${t.artist_name}’s tile` : "A tile";
-  const title = `${who} · what home looks like`;
-  const description = live && t?.story ? `“${t.story}” · Canvas Nº 001 on ekam.ink` : "Leave the words. Draw the lines. Claim a tile and paint what home looks like.";
+  const title = `${who} · many hands, one canvas`;
+  const description = live && t?.story ? `“${t.story}” · Canvas Nº 001 on ekam.ink` : "Leave the words. Draw the lines. Claim a tile and paint your piece of one canvas.";
   return {
     title, description,
     openGraph: { title, description, url: `${SITE}/t/${id}`, type: "website" },
@@ -57,7 +57,7 @@ export default async function TilePage({ params }: { params: Promise<{ id: strin
     <main className="sharepage">
       <div className="sharepage__home"><Logo sm /></div>
       <div className="sharepage__card">
-        <div className="sharepage__eyebrow">Canvas Nº 001 · what home looks like</div>
+        <div className="sharepage__eyebrow">Canvas Nº 001 · many hands, one canvas</div>
         {mostLoved && <div className="sharepage__laurel">✦ Most loved on the wall</div>}
         {img ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -72,7 +72,7 @@ export default async function TilePage({ params }: { params: Promise<{ id: strin
           <div className="sharepage__id">{label}{votes > 0 ? ` · ♥ ${votes}` : ""}</div>
         </div>
         {live && t.story && <blockquote className="sharepage__story">“{t.story}”</blockquote>}
-        {(img || hex) && <ShareTile url={`${SITE}/t/${id}`} imageUrl={img || ""} title={live && t.artist_name ? `${t.artist_name}’s tile on ekam.ink · what home looks like` : "A tile on ekam.ink · what home looks like"} />}
+        {(img || hex) && <ShareTile url={`${SITE}/t/${id}`} imageUrl={img || ""} title={live && t.artist_name ? `${t.artist_name}’s tile on ekam.ink · many hands, one canvas` : "A tile on ekam.ink · many hands, one canvas"} />}
         <Link href="/canvas" className="btn btn--primary btn--block sharepage__cta">{live ? "Add your own tile →" : "Explore the canvas →"}</Link>
       </div>
     </main>
