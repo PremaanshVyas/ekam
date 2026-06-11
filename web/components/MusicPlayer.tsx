@@ -48,12 +48,17 @@ export default function MusicPlayer() {
   const pendingSeekRef = useRef(0);
   const lastRebuildRef = useRef(0);
   const volRef = useRef(vol); volRef.current = vol;
+  // after the tab has been hidden (or the audio device changed), the context can be wired
+  // to a stale output and stay "healthy" by every probe — so the next play rebuilds, period
+  const staleRef = useRef(false);
 
   useEffect(() => {
     fetch("/audio/playlist.json").then((r) => r.json())
       .then((d) => { if (Array.isArray(d) && d.length && d.every((t) => t?.src)) setTracks(d); })
       .catch(() => { /* keep DEFAULT */ });
-    try { const v = parseFloat(localStorage.getItem("ekam.vol") || ""); if (isFinite(v) && v >= 0 && v <= 1) setVol(v); } catch { /* default */ }
+    // ignore near-zero saved volumes: the slider was a no-op for a while, so a stored 0
+    // is almost certainly stale, and restoring it would mute the player invisibly
+    try { const v = parseFloat(localStorage.getItem("ekam.vol") || ""); if (isFinite(v) && v >= 0.05 && v <= 1) setVol(v); } catch { /* default */ }
     if (window.innerWidth >= 900) setOpen(true);
   }, []);
 
@@ -144,21 +149,30 @@ export default function MusicPlayer() {
   }, [playing, rebuildPipeline]);
 
   // "Shows playing but silent" fix: the AudioContext gets suspended when the tab is
-  // backgrounded or by autoplay policy. Resume it whenever we come back.
+  // backgrounded or by autoplay policy. Resume it whenever we come back — and remember
+  // that we were hidden, so the next play press rebuilds onto the current audio device.
   useEffect(() => {
     const resume = () => {
+      if (document.hidden) { if (acRef.current) staleRef.current = true; return; }
       const ac = acRef.current;
       if (ac && ac.state === "suspended" && playingRef.current) ac.resume().catch(() => {});
+    };
+    const deviceChanged = () => {
+      if (!acRef.current) return;
+      if (playingRef.current) { lastRebuildRef.current = 0; rebuildPipeline(true); }
+      else staleRef.current = true;
     };
     document.addEventListener("visibilitychange", resume);
     window.addEventListener("focus", resume);
     window.addEventListener("pageshow", resume);
+    navigator.mediaDevices?.addEventListener?.("devicechange", deviceChanged);
     return () => {
       document.removeEventListener("visibilitychange", resume);
       window.removeEventListener("focus", resume);
       window.removeEventListener("pageshow", resume);
+      navigator.mediaDevices?.removeEventListener?.("devicechange", deviceChanged);
     };
-  }, []);
+  }, [rebuildPipeline]);
 
   const drawIdle = useCallback(() => {
     const cv = vizRef.current; const ctx = cv?.getContext("2d"); if (!cv || !ctx) return;
@@ -195,17 +209,17 @@ export default function MusicPlayer() {
   }, [playing, open, loop, drawIdle]);
   useEffect(() => { drawIdle(); }, [drawIdle, open]);
 
+  // start playback through a guaranteed-fresh-or-verified pipeline
+  const startThroughFreshPipeline = (src: string, time: number) => {
+    restoreRef.current = null; lastRebuildRef.current = 0; staleRef.current = false;
+    rebuildPipeline(true);
+    restoreRef.current = { src, time, play: true };
+  };
   const play = async (i: number) => {
     const a = audioRef.current; if (!a) return;
     setIdx(i); setCur(0); setLoading(true);
-    if (!(await graphAlive())) {
-      // dead pipeline: rebuild and let the restore effect start this track fresh
-      restoreRef.current = null; lastRebuildRef.current = 0;
-      const src = tracks[i].src;
-      rebuildPipeline(true);
-      restoreRef.current = { src, time: 0, play: true };
-      return;
-    }
+    // hidden-since-last-play or device change → don't trust any probe, rebuild onto the current device
+    if (acRef.current && (staleRef.current || !(await graphAlive()))) { startThroughFreshPipeline(tracks[i].src, 0); return; }
     ensureGraph(); acRef.current?.resume().catch(() => {});
     a.src = tracks[i].src;
     a.play().then(() => { setPlaying(true); setLoading(false); }).catch(() => { setPlaying(false); setLoading(false); });
@@ -214,14 +228,7 @@ export default function MusicPlayer() {
     const a = audioRef.current; if (!a) return;
     if (playing) { a.pause(); setPlaying(false); return; }
     setLoading(true);
-    if (!(await graphAlive())) {
-      restoreRef.current = null; lastRebuildRef.current = 0;
-      const src = a.src || track.src;
-      const time = a.currentTime || 0;
-      rebuildPipeline(true);
-      restoreRef.current = { src, time, play: true };
-      return;
-    }
+    if (acRef.current && (staleRef.current || !(await graphAlive()))) { startThroughFreshPipeline(a.src || track.src, a.currentTime || 0); return; }
     ensureGraph(); acRef.current?.resume().catch(() => {});
     if (!a.src) a.src = track.src;
     a.play().then(() => { setPlaying(true); setLoading(false); }).catch(() => { setLoading(false); });
