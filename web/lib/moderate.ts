@@ -1,15 +1,18 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { supabaseAdmin } from "@/lib/supabase";
-import { publishTile } from "@/lib/publish";
+import { publishTile, aiRejectTile } from "@/lib/publish";
 
 /* AI moderation: Claude screens every submission (painting + display name + story)
  * right after submit, via next/server `after` so it never delays the response.
  *
- * Verdicts: approve | review | reject — stored on the tile (migration 0005) and shown
- * in the /admin queue. The human gate stays: nothing publishes automatically unless
- * AI_AUTO_PUBLISH=1 is set, in which case confident "approve" verdicts go live and
- * everything else still waits for a human. Fails soft at every step: no API key,
- * missing columns, or a model error never affects the artist's submit. */
+ * Verdicts: approve | review | reject — stored on the tile (migration 0005), acted on
+ * automatically, and logged to moderation_log (visible in the admin Log tab):
+ *   approve → published immediately
+ *   reject  → returned to the artist (tile + painting kept) / pending edit dropped
+ *   review  → waits in the admin queue for a human
+ * Set AI_AUTO=0 to demote the AI to label-only (verdicts shown, no actions).
+ * Fails soft at every step: no API key, missing columns, or a model error never
+ * affects the artist's submit — things just wait for a human as before. */
 
 const MOD_SYSTEM = `You are the moderation reviewer for ekam.ink, a public collaborative art wall. Strangers each paint one small tile answering the soft prompt "what home looks like", and approved tiles appear on a family friendly public canvas with the artist's display name and an optional one line story.
 
@@ -83,11 +86,11 @@ export async function moderateTile(tileId: string): Promise<void> {
     await db.from("tiles").update({
       ai_verdict: v.verdict, ai_reason: v.reason.slice(0, 300), ai_checked_at: new Date().toISOString(),
     }).eq("id", tileId);
-    await db.from("moderation_log").insert({ tile_id: tileId, action: "ai-screened", reason: `${v.verdict}: ${v.reason}`.slice(0, 300) });
 
-    if (v.verdict === "approve" && process.env.AI_AUTO_PUBLISH === "1") {
-      await publishTile(db, tileId, "ai");
-    }
+    const auto = process.env.AI_AUTO !== "0";
+    if (auto && v.verdict === "approve") await publishTile(db, tileId, "ai");
+    else if (auto && v.verdict === "reject") await aiRejectTile(db, tileId, v.reason);
+    else await db.from("moderation_log").insert({ tile_id: tileId, action: "ai-screened", reason: `${v.verdict}: ${v.reason}`.slice(0, 300) });
   } catch (err) {
     // never let moderation problems touch the artist's submit; leave a trace for the admin
     try {

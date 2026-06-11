@@ -22,6 +22,21 @@ export async function publishTile(db: ReturnType<typeof supabaseAdmin>, id: stri
   } else {
     await db.from("tiles").update({ status: "published", published_at: new Date().toISOString() }).eq("id", id).eq("status", "pending");
   }
-  await db.from("moderation_log").insert({ tile_id: id, action: "approved", reason: via === "ai" ? "auto approved by AI screen" : null });
+  await db.from("moderation_log").insert({ tile_id: id, action: via === "ai" ? "ai-approved" : "approved", reason: via === "ai" ? "auto approved by AI screen" : null });
+  await broadcastWallChange();
+}
+
+// AI auto-reject: kind by design. A new tile is RETURNED to its artist (status back to
+// claimed, painting kept) so they can fix and resubmit — never un-claimed by a machine.
+// A rejected edit to a live tile is dropped; the live tile stays untouched.
+export async function aiRejectTile(db: ReturnType<typeof supabaseAdmin>, id: string, reason: string): Promise<void> {
+  const { data: tile } = await db.from("tiles").select("status, pending_image_path").eq("id", id).maybeSingle();
+  if (!tile) return;
+  if (tile.pending_image_path) {
+    await db.from("tiles").update({ pending_image_path: null, pending_story: null, pending_submitted_at: null }).eq("id", id);
+  } else if (tile.status === "pending") {
+    await db.from("tiles").update({ status: "claimed" }).eq("id", id).eq("status", "pending");
+  }
+  await db.from("moderation_log").insert({ tile_id: id, action: "ai-rejected", reason: reason.slice(0, 300) });
   await broadcastWallChange();
 }

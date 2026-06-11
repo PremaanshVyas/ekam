@@ -6,6 +6,15 @@ import { isAdmin } from "@/lib/admin-auth";
 import { publishTile } from "@/lib/publish";
 import { broadcastWallChange } from "@/lib/broadcast";
 
+// Re-run the AI screen on one tile (also handy as a one-click live test).
+export async function screenTile(id: string) {
+  if (!(await isAdmin())) throw new Error("unauthorized");
+  const { moderateTile } = await import("@/lib/moderate");
+  await moderateTile(id);
+  revalidatePath("/admin");
+  revalidatePath("/");
+}
+
 export async function approve(id: string) {
   if (!(await isAdmin())) throw new Error("unauthorized");
   await publishTile(supabaseAdmin(), id, "admin");

@@ -14,7 +14,7 @@ import SignInModal from "@/components/SignInModal";
 import ShareTile from "@/components/ShareTile";
 import Logo from "@/components/Logo";
 
-type MyTile = { id: string; idx: number; status: string; name: string | null; artUrl: string | null; story: string | null; draftUrl: string | null; draftStory: string | null };
+type MyTile = { id: string; idx: number; status: string; name: string | null; artUrl: string | null; story: string | null; draftUrl: string | null; draftStory: string | null; aiVerdict: string | null; aiReason: string | null };
 type Panel = "detail" | "claim" | "studio" | "submitted" | null;
 type ViewMode = "claimed" | "all";
 
@@ -240,11 +240,16 @@ function TileDetail({ wall, info, version, myTile, onClose, onZoom, onEdit }: {
         <ShareTile url={`https://ekam.ink/t/${myTile.id}`} imageUrl={myTile.artUrl} title="my tile on ekam.ink · what home looks like" />
       )}
       {info.mine && myTile?.status === "pending" && <p className="detail__sharehint">In review. You can share it once it&apos;s live on the wall.</p>}
+      {info.mine && myTile?.status !== "pending" && myTile?.aiVerdict === "reject" && (
+        <p className="detail__sharehint" style={{ color: "var(--accent)" }}>
+          {myTile.status === "published" ? "Your last update was returned" : "Returned by review"}{myTile.aiReason ? `: ${myTile.aiReason}` : "."} Edit your tile and resubmit.
+        </p>
+      )}
       <div className="owner">
         <div className="owner__avatar" style={{ background: wall.accent }}>{(info.handle || "?").slice(0, 1).toUpperCase()}</div>
         <div className="owner__meta">
           <span className="owner__handle">{info.mine ? "you" : info.handle || "someone"}</span>
-          <span className="owner__joined">{info.mine ? (myTile?.status === "published" ? "on the wall" : myTile?.status === "pending" ? "in review" : "claimed · not painted yet") : published ? "on the wall" : "being painted"}</span>
+          <span className="owner__joined">{info.mine ? (myTile?.status === "published" ? "on the wall" : myTile?.status === "pending" ? "in review" : myTile?.aiVerdict === "reject" && myTile?.artUrl ? "returned · needs a change" : myTile?.artUrl ? "ready to resubmit" : "claimed · not painted yet") : published ? "on the wall" : "being painted"}</span>
         </div>
       </div>
       {info.note && <blockquote className="owner__note">“{info.note}”</blockquote>}

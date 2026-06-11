@@ -60,7 +60,7 @@ export default async function CanvasPage({ searchParams }: { searchParams: Promi
       if (mt) {
         // cache-bust the draft URL with its updated_at so a new device always pulls the latest
         const draftUrl = mt.draft_image_path ? `${artUrl(mt.draft_image_path)}?v=${encodeURIComponent(mt.draft_updated_at ?? "")}` : null;
-        myTile = { id: mt.id, idx: mt.y * cols + mt.x, status: mt.status, name: mt.artist_name, artUrl: artUrl(mt.pending_image_path || mt.image_path), story: mt.pending_story || mt.story, draftUrl, draftStory: mt.draft_story ?? null };
+        myTile = { id: mt.id, idx: mt.y * cols + mt.x, status: mt.status, name: mt.artist_name, artUrl: artUrl(mt.pending_image_path || mt.image_path), story: mt.pending_story || mt.story, draftUrl, draftStory: mt.draft_story ?? null, aiVerdict: mt.ai_verdict, aiReason: mt.ai_reason };
       }
     } else {
       loadError = true;

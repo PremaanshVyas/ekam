@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { supabaseAdmin } from "@/lib/supabase";
 import { isAdmin } from "@/lib/admin-auth";
-import { approve, reject, removeTile } from "./actions";
+import { approve, reject, removeTile, screenTile } from "./actions";
 import AdminImage from "@/components/AdminImage";
 import AdminAutoRefresh from "@/components/AdminAutoRefresh";
 import Logo from "@/components/Logo";
@@ -49,9 +49,24 @@ function AiChip({ verdict, reason }: { verdict: string | null; reason: string | 
   );
 }
 
+type LogRow = {
+  id: string; action: string; reason: string | null; created_at: string;
+  tiles: { x: number; y: number; artist_name: string | null } | null;
+};
+
+const LOG_LOOK: Record<string, { fg: string; label: string }> = {
+  "ai-approved": { fg: "#5fcf8f", label: "AI approved" },
+  "ai-rejected": { fg: "#e8643c", label: "AI returned" },
+  "ai-screened": { fg: "#e0a23a", label: "AI review" },
+  "approved": { fg: "#5fcf8f", label: "approved" },
+  "rejected": { fg: "#e8643c", label: "rejected" },
+  "removed": { fg: "#e8643c", label: "removed" },
+};
+
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   if (!(await isAdmin())) redirect("/admin/login");
-  const tab = (await searchParams).tab === "painted" ? "painted" : "queue";
+  const rawTab = (await searchParams).tab;
+  const tab = rawTab === "painted" ? "painted" : rawTab === "log" ? "log" : "queue";
   const db = supabaseAdmin();
   const base = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/tiles/`;
 
@@ -64,6 +79,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const queue = tab === "queue" ? await fetchQueue(db) : [];
   const painted = tab === "painted"
     ? ((await db.from("tiles").select(SAFE_COLS).eq("status", "published").order("published_at", { ascending: false })).data as Row[]) ?? []
+    : [];
+  const log = tab === "log"
+    ? (((await db.from("moderation_log").select("id, action, reason, created_at, tiles(x, y, artist_name)").order("created_at", { ascending: false }).limit(80)).data as unknown as LogRow[]) ?? [])
     : [];
 
   const tabStyle = (active: boolean): React.CSSProperties => ({
@@ -85,6 +103,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         <div style={{ display: "flex", gap: 22, borderBottom: "1px solid var(--color-border-default)" }}>
           <Link href="/admin?tab=queue" style={tabStyle(tab === "queue")}>moderation queue · {queueCount}</Link>
           <Link href="/admin?tab=painted" style={tabStyle(tab === "painted")}>painted tiles · {paintedCount}</Link>
+          <Link href="/admin?tab=log" style={tabStyle(tab === "log")}>log</Link>
         </div>
 
         {tab === "queue" ? (
@@ -111,7 +130,29 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                     <form action={reject.bind(null, r.id)}>
                       <button type="submit" style={{ width: "100%", fontFamily: "var(--font-ui), sans-serif", fontSize: 14, fontWeight: 500, color: "var(--palette-rust)", background: "var(--color-bg-surface)", border: "1px solid var(--palette-rust)", borderRadius: 4, padding: 8, cursor: "pointer" }}>reject</button>
                     </form>
+                    <form action={screenTile.bind(null, r.id)}>
+                      <button type="submit" title="Run the AI screen on this tile now" style={{ width: "100%", fontFamily: "var(--font-ui), sans-serif", fontSize: 12, color: "var(--color-text-secondary)", background: "none", border: "1px solid var(--color-border-default)", borderRadius: 4, padding: 6, cursor: "pointer" }}>AI screen</button>
+                    </form>
                   </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : tab === "log" ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <p style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: "var(--color-text-muted)", margin: "0 0 8px" }}>Every moderation action, newest first. AI actions happen seconds after each submission.</p>
+            {log.length === 0 && <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 20, color: "var(--color-text-secondary)" }}>nothing logged yet.</p>}
+            {log.map((l) => {
+              const look = LOG_LOOK[l.action] ?? { fg: "var(--color-text-muted)", label: l.action };
+              const when = l.created_at.slice(5, 16).replace("T", " · ");
+              return (
+                <div key={l.id} style={{ display: "flex", gap: 12, alignItems: "baseline", padding: "9px 2px", borderBottom: "1px solid var(--color-border-default)" }}>
+                  <span style={{ fontFamily: "var(--font-ui), monospace", fontSize: 11, color: "var(--color-text-muted)", flex: "none", width: 78 }}>{when}</span>
+                  <span style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", color: look.fg, flex: "none", width: 92 }}>{look.label}</span>
+                  <span style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: "var(--color-text-primary)", flex: "none" }}>
+                    {l.tiles ? `R${String(l.tiles.y + 1).padStart(2, "0")}·C${String(l.tiles.x + 1).padStart(2, "0")}` : "—"}{l.tiles?.artist_name ? ` · ${l.tiles.artist_name}` : ""}
+                  </span>
+                  <span style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 12.5, color: "var(--color-text-secondary)", lineHeight: 1.4 }}>{l.reason ?? ""}</span>
                 </div>
               );
             })}
