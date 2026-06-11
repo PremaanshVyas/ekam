@@ -165,7 +165,7 @@ export default function Landing({ total, claimed, published, email, myTile }: { 
       </section>
 
       {/* manifesto */}
-      <section className="band">
+      <section className="band" id="manifesto">
         <Reveal>
           <p className="bigquote">This isn&apos;t a marketplace. It&apos;s a <em>wall</em>: {fmt(total)} little squares, each one painted by a different person, sitting side by side at exactly the same size.</p>
           <p className="bigquote__by">Claim one, paint what home looks like, and your mark stays. That&apos;s the whole thing.</p>
@@ -244,8 +244,8 @@ export default function Landing({ total, claimed, published, email, myTile }: { 
         <div className="foot__brand"><Logo /><span className="foot__tag">Leave the words. Draw the lines. Say what&apos;s in your mind.</span></div>
         <div className="foot__cols">
           <div className="foot__col"><span className="foot__h">Canvas</span><Link href="/canvas">The wall</Link><a href="#how">How it works</a><a href="#rules">The rules</a></div>
-          <div className="foot__col"><span className="foot__h">About</span><a href="#">Manifesto</a><a href="#wall">Three ways to look</a><a href="#">What home looks like</a></div>
-          <div className="foot__col"><span className="foot__h">More</span><a href="/admin">Moderation</a><a href="#">Contact</a></div>
+          <div className="foot__col"><span className="foot__h">About</span><a href="#manifesto">Manifesto</a><a href="#wall">Three ways to look</a><a href="#how">What home looks like</a></div>
+          <div className="foot__col"><span className="foot__h">More</span><a href="/admin">Moderation</a></div>
         </div>
         <div className="foot__legal">© 2026 ekam.ink · a collaborative canvas · what home looks like.</div>
       </footer>

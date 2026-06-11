@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase";
+import { broadcastWallChange } from "@/lib/broadcast";
 
 // Core publish logic shared by the human admin action and the AI auto-approve path.
 // Handles both cases: a brand-new pending tile, and a pending EDIT to a live tile.
@@ -22,4 +23,5 @@ export async function publishTile(db: ReturnType<typeof supabaseAdmin>, id: stri
     await db.from("tiles").update({ status: "published", published_at: new Date().toISOString() }).eq("id", id).eq("status", "pending");
   }
   await db.from("moderation_log").insert({ tile_id: id, action: "approved", reason: via === "ai" ? "auto approved by AI screen" : null });
+  await broadcastWallChange();
 }

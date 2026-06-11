@@ -285,15 +285,29 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
   const studioTarget = useRef<{ tileId: string; idx: number; label: string; artUrl: string | null; note: string; name: string } | null>(null);
   const [signInOpen, setSignInOpen] = useState(false);
   const [lastArt, setLastArt] = useState<string | null>(null);
+  const [nudge, setNudge] = useState(false);
   const openedMine = useRef(false);
 
   const myIdx = myTile?.idx ?? -1;
   const accent = "#e8643c";
 
+  const myArt = myTile && myTile.status !== "published" ? (myTile.artUrl ?? myTile.draftUrl) : null;
   useEffect(() => {
-    const w = createRealWall(cols, tiles, myIdx, () => setVer((v) => v + 1));
+    const w = createRealWall(cols, tiles, myIdx, () => setVer((v) => v + 1), myArt);
     setWall(w); setVer((v) => v + 1);
-  }, [cols, tiles, myIdx]);
+  }, [cols, tiles, myIdx, myArt]);
+
+  // live wall: server actions broadcast on the "wall" channel whenever a tile changes;
+  // refresh (debounced) so new paintings + counters land without anyone touching reload
+  useEffect(() => {
+    const supa = createSupabaseBrowser();
+    let t: number | null = null;
+    const refresh = () => { if (t) return; t = window.setTimeout(() => { t = null; router.refresh(); }, 800); };
+    const ch = supa.channel("wall").on("broadcast", { event: "tiles" }, refresh).subscribe();
+    const vis = () => { if (!document.hidden) router.refresh(); };
+    document.addEventListener("visibilitychange", vis);
+    return () => { supa.removeChannel(ch); document.removeEventListener("visibilitychange", vis); if (t) window.clearTimeout(t); };
+  }, [router]);
 
   // viewport class + pointer type; sidebar starts closed on small screens
   useEffect(() => {
@@ -322,8 +336,14 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
 
   useEffect(() => { const id = setInterval(() => { if (api.current) setZoomLabel(api.current.getZoomLabel()); }, 250); return () => clearInterval(id); }, []);
 
+  // first visit, no tile yet → one gentle pointer at the core action
+  useEffect(() => {
+    try { if (!myTile && !localStorage.getItem("ekam.nudged")) setNudge(true); } catch { /* private mode */ }
+  }, [myTile]);
+  const dismissNudge = useCallback(() => { setNudge(false); try { localStorage.setItem("ekam.nudged", "1"); } catch { /* fine */ } }, []);
+
   const onHover = useCallback((info: TileInfo | null, x?: number, y?: number) => setHover(info ? { info, x: x ?? 0, y: y ?? 0 } : null), []);
-  const onSelect = useCallback((info: TileInfo) => { setSelected(info); setHover(null); setPanel(info.claimed ? "detail" : "claim"); }, []);
+  const onSelect = useCallback((info: TileInfo) => { setSelected(info); setHover(null); setPanel(info.claimed ? "detail" : "claim"); dismissNudge(); }, [dismissNudge]);
   const closeAll = () => { setPanel(null); setSelected(null); };
 
   const myLabel = myTile ? "R" + String((Math.floor(myTile.idx / cols)) + 1).padStart(2, "0") + "·C" + String((myTile.idx % cols) + 1).padStart(2, "0") : "";
@@ -436,6 +456,9 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
         <Studio tileLabel={studioTarget.current.label} initialArtUrl={studioTarget.current.artUrl} initialNote={studioTarget.current.note} initialName={studioTarget.current.name} accent={accent} onClose={() => setPanel(myTile ? "detail" : null)} onSubmit={onStudioSubmit} onSaveDraft={onSaveDraft} />
       )}
 
+      {nudge && !panel && (
+        <button className="ex__nudge" onClick={dismissNudge}>✦ {coarse ? "Tap" : "Click"} any open tile to make it yours</button>
+      )}
       <div className="ex__hint">{coarse ? "Pinch to zoom · drag to pan · tap a tile" : "Scroll to zoom · drag to pan · click a tile"}</div>
       {signInOpen && <SignInModal onClose={() => setSignInOpen(false)} />}
     </div>

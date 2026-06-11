@@ -23,7 +23,7 @@ export type RealTileInput = {
 const TAKEN = ["claimed", "pending", "published"];
 const pad = (n: number) => String(n).padStart(2, "0");
 
-export function createRealWall(GRID: number, tiles: RealTileInput[], myIdx: number, onProgress: () => void): Wall {
+export function createRealWall(GRID: number, tiles: RealTileInput[], myIdx: number, onProgress: () => void, myArt?: string | null): Wall {
   // Adaptive composite resolution: small screens get 64px/tile (24×24 → 1536²,
   // ~9MB), larger screens 128px/tile. Detail views always load the full PNG.
   const small = typeof window !== "undefined" && Math.min(window.innerWidth, window.innerHeight) < 700;
@@ -61,6 +61,18 @@ export function createRealWall(GRID: number, tiles: RealTileInput[], myIdx: numb
   };
   for (let i = 0; i < N_TOTAL; i++) paintCell(i);
 
+  // Owner-only overlay: while your tile is in review, YOU still see your painting in
+  // place on the wall (the public sees a dark cell until it's approved).
+  if (myIdx >= 0 && myArt) {
+    const t = byIdx.get(myIdx);
+    if (!t || t.status !== "published" || !t.img) {
+      const X = (myIdx % GRID) * TILE_PX, Y = ((myIdx / GRID) | 0) * TILE_PX;
+      const im = new Image();
+      im.onload = () => { g.fillStyle = PAPER; g.fillRect(X, Y, TILE_PX, TILE_PX); g.drawImage(im, X, Y, TILE_PX, TILE_PX); onProgress(); };
+      im.src = myArt;
+    }
+  }
+
   const claimedCount = tiles.reduce((n, t) => n + (TAKEN.includes(t.status) ? 1 : 0), 0);
   const isClaimed = (idx: number) => { const t = byIdx.get(idx); return !!t && TAKEN.includes(t.status); };
 
@@ -69,7 +81,8 @@ export function createRealWall(GRID: number, tiles: RealTileInput[], myIdx: numb
     const claimed = !!t && TAKEN.includes(t.status);
     const info: TileInfo = { idx, x, y, claimed, id: "R" + pad(y + 1) + "·C" + pad(x + 1), num: idx + 1, mine: idx === myIdx };
     if (t && t.status === "published") { info.handle = t.name || "someone"; if (t.story) info.note = t.story; }
-    else if (claimed) { info.handle = info.mine ? "you" : "—"; } // taken, not yet on the wall
+    else if (info.mine) { info.claimed = true; info.handle = "you"; } // your own claim always reads as yours
+    else if (claimed) { info.handle = "—"; } // taken, not yet on the wall
     return info;
   };
 

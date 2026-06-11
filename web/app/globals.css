@@ -422,6 +422,13 @@ body[data-panel] .mp-root{display:none}
   .side-fab.side-fab--open{left:min(330px,calc(88vw + 10px))}
 }
 .ex__hint{position:absolute;bottom:26px;left:20px;z-index:20;font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:.03em}
+.ex__nudge{position:absolute;bottom:calc(86px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);z-index:29;
+  font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:var(--ink);white-space:nowrap;
+  background:rgba(22,17,12,0.92);border:1px solid var(--accent);border-radius:100px;padding:11px 18px;
+  box-shadow:0 10px 30px rgba(0,0,0,.4),0 0 0 4px rgba(232,100,60,.08);animation:nudgefloat 2.6s ease-in-out infinite;cursor:pointer}
+@keyframes nudgefloat{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-5px)}}
+@media(prefers-reduced-motion:reduce){.ex__nudge{animation:none}}
+@media(max-width:480px){.ex__nudge{font-size:11px;padding:10px 14px}}
 @media(max-width:899px){.ex__hint{display:none}.ex__edno{display:none}.authchip{display:none}}
 
 /* =================== STUDIO =================== */

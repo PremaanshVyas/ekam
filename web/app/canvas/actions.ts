@@ -2,6 +2,7 @@
 
 import { supabaseAdmin, CANVAS_SLUG } from "@/lib/supabase";
 import { createSupabaseServer } from "@/lib/auth-server";
+import { broadcastWallChange } from "@/lib/broadcast";
 
 export type ClaimResult =
   | { ok: true; tileId: string; x: number; y: number }
@@ -36,5 +37,6 @@ export async function claimTileAt(idx: number): Promise<ClaimResult> {
     .eq("canvas_id", canvas.id).eq("x", x).eq("y", y).eq("status", "open")
     .select("id");
   if (!rows || rows.length === 0) return { ok: false, error: "taken", x, y };
+  await broadcastWallChange();
   return { ok: true, tileId: rows[0].id, x, y };
 }

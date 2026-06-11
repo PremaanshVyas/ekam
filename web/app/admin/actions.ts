@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase";
 import { isAdmin } from "@/lib/admin-auth";
 import { publishTile } from "@/lib/publish";
+import { broadcastWallChange } from "@/lib/broadcast";
 
 export async function approve(id: string) {
   if (!(await isAdmin())) throw new Error("unauthorized");
@@ -29,6 +30,7 @@ export async function reject(id: string) {
     }).eq("id", id).eq("status", "pending");
   }
   await db.from("moderation_log").insert({ tile_id: id, action: "rejected" });
+  await broadcastWallChange();
   revalidatePath("/admin");
   revalidatePath("/");
 }
@@ -51,6 +53,7 @@ export async function removeTile(id: string) {
   }
   if (error) throw new Error(error.message);
   await db.from("moderation_log").insert({ tile_id: id, action: "removed" });
+  await broadcastWallChange();
   revalidatePath("/admin");
   revalidatePath("/");
 }
