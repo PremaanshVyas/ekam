@@ -2,8 +2,7 @@
 
 _Read this first. It's the full technical context: what the thing is, how it's built, every
 non-obvious decision + **why**, the bugs that bit us + how they were fixed, conventions, and
-how to do common tasks. Competition strategy/prize angles live in the gitignored
-`CLAUDE_MASTER_BRIEF.md`._
+how to do common tasks. Private planning notes live in a gitignored brief._
 
 **As of:** 2026-06-11 · **Live:** https://ekam.ink · **Repo:** github.com/PremaanshVyas/ekam (app in `web/`)
 
@@ -20,7 +19,7 @@ how to do common tasks. Competition strategy/prize angles live in the gitignored
 > - **Live wall:** server actions broadcast on Supabase Realtime REST channel "wall" → all open canvases refresh in ~1s. Owner sees their unapproved art dimmed with a dashed ember frame ("in review").
 > - **Finale (2026-06-12):** `lib/stitch.ts` composes the whole wall client side (published art, blanks as paper, 12-way loader, `crossOrigin` so the PNG export never taints; 384px/tile → 9216²; print res stays an offline job). Admin → "the artwork" tab previews the growing artwork any day (square corners, thumb stitch + caption + hi res download). When all 576 publish, `/canvas` reveals: one-time celebration (randomized confetti rain, staggered card, localStorage `ekam.finale.seen`), then a confetti burst + twinkles over the seamless artwork, "The artwork / The tiles" toggle pill in its own lane (top inset 118 — never covers the wall), caption card with scrolling artist-credits reel, Download + Share. Grout is controlled only by the `seamless` prop now, so the tiles toggle stays meaningful at full completion. No public preview URL; test locally with `FINALE_FORCE=1 npm start` (server env knob, never set in prod). Music player UI hides during celebration/art mode via `body[data-panel]`.
 > - **Verification:** `web/probe.mjs` (gitignored) + `puppeteer-core` — real mobile-emulation screenshots/rect probes. Raw `chrome --headless --screenshot` lies about mobile layout; don't trust it.
-> - **Deadlines (2026-06-12, migration 0008):** `canvases.closes_at` = 18 June 2026 11:59pm PDT (the makeathon submission cutoff; 19 June 06:59:59 UTC) — Mickey chose max painting time over a pre-close buffer, so the demo video's finale segment records from the local `FINALE_FORCE` simulation before submitting. After it: claims + submits return "closed" (typed results, not throws — server action errors are masked in prod), the finale reveal triggers at partial fill, and the wall composite renders blanks as paper (`createRealWall` `paperBlanks` arg). **48h claim window**: set at claim, RESET on every submission (returned tiles stay yours while you keep trying); 12h warning notification (deduped via `expiry_warned_at`); lapse → tile reopens clean + "expired" notification + log row. Enforced by a lazy `sweepClaimWindows()` in `after()` on /canvas (5 min throttle) + daily cron backstop in `vercel.json`. Pre-0008 claims (NULL `claim_expires_at`) never expire. All writes fall back without the 0008 columns so deploy order doesn't matter. Countdowns tick live to the second, no timezone labels anywhere (Mickey is not in India — never display IST): landing hero, canvas sidebar, owner's tile panel (`components/Countdown.tsx`). Local test knobs (server env, never in prod): `FINALE_FORCE=1` simulates deadline day; `CLOSES_AT_TEST=<iso>` injects a fake closes_at for countdown work.
+> - **Deadlines (2026-06-12, migration 0008):** `canvases.closes_at` = 18 June 2026 11:59pm PDT (the makeathon submission cutoff; 19 June 06:59:59 UTC) (the makeathon submission cutoff). After it: claims + submits return "closed" (typed results, not throws — server action errors are masked in prod), the finale reveal triggers at partial fill, and the wall composite renders blanks as paper (`createRealWall` `paperBlanks` arg). **48h claim window**: set at claim, RESET on every submission (returned tiles stay yours while you keep trying); 12h warning notification (deduped via `expiry_warned_at`); lapse → tile reopens clean + "expired" notification + log row. Enforced by a lazy `sweepClaimWindows()` in `after()` on /canvas (5 min throttle) + daily cron backstop in `vercel.json`. Pre-0008 claims (NULL `claim_expires_at`) never expire. All writes fall back without the 0008 columns so deploy order doesn't matter. Countdowns tick live to the second with no timezone labels (relative time reads the same everywhere): landing hero, canvas sidebar, owner's tile panel (`components/Countdown.tsx`). Local test knobs (server env, never in prod): `FINALE_FORCE=1` simulates deadline day; `CLOSES_AT_TEST=<iso>` injects a fake closes_at for countdown work.
 > - **SEO/analytics (2026-06-12):** `app/robots.ts` (blocks /admin + /api) + dynamic `app/sitemap.ts` (every published tile's share page joins it). `@vercel/analytics` in the root layout — needs the one-time dashboard toggle (Vercel → project → Analytics → Enable). `web/proxy.ts` (Next 16 renamed middleware → proxy!) gives malformed /t/ links a true 404 status — pages can't set one themselves because the root loading.tsx streams a 200 first.
 > - **Copy (2026-06-12):** "what home looks like" is retired platform-wide. Titles/captions/OG say "many hands, one canvas"; instructional copy says "paint what's in your mind" (ties to the tagline) or "paint your piece of one canvas". The moderation prompt was updated to match. Don't reintroduce the old phrase.
 
@@ -82,7 +81,7 @@ daily build-in-public posts.**
 6. **Tiles are editable anytime.** Editing a *pending/claimed* tile overwrites it. Editing an *already-published* tile stores the new version in `pending_image_path`/`pending_story` (migration 0003) so the **live tile stays on the canvas** until you re-approve. Admin shows these as "edit · live tile". _Why:_ Mickey wanted edits without taking a tile off the canvas during re-review.
 7. **Tiles are keyed to the artist's email**, found via `findMyTile` — so a person can return on any device and edit. `/me` is the dashboard.
 8. **Music: 20 self-hosted Pixabay lofi tracks** (free for commercial, no attribution) in `public/audio/`, configured by `playlist.json`. _Why:_ SomaFM streams couldn't be verified from the sandbox + Pixabay self-host = bulletproof licensing + reliable playback. Player has a Web Audio **multi-colour visualizer** (ekam tile palette as a rainbow), scrub bar, auto-next, draggable, minimizable, persists across pages.
-9. **Submit as a LIVING canvas** for the competition (it won't be 100% by June 18; the evolving piece is the better story). A **stitched high-res PNG export** is planned for the video (NOT built yet).
+9. **The canvas is a living piece**: it closes with the makeathon window and the reveal shows whatever is painted, blanks as paper. The stitched high-res PNG export ships in the admin's artwork tab.
 10. **Domain: `ekam.ink` (apex) is PRIMARY** (serves directly); `www` 308-redirects to it. **Do not reshuffle this in Vercel** (flipping primary caused a cached-308 redirect loop on phones). Certs auto-renew (Let's Encrypt via Vercel).
 
 ## 6. Gotchas / bugs fixed (don't re-introduce these)
@@ -119,12 +118,7 @@ daily build-in-public posts.**
 - **Resend:** domain ekam.ink verified; custom SMTP set in Supabase Auth; email templates use `{{ .Token }}` (code, not link). Free tier ≈ 100 emails/day — bump if a post goes viral.
 
 ## 10. What's left
-**Competition / launch (human-led, ~June 11 onward):**
-- Record the **video** (2:30 + 0:30) — scored category; script in the brief.
-- **Publish the Figma file to Community** (+5 bonus).
-- **Submit on Contra** (live link + community/working file + video).
-- **Social posts** daily (#ConfigMakeathon @figma) — build-in-public.
-- **Recruit real painters** / soft-launch so the canvas has real art for the demo/timelapse.
+**Launch (human-led):** demo video, Figma Community publish, submission, social posts, recruiting painters.
 
 **Product (buildable):**
 - **Stitched-canvas high-res PNG export** (for the video + a permanent artifact) — designed/agreed, not built.
