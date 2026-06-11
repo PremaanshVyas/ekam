@@ -5,6 +5,7 @@ import { isAdmin } from "@/lib/admin-auth";
 import { approve, reject, removeTile, screenTile } from "./actions";
 import AdminImage from "@/components/AdminImage";
 import AdminAutoRefresh from "@/components/AdminAutoRefresh";
+import StitchPreview from "@/components/StitchPreview";
 import Logo from "@/components/Logo";
 
 export const dynamic = "force-dynamic";
@@ -75,7 +76,7 @@ const LOG_LOOK: Record<string, { fg: string; label: string }> = {
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   if (!(await isAdmin())) redirect("/admin/login");
   const rawTab = (await searchParams).tab;
-  const tab = rawTab === "painted" ? "painted" : rawTab === "log" ? "log" : "queue";
+  const tab = rawTab === "painted" ? "painted" : rawTab === "log" ? "log" : rawTab === "stitch" ? "stitch" : "queue";
   const db = supabaseAdmin();
   const base = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/tiles/`;
 
@@ -89,6 +90,22 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const painted = tab === "painted"
     ? ((await db.from("tiles").select(SAFE_COLS).eq("status", "published").order("published_at", { ascending: false })).data as Row[]) ?? []
     : [];
+  // the growing artwork: published tiles + canvas dims + the date span
+  let stitch = null as null | { tiles: { x: number; y: number; img: string | null }[]; previewTiles: { x: number; y: number; img: string | null }[]; cols: number; rows: number; people: number; fromDate: string | null; toDate: string | null };
+  if (tab === "stitch") {
+    const { data: canvas } = await db.from("canvases").select("grid_cols, grid_rows").limit(1).maybeSingle();
+    const { data: pub } = await db.from("tiles").select("x, y, image_path, thumb_path, published_at").eq("status", "published");
+    const rowsList = pub ?? [];
+    const url = (p2: string | null) => (p2 ? (p2.startsWith("#") ? p2 : `${base}${p2}`) : null);
+    const dates = rowsList.map((r) => r.published_at).filter(Boolean).sort();
+    stitch = {
+      tiles: rowsList.map((r) => ({ x: r.x, y: r.y, img: url(r.image_path) })),
+      previewTiles: rowsList.map((r) => ({ x: r.x, y: r.y, img: url(r.thumb_path) ?? url(r.image_path) })),
+      cols: canvas?.grid_cols ?? 24, rows: canvas?.grid_rows ?? 24,
+      people: rowsList.length, fromDate: dates[0] ?? null, toDate: dates[dates.length - 1] ?? null,
+    };
+  }
+
   const log = tab === "log"
     ? (((await db.from("moderation_log").select("id, action, reason, created_at, tiles(x, y, artist_name)").order("created_at", { ascending: false }).limit(80)).data as unknown as LogRow[]) ?? [])
     : [];
@@ -113,6 +130,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <Link href="/admin?tab=queue" style={tabStyle(tab === "queue")}>moderation queue · {queueCount}</Link>
           <Link href="/admin?tab=painted" style={tabStyle(tab === "painted")}>painted tiles · {paintedCount}</Link>
           <Link href="/admin?tab=log" style={tabStyle(tab === "log")}>log</Link>
+          <Link href="/admin?tab=stitch" style={tabStyle(tab === "stitch")}>the artwork</Link>
         </div>
 
         {tab === "queue" ? (
@@ -148,6 +166,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               );
             })}
           </div>
+        ) : tab === "stitch" && stitch ? (
+          <StitchPreview tiles={stitch.tiles} previewTiles={stitch.previewTiles} cols={stitch.cols} rows={stitch.rows} people={stitch.people} fromDate={stitch.fromDate} toDate={stitch.toDate} />
         ) : tab === "log" ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <p style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: "var(--color-text-muted)", margin: "0 0 8px" }}>Every moderation action, newest first. AI actions happen seconds after each submission.</p>

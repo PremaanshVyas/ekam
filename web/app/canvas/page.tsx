@@ -1,6 +1,7 @@
 import Explorer from "@/components/Explorer";
 import { supabaseAnon, supabaseAdmin, CANVAS_SLUG } from "@/lib/supabase";
 import { createSupabaseServer } from "@/lib/auth-server";
+import { isAdmin } from "@/lib/admin-auth";
 import { findMyTile } from "@/lib/tiles";
 import type { RealTileInput } from "@/lib/realWall";
 
@@ -13,11 +14,14 @@ const artUrl = (p: string | null) => (p && !p.startsWith("#") ? `${SUPA}/storage
 
 type Row = {
   id: string; x: number; y: number; status: string; artist_name: string | null; artist_location: string | null;
-  story: string | null; image_path: string | null; thumb_path: string | null;
+  story: string | null; image_path: string | null; thumb_path: string | null; published_at: string | null;
 };
 
-export default async function CanvasPage({ searchParams }: { searchParams: Promise<{ mine?: string }> }) {
-  const autoOpenMine = (await searchParams).mine === "1";
+export default async function CanvasPage({ searchParams }: { searchParams: Promise<{ mine?: string; finale?: string }> }) {
+  const sp = await searchParams;
+  const autoOpenMine = sp.mine === "1";
+  // the finale can be previewed before completion, but only by the moderator
+  const finalePreview = sp.finale === "1" && (await isAdmin());
 
   let cols = 24, rows = 24;
   let tiles: RealTileInput[] = [];
@@ -27,6 +31,8 @@ export default async function CanvasPage({ searchParams }: { searchParams: Promi
   let loadError = false;
   let notifs: { id: string; kind: string; title: string; body: string | null; created_at: string; read_at: string | null }[] = [];
   let unread = 0;
+  let published = 0;
+  let finaleFrom: string | null = null, finaleTo: string | null = null;
 
   try {
     const auth = await createSupabaseServer();
@@ -44,7 +50,7 @@ export default async function CanvasPage({ searchParams }: { searchParams: Promi
       // Parallel: the tile list + the signed-in person's tile.
       const [tilesRes, mt] = await Promise.all([
         db.from("public_tiles")
-          .select("id, x, y, status, artist_name, artist_location, story, image_path, thumb_path")
+          .select("id, x, y, status, artist_name, artist_location, story, image_path, thumb_path, published_at")
           .eq("canvas_id", canvas.id),
         email ? findMyTile(supabaseAdmin(), canvas.id, email) : Promise.resolve(null),
       ]);
@@ -67,6 +73,13 @@ export default async function CanvasPage({ searchParams }: { searchParams: Promi
         const img = isPub && ip ? (ip.startsWith("#") ? ip : `${SUPA}/storage/v1/object/public/tiles/${ip}`) : null;
         const thumb = isPub && t.thumb_path && !t.thumb_path.startsWith("#") ? `${SUPA}/storage/v1/object/public/tiles/${t.thumb_path}` : null;
         if (["claimed", "pending", "published"].includes(t.status)) claimed++;
+        if (isPub) {
+          published++;
+          if (t.published_at) {
+            if (!finaleFrom || t.published_at < finaleFrom) finaleFrom = t.published_at;
+            if (!finaleTo || t.published_at > finaleTo) finaleTo = t.published_at;
+          }
+        }
         return { x: t.x, y: t.y, status: t.status, name: isPub ? t.artist_name : null, loc: isPub ? t.artist_location : null, story: isPub ? t.story : null, img, thumb, uuid: t.id, votes: voteCount.get(t.id) ?? 0, voted: myVotes.has(t.id) };
       });
       if (tilesRes.error) loadError = true;
@@ -95,5 +108,6 @@ export default async function CanvasPage({ searchParams }: { searchParams: Promi
     loadError = true;
   }
 
-  return <Explorer cols={cols} total={cols * rows} tiles={tiles} claimed={claimed} email={email} myTile={myTile} autoOpenMine={autoOpenMine} loadError={loadError} notifs={notifs} unread={unread} />;
+    const complete = published >= cols * rows;
+  return <Explorer cols={cols} total={cols * rows} tiles={tiles} claimed={claimed} email={email} myTile={myTile} autoOpenMine={autoOpenMine} loadError={loadError} notifs={notifs} unread={unread} complete={complete || finalePreview} finalePreview={finalePreview} published={published} finaleFrom={finaleFrom} finaleTo={finaleTo} />;
 }

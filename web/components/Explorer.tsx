@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import MosaicCanvas, { type MosaicApi, type Insets } from "@/components/MosaicCanvas";
 import Studio from "@/components/Studio";
 import { createRealWall, type RealTileInput } from "@/lib/realWall";
+import { stitchWall, downloadBlob } from "@/lib/stitch";
 import type { Wall, TileInfo } from "@/lib/demoWall";
 import { createSupabaseBrowser } from "@/lib/auth-browser";
 import { claimTileAt, toggleVote } from "@/app/canvas/actions";
@@ -306,9 +307,11 @@ function TileDetail({ wall, info, version, myTile, signedIn, onNeedSignIn, onClo
 }
 
 const CONFETTI_N = 18;
+const fmtDay = (s: string | null) => (s ? new Date(s).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "");
 
-export default function Explorer({ cols, total, tiles, claimed, email, myTile, autoOpenMine, loadError, notifs = [], unread = 0 }: {
+export default function Explorer({ cols, total, tiles, claimed, email, myTile, autoOpenMine, loadError, notifs = [], unread = 0, complete = false, finalePreview = false, published = 0, finaleFrom = null, finaleTo = null }: {
   cols: number; total: number; tiles: RealTileInput[]; claimed: number; email: string | null; myTile: MyTile | null; autoOpenMine?: boolean; loadError?: boolean; notifs?: Notif[]; unread?: number;
+  complete?: boolean; finalePreview?: boolean; published?: number; finaleFrom?: string | null; finaleTo?: string | null;
 }) {
   const router = useRouter();
   const api = useRef<MosaicApi | null>(null);
@@ -331,6 +334,10 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
   const [lastArt, setLastArt] = useState<string | null>(null);
   const [nudge, setNudge] = useState(false);
   const openedMine = useRef(false);
+  const [finaleMode, setFinaleMode] = useState<"art" | "tiles">("art");
+  const [celebrate, setCelebrate] = useState(false);
+  const [stitching, setStitching] = useState(0); // 0 idle, else percent
+  const [shared, setShared] = useState(false);
 
   const myIdx = myTile?.idx ?? -1;
   const accent = "#e8643c";
@@ -380,10 +387,10 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
   // fixed-position roots are their own stacking contexts, so z-index can't layer the
   // global music player under panels — hide its UI (audio keeps playing) while one is open
   useEffect(() => {
-    if (panel) document.body.setAttribute("data-panel", "1");
+    if (panel || celebrate || (complete && finaleMode === "art")) document.body.setAttribute("data-panel", "1");
     else document.body.removeAttribute("data-panel");
     return () => document.body.removeAttribute("data-panel");
-  }, [panel]);
+  }, [panel, celebrate, complete, finaleMode]);
 
   useEffect(() => { const id = setInterval(() => { if (api.current) setZoomLabel(api.current.getZoomLabel()); }, 250); return () => clearInterval(id); }, []);
 
@@ -450,9 +457,42 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
   };
   const onSaveDraft = async (dataUrl: string, note: string) => { const t = studioTarget.current; if (!t) return { ok: false }; return await saveDraft(t.tileId, dataUrl, note); };
 
+  // the finale: one full picture, seen once with a celebration, then a quiet toggle
+  const artMode = complete && finaleMode === "art";
+  useEffect(() => {
+    if (!complete) return;
+    try { if (finalePreview || !localStorage.getItem("ekam.finale.seen")) setCelebrate(true); } catch { setCelebrate(true); }
+  }, [complete, finalePreview]);
+  const dismissCelebrate = useCallback(() => {
+    setCelebrate(false); setFinaleMode("art"); setPanel(null); setSelected(null); setHover(null);
+    if (!finalePreview) { try { localStorage.setItem("ekam.finale.seen", "1"); } catch { /* private mode */ } }
+    setTimeout(() => api.current?.fit(), 90);
+  }, [finalePreview]);
+  const switchFinale = useCallback((m: "art" | "tiles") => {
+    setFinaleMode(m); setPanel(null); setSelected(null); setHover(null);
+    setTimeout(() => api.current?.fit(), 90);
+  }, []);
+  const downloadArtwork = async () => {
+    if (stitching) return; setStitching(1);
+    try {
+      const st = tiles.filter((t) => t.status === "published" && t.img).map((t) => ({ x: t.x, y: t.y, img: t.img }));
+      const blob = await stitchWall(st, cols, Math.round(total / cols), 384, (d, n) => setStitching(Math.max(1, Math.round((d / n) * 100))));
+      downloadBlob(blob, "ekam-what-home-looks-like.png");
+    } catch { /* button resets below */ }
+    setStitching(0);
+  };
+  const shareArtwork = async () => {
+    const url = window.location.origin + "/canvas";
+    const text = `what home looks like · one canvas painted by ${published} people · ekam.ink`;
+    if (navigator.share) { try { await navigator.share({ title: "ekam.ink", text, url }); } catch { /* cancelled */ } return; }
+    try { await navigator.clipboard.writeText(url); setShared(true); setTimeout(() => setShared(false), 1800); } catch { /* fine */ }
+  };
+
   // chrome-aware fit: the wall centers inside the space the topbar/sidebar/panel/dock leave free
   const panelOpen = panel !== null && panel !== "studio";
-  const insets: Insets = {
+  const insets: Insets = artMode ? {
+    top: 64, left: 14, right: 14, bottom: desktop ? 178 : 206,
+  } : {
     top: 64,
     left: desktop && sideOpen ? 348 : 14,
     right: desktop && panelOpen ? 390 : 14,
@@ -470,8 +510,8 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
   return (
     <div className="explorer">
       <div className="ex__canvas">
-        <MosaicCanvas wall={wall} interactive grid viewMode={viewMode} version={ver} accent={accent}
-          apiRef={api} onHover={onHover} onSelect={onSelect} insets={insets}
+        <MosaicCanvas wall={wall} interactive grid seamless={artMode} viewMode={artMode ? "claimed" : viewMode} version={ver} accent={accent}
+          apiRef={api} onHover={artMode ? undefined : onHover} onSelect={artMode ? undefined : onSelect} insets={insets}
           selectedIdx={selected ? selected.idx : -1} hoverIdx={hover ? hover.info.idx : -1} initialZoom="macro" />
         <div className="ex__grain" />
       </div>
@@ -520,17 +560,17 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
         </button>
       )}
 
-      {!desktop && sideOpen && <div className="side__backdrop" onClick={() => setSideOpen(false)} />}
-      <Sidebar open={sideOpen} claimed={claimed} total={total} loved={loved} onLoved={(idx) => { if (!wall) return; setSelected(wall.infoFor(idx)); setPanel("detail"); setHover(null); if (!desktop) setSideOpen(false); setTimeout(() => api.current?.zoomToTile(idx, 96), 60); }} />
-      <button
+      {!artMode && !desktop && sideOpen && <div className="side__backdrop" onClick={() => setSideOpen(false)} />}
+      {!artMode && <Sidebar open={sideOpen} claimed={claimed} total={total} loved={loved} onLoved={(idx) => { if (!wall) return; setSelected(wall.infoFor(idx)); setPanel("detail"); setHover(null); if (!desktop) setSideOpen(false); setTimeout(() => api.current?.zoomToTile(idx, 96), 60); }} />}
+      {!artMode && <button
         className={"side-fab" + (sideOpen ? " side-fab--open" : "")}
         aria-label={sideOpen ? "Hide canvas info" : "Show canvas info"}
         aria-expanded={sideOpen}
         onClick={() => setSideOpen(!sideOpen)}
-      >{sideOpen ? "‹" : "›"}</button>
+      >{sideOpen ? "‹" : "›"}</button>}
 
       <Tooltip hover={hover} />
-      {!(panelOpen && !desktop) && <Dock api={api} viewMode={viewMode} setViewMode={setViewMode} zoomLabel={zoomLabel} />}
+      {!artMode && !(panelOpen && !desktop) && <Dock api={api} viewMode={viewMode} setViewMode={setViewMode} zoomLabel={zoomLabel} />}
 
       {panel && panel !== "studio" && selected && (
         <div className="panelwrap">
@@ -590,10 +630,43 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
         <Studio tileLabel={studioTarget.current.label} initialArtUrl={studioTarget.current.artUrl} initialNote={studioTarget.current.note} initialName={studioTarget.current.name} accent={accent} onClose={() => setPanel(myTile ? "detail" : null)} onSubmit={onStudioSubmit} onSaveDraft={onSaveDraft} />
       )}
 
-      {nudge && !panel && (
+      {nudge && !panel && !complete && (
         <button className="ex__nudge" onClick={dismissNudge}>✦ {coarse ? "Tap" : "Click"} any open tile to make it yours</button>
       )}
-      <div className="ex__hint">{coarse ? "Pinch to zoom · drag to pan · tap a tile" : "Scroll to zoom · drag to pan · click a tile"}</div>
+      {!artMode && <div className="ex__hint">{coarse ? "Pinch to zoom · drag to pan · tap a tile" : "Scroll to zoom · drag to pan · click a tile"}</div>}
+      {complete && (
+        <div className="fseg" role="tablist" aria-label="Canvas view">
+          <button role="tab" aria-selected={finaleMode === "art"} className={"fseg__b" + (finaleMode === "art" ? " fseg__b--on" : "")} onClick={() => switchFinale("art")}>The artwork</button>
+          <button role="tab" aria-selected={finaleMode === "tiles"} className={"fseg__b" + (finaleMode === "tiles" ? " fseg__b--on" : "")} onClick={() => switchFinale("tiles")}>The tiles</button>
+        </div>
+      )}
+
+      {artMode && (
+        <div className="fcap">
+          <div className="fcap__title">what home looks like</div>
+          <div className="fcap__meta">
+            Made by {published} {published === 1 ? "person" : "people"}{finaleFrom && finaleTo ? (fmtDay(finaleFrom) === fmtDay(finaleTo) ? `, ${fmtDay(finaleTo)}` : `, ${fmtDay(finaleFrom)} to ${fmtDay(finaleTo)}`) : ""}
+          </div>
+          <div className="fcap__actions">
+            <button className="btn btn--primary" disabled={stitching > 0} onClick={downloadArtwork}>{stitching > 0 ? `Stitching… ${stitching}%` : "Download"}</button>
+            <button className="btn btn--ghost" onClick={shareArtwork}>{shared ? "Link copied ✓" : "Share"}</button>
+          </div>
+        </div>
+      )}
+
+      {celebrate && (
+        <div className="finale" role="dialog" aria-label="The wall is complete">
+          <div className="confetti confetti--sky" aria-hidden>{Array.from({ length: CONFETTI_N }).map((_, i) => <i key={i} />)}</div>
+          <div className="finale__card">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/ekam-mark.svg" width={52} height={52} alt="" />
+            <h2 className="finale__t">The wall is complete.</h2>
+            <p className="finale__d">{published} strangers each painted one tile. Together they made one picture of home.</p>
+            <button className="btn btn--primary" onClick={dismissCelebrate}>See the artwork</button>
+          </div>
+        </div>
+      )}
+
       {signInOpen && <SignInModal onClose={() => setSignInOpen(false)} />}
     </div>
   );

@@ -24,14 +24,14 @@ const dprCap = () => Math.min(2, (typeof window !== "undefined" && window.device
 export default function MosaicCanvas({
   wall, version = 0, interactive = false, hero = false, viewMode = "claimed",
   onHover, onSelect, selectedIdx = -1, hoverIdx = -1, initialZoom = "macro", apiRef, accent = "#e8643c", grid = false,
-  insets,
+  insets, seamless = false,
 }: {
   wall: Wall; version?: number; interactive?: boolean; hero?: boolean; viewMode?: ViewMode;
   onHover?: (info: TileInfo | null, x?: number, y?: number) => void;
   onSelect?: (info: TileInfo) => void;
   selectedIdx?: number; hoverIdx?: number; initialZoom?: "macro" | "mid" | "micro";
   apiRef?: React.MutableRefObject<MosaicApi | null>; accent?: string; grid?: boolean;
-  insets?: Insets;
+  insets?: Insets; seamless?: boolean;
 }) {
   const GRID = wall.GRID;
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -47,8 +47,8 @@ export default function MosaicCanvas({
   const pointer = useRef({ down: false, moved: false, sx: 0, sy: 0, lx: 0, ly: 0, type: "mouse", everInteracted: false });
   const pointersRef = useRef(new Map<number, { x: number; y: number }>());
   const pinchRef = useRef<{ d0: number; cx0: number; cy0: number; v0: { scale: number; ox: number; oy: number } } | null>(null);
-  const stateRef = useRef({ viewMode, selectedIdx, hoverIdx, accent, grid });
-  stateRef.current = { viewMode, selectedIdx, hoverIdx, accent, grid };
+  const stateRef = useRef({ viewMode, selectedIdx, hoverIdx, accent, grid, seamless });
+  stateRef.current = { viewMode, selectedIdx, hoverIdx, accent, grid, seamless };
   const wallRef = useRef(wall); wallRef.current = wall;
 
   // available (non-chrome-covered) rect, in CSS px
@@ -62,7 +62,7 @@ export default function MosaicCanvas({
     const ctx = canvas.getContext("2d"); if (!ctx) return;
     const W = wallRef.current; const dpr = dprCap();
     const { w, h } = sizeRef.current; const { scale, ox, oy } = view.current;
-    const { viewMode, selectedIdx, hoverIdx, accent, grid } = stateRef.current;
+    const { viewMode, selectedIdx, hoverIdx, accent, grid, seamless } = stateRef.current;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = W.bg; ctx.fillRect(0, 0, w, h);
     const size = GRID * scale;
@@ -74,7 +74,7 @@ export default function MosaicCanvas({
     const y1 = Math.min(GRID, Math.ceil((h - oy) / scale));
 
     const complete = W.N_TOTAL > 0 && W.claimedCount >= W.N_TOTAL;
-    const gridded = grid && !complete && scale >= 5;
+    const gridded = grid && !seamless && !complete && scale >= 5;
     const gap = gridded ? Math.max(1, scale * 0.06) : 0;
 
     if (!gridded) {
@@ -178,7 +178,7 @@ export default function MosaicCanvas({
     }
   }, [insets, GRID, animateTo, centerOn, computeFitScale]);
 
-  useEffect(() => { requestDraw(); }, [version, viewMode, selectedIdx, hoverIdx, accent, requestDraw]);
+  useEffect(() => { requestDraw(); }, [version, viewMode, selectedIdx, hoverIdx, accent, seamless, requestDraw]);
 
   // hero Ken Burns autoplay
   useEffect(() => {
