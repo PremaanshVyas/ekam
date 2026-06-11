@@ -164,6 +164,15 @@ export async function moderateTile(tileId: string): Promise<void> {
       }
     }
 
+    // supersede guard: if the artist resubmitted (new image) or another screen took over
+    // while the model was thinking, this run's verdict is about a STALE image — abandon
+    // it silently and let the newer run own the tile.
+    const { data: cur } = await db.from("tiles").select("ai_verdict, image_path, pending_image_path").eq("id", tileId).maybeSingle();
+    if (!cur) return;
+    const curPath = cur.pending_image_path || cur.image_path;
+    if (curPath !== imgPath) return;
+    if (cur.ai_verdict !== null && cur.ai_verdict !== "checking") return;
+
     // store the FINAL verdict — tolerant of migration 0005 not being run yet
     await db.from("tiles").update({
       ai_verdict: v.verdict, ai_reason: v.reason.slice(0, 300), ai_checked_at: new Date().toISOString(),

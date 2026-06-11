@@ -106,7 +106,13 @@ export async function reviewStatus(tileId: string): Promise<ReviewState> {
   if (t.review_requested_at) return { state: "requested", reason: t.ai_reason ?? null };
   if (!t.ai_checked_at) return { state: "checking", reason: null };
   const v = t.ai_verdict;
-  if (v === "approve" && t.status === "published" && !t.pending_image_path) return { state: "live", reason: null };
+  if (v === "approve") {
+    if (t.status === "published" && !t.pending_image_path) return { state: "live", reason: null };
+    // verdict stored but the publish is still in flight (thumb check, notify, broadcast)
+    // — keep the client polling instead of mislabeling this gap as "needs a human"
+    if (process.env.AI_AUTO !== "0") return { state: "checking", reason: null };
+    return { state: "escalated", reason: null }; // label-only mode: a human publishes
+  }
   if (v === "reject") return { state: "returned", reason: t.ai_reason ?? null };
   // review verdict, or an AI error → it's sitting with the human moderator
   return { state: "escalated", reason: v === "review" ? (t.ai_reason ?? null) : null };
