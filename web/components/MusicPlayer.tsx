@@ -40,6 +40,14 @@ export default function MusicPlayer() {
   const [dur, setDur] = useState(0);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const playingRef = useRef(false); playingRef.current = playing;
+  // self-healing pipeline: after long idle Chrome can kill the AudioContext's renderer
+  // while reporting it healthy — and a captured <audio> element can never be re-captured,
+  // so the ONLY cure is a fresh element + fresh context. audioKey swaps the element.
+  const [audioKey, setAudioKey] = useState(0);
+  const restoreRef = useRef<{ src: string; time: number; play: boolean } | null>(null);
+  const pendingSeekRef = useRef(0);
+  const lastRebuildRef = useRef(0);
+  const volRef = useRef(vol); volRef.current = vol;
 
   useEffect(() => {
     fetch("/audio/playlist.json").then((r) => r.json())
@@ -77,6 +85,63 @@ export default function MusicPlayer() {
       acRef.current = ac; analyserRef.current = an; srcNodeRef.current = src; gainRef.current = gain;
     } catch { /* visualizer optional — audio still plays */ }
   }, [vol]);
+
+  // Tear down the dead pipeline and stand up a new one (element + context + graph),
+  // restoring the current track, position and play state. Throttled so a machine with
+  // genuinely broken audio can't rebuild-loop.
+  const rebuildPipeline = useCallback((wasPlaying: boolean) => {
+    const now = Date.now();
+    if (now - lastRebuildRef.current < 15000) return;
+    lastRebuildRef.current = now;
+    const a = audioRef.current;
+    restoreRef.current = { src: a?.src || "", time: a?.currentTime || 0, play: wasPlaying };
+    try { a?.pause(); } catch { /* already dead */ }
+    try { acRef.current?.close(); } catch { /* already closed */ }
+    acRef.current = null; analyserRef.current = null; gainRef.current = null; srcNodeRef.current = null;
+    setAudioKey((k) => k + 1);
+  }, []);
+
+  // Health probe: a dead-but-"running" context has a frozen clock. Resume if suspended,
+  // then verify currentTime actually advances.
+  const graphAlive = useCallback(async () => {
+    const ac = acRef.current; if (!ac) return true; // no graph yet — the element is still native
+    try { if (ac.state !== "running") await ac.resume(); } catch { /* probe below decides */ }
+    if ((ac.state as string) !== "running") return false;
+    const t0 = ac.currentTime;
+    await new Promise((r) => setTimeout(r, 200));
+    return ac.currentTime > t0;
+  }, []);
+
+  // After a rebuild, the fresh element restores src/volume/position and resumes.
+  useEffect(() => {
+    if (audioKey === 0) return;
+    const a = audioRef.current; const r = restoreRef.current; restoreRef.current = null;
+    if (!a || !r) return;
+    a.volume = volRef.current;
+    pendingSeekRef.current = r.time;
+    if (r.src) a.src = r.src; else return;
+    ensureGraph(); acRef.current?.resume().catch(() => {});
+    if (r.play) {
+      setLoading(true);
+      a.play().then(() => { setPlaying(true); setLoading(false); }).catch(() => { setPlaying(false); setLoading(false); });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audioKey]);
+
+  // Watchdog while playing: if the context clock freezes mid-playback (came back to a
+  // killed tab), rebuild without waiting for a click.
+  useEffect(() => {
+    if (!playing) return;
+    let last = -1, misses = 0;
+    const id = window.setInterval(() => {
+      const ac = acRef.current; if (!ac) return;
+      if (ac.state === "running") {
+        if (ac.currentTime === last) { misses += 1; if (misses >= 2) rebuildPipeline(true); }
+        else { misses = 0; last = ac.currentTime; }
+      } else { ac.resume().catch(() => {}); }
+    }, 2000);
+    return () => window.clearInterval(id);
+  }, [playing, rebuildPipeline]);
 
   // "Shows playing but silent" fix: the AudioContext gets suspended when the tab is
   // backgrounded or by autoplay policy. Resume it whenever we come back.
@@ -130,19 +195,35 @@ export default function MusicPlayer() {
   }, [playing, open, loop, drawIdle]);
   useEffect(() => { drawIdle(); }, [drawIdle, open]);
 
-  const play = (i: number) => {
+  const play = async (i: number) => {
     const a = audioRef.current; if (!a) return;
+    setIdx(i); setCur(0); setLoading(true);
+    if (!(await graphAlive())) {
+      // dead pipeline: rebuild and let the restore effect start this track fresh
+      restoreRef.current = null; lastRebuildRef.current = 0;
+      const src = tracks[i].src;
+      rebuildPipeline(true);
+      restoreRef.current = { src, time: 0, play: true };
+      return;
+    }
     ensureGraph(); acRef.current?.resume().catch(() => {});
-    setIdx(i); a.src = tracks[i].src; setCur(0);
-    setLoading(true);
+    a.src = tracks[i].src;
     a.play().then(() => { setPlaying(true); setLoading(false); }).catch(() => { setPlaying(false); setLoading(false); });
   };
-  const toggle = () => {
+  const toggle = async () => {
     const a = audioRef.current; if (!a) return;
-    ensureGraph(); acRef.current?.resume().catch(() => {});
     if (playing) { a.pause(); setPlaying(false); return; }
-    if (!a.src) a.src = track.src;
     setLoading(true);
+    if (!(await graphAlive())) {
+      restoreRef.current = null; lastRebuildRef.current = 0;
+      const src = a.src || track.src;
+      const time = a.currentTime || 0;
+      rebuildPipeline(true);
+      restoreRef.current = { src, time, play: true };
+      return;
+    }
+    ensureGraph(); acRef.current?.resume().catch(() => {});
+    if (!a.src) a.src = track.src;
     a.play().then(() => { setPlaying(true); setLoading(false); }).catch(() => { setLoading(false); });
   };
   const next = () => play((idx + 1) % tracks.length);
@@ -168,13 +249,17 @@ export default function MusicPlayer() {
   return (
     <>
       <audio
+        key={audioKey}
         ref={audioRef} preload="none"
         onPlaying={() => { setPlaying(true); setLoading(false); }}
         onPause={() => setPlaying(false)}
         onWaiting={() => setLoading(true)}
         onError={() => { setLoading(false); setPlaying(false); }}
         onTimeUpdate={(e) => setCur(e.currentTarget.currentTime)}
-        onLoadedMetadata={(e) => setDur(e.currentTarget.duration)}
+        onLoadedMetadata={(e) => {
+          setDur(e.currentTarget.duration);
+          if (pendingSeekRef.current > 0) { try { e.currentTarget.currentTime = pendingSeekRef.current; } catch { /* not seekable yet */ } pendingSeekRef.current = 0; }
+        }}
         onEnded={() => next()}
       />
 
