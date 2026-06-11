@@ -6,7 +6,7 @@
 export type TileInfo = {
   idx: number; x: number; y: number; claimed: boolean; id: string; num: number;
   handle?: string; emailMasked?: string; day?: number; note?: string; mine?: boolean;
-  stage?: string;
+  stage?: string; uuid?: string; votes?: number; voted?: boolean;
 };
 
 export type Wall = {

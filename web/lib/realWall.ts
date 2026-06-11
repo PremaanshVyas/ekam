@@ -18,12 +18,15 @@ export type RealTileInput = {
   name: string | null; loc: string | null; story: string | null;
   img: string | null;   // published full PNG URL, founder hex (#...), or null
   thumb: string | null; // small PNG URL for the wall composite, if generated
+  uuid?: string | null; // tile id, needed for voting
+  votes?: number;       // upvote count
+  voted?: boolean;      // signed-in viewer has voted for it
 };
 
 const TAKEN = ["claimed", "pending", "published"];
 const pad = (n: number) => String(n).padStart(2, "0");
 
-export function createRealWall(GRID: number, tiles: RealTileInput[], myIdx: number, onProgress: () => void, myArt?: string | null): Wall {
+export function createRealWall(GRID: number, tiles: RealTileInput[], myIdx: number, onProgress: () => void, myArt?: string | null, topIdx = -1): Wall {
   // Adaptive composite resolution: small screens get 64px/tile (24×24 → 1536²,
   // ~9MB), larger screens 128px/tile. Detail views always load the full PNG.
   const small = typeof window !== "undefined" && Math.min(window.innerWidth, window.innerHeight) < 700;
@@ -37,20 +40,33 @@ export function createRealWall(GRID: number, tiles: RealTileInput[], myIdx: numb
   const g = hi.getContext("2d")!; g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
   g.fillStyle = BG; g.fillRect(0, 0, HI, HI);
 
-  const drawTo = (im: HTMLImageElement, X: number, Y: number) => {
+  const HONEY = "#e0a23a";
+  const crown = (idx: number) => {
+    // golden frame + star on the most loved tile — the wall itself announces the leader
+    if (idx !== topIdx) return;
+    const X = (idx % GRID) * TILE_PX, Y = ((idx / GRID) | 0) * TILE_PX;
+    g.save();
+    g.strokeStyle = HONEY; g.lineWidth = Math.max(2.5, TILE_PX * 0.045);
+    const inset = g.lineWidth / 2; g.strokeRect(X + inset, Y + inset, TILE_PX - inset * 2, TILE_PX - inset * 2);
+    g.fillStyle = HONEY; g.font = `${Math.round(TILE_PX * 0.26)}px serif`; g.textBaseline = "top";
+    g.fillText("✦", X + TILE_PX * 0.06, Y + TILE_PX * 0.03);
+    g.restore();
+  };
+  const drawTo = (im: HTMLImageElement, X: number, Y: number, idx: number) => {
     g.fillStyle = PAPER; g.fillRect(X, Y, TILE_PX, TILE_PX);
     g.drawImage(im, X, Y, TILE_PX, TILE_PX);
+    crown(idx);
     onProgress();
   };
   const paintCell = (idx: number) => {
     const t = byIdx.get(idx); if (!t || t.status !== "published" || !t.img) return;
     const X = (idx % GRID) * TILE_PX, Y = ((idx / GRID) | 0) * TILE_PX;
-    if (t.img.startsWith("#")) { g.fillStyle = t.img; g.fillRect(X, Y, TILE_PX, TILE_PX); return; }
+    if (t.img.startsWith("#")) { g.fillStyle = t.img; g.fillRect(X, Y, TILE_PX, TILE_PX); crown(idx); return; }
     // thumb first; if it 404s (older tiles), retry with the full PNG; if that
     // fails too, paint paper so the tile never stays a black hole.
     const tryLoad = (url: string, fallback: string | null) => {
       const im = new Image();
-      im.onload = () => drawTo(im, X, Y);
+      im.onload = () => drawTo(im, X, Y, idx);
       im.onerror = () => {
         if (fallback) tryLoad(fallback, null);
         else { g.fillStyle = PAPER; g.fillRect(X, Y, TILE_PX, TILE_PX); onProgress(); }
@@ -87,7 +103,7 @@ export function createRealWall(GRID: number, tiles: RealTileInput[], myIdx: numb
     const x = idx % GRID, y = (idx / GRID) | 0; const t = byIdx.get(idx);
     const claimed = !!t && TAKEN.includes(t.status);
     const info: TileInfo = { idx, x, y, claimed, id: "R" + pad(y + 1) + "·C" + pad(x + 1), num: idx + 1, mine: idx === myIdx };
-    if (t && t.status === "published") { info.handle = t.name || "someone"; if (t.story) info.note = t.story; info.stage = "on the wall"; }
+    if (t && t.status === "published") { info.handle = t.name || "someone"; if (t.story) info.note = t.story; info.stage = idx === topIdx ? "most loved on the wall ✦" : "on the wall"; info.uuid = t.uuid ?? undefined; info.votes = t.votes ?? 0; info.voted = !!t.voted; }
     else if (info.mine) { info.claimed = true; info.handle = "you"; info.stage = t?.status === "pending" ? "in review" : "not submitted yet"; }
     else if (claimed) { info.handle = "—"; info.stage = "being painted"; }
     return info;

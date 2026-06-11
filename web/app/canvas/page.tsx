@@ -12,7 +12,7 @@ const SUPA = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const artUrl = (p: string | null) => (p && !p.startsWith("#") ? `${SUPA}/storage/v1/object/public/tiles/${p}` : null);
 
 type Row = {
-  x: number; y: number; status: string; artist_name: string | null; artist_location: string | null;
+  id: string; x: number; y: number; status: string; artist_name: string | null; artist_location: string | null;
   story: string | null; image_path: string | null; thumb_path: string | null;
 };
 
@@ -44,10 +44,22 @@ export default async function CanvasPage({ searchParams }: { searchParams: Promi
       // Parallel: the tile list + the signed-in person's tile.
       const [tilesRes, mt] = await Promise.all([
         db.from("public_tiles")
-          .select("x, y, status, artist_name, artist_location, story, image_path, thumb_path")
+          .select("id, x, y, status, artist_name, artist_location, story, image_path, thumb_path")
           .eq("canvas_id", canvas.id),
         email ? findMyTile(supabaseAdmin(), canvas.id, email) : Promise.resolve(null),
       ]);
+
+      // upvotes: aggregate counts + the viewer's own votes (server-only reads; emails stay private)
+      const voteCount = new Map<string, number>();
+      const myVotes = new Set<string>();
+      try {
+        const [allVotes, mine] = await Promise.all([
+          supabaseAdmin().from("tile_votes").select("tile_id"),
+          email ? supabaseAdmin().from("tile_votes").select("tile_id").eq("voter_email", email.toLowerCase()) : Promise.resolve({ data: [] as { tile_id: string }[] }),
+        ]);
+        for (const v of allVotes.data ?? []) voteCount.set(v.tile_id, (voteCount.get(v.tile_id) ?? 0) + 1);
+        for (const v of mine.data ?? []) myVotes.add(v.tile_id);
+      } catch { /* migration 0007 not run yet */ }
 
       tiles = ((tilesRes.data as Row[]) ?? []).map((t) => {
         const isPub = t.status === "published";
@@ -55,7 +67,7 @@ export default async function CanvasPage({ searchParams }: { searchParams: Promi
         const img = isPub && ip ? (ip.startsWith("#") ? ip : `${SUPA}/storage/v1/object/public/tiles/${ip}`) : null;
         const thumb = isPub && t.thumb_path && !t.thumb_path.startsWith("#") ? `${SUPA}/storage/v1/object/public/tiles/${t.thumb_path}` : null;
         if (["claimed", "pending", "published"].includes(t.status)) claimed++;
-        return { x: t.x, y: t.y, status: t.status, name: isPub ? t.artist_name : null, loc: isPub ? t.artist_location : null, story: isPub ? t.story : null, img, thumb };
+        return { x: t.x, y: t.y, status: t.status, name: isPub ? t.artist_name : null, loc: isPub ? t.artist_location : null, story: isPub ? t.story : null, img, thumb, uuid: t.id, votes: voteCount.get(t.id) ?? 0, voted: myVotes.has(t.id) };
       });
       if (tilesRes.error) loadError = true;
 

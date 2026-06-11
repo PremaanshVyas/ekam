@@ -7,7 +7,7 @@ import Studio from "@/components/Studio";
 import { createRealWall, type RealTileInput } from "@/lib/realWall";
 import type { Wall, TileInfo } from "@/lib/demoWall";
 import { createSupabaseBrowser } from "@/lib/auth-browser";
-import { claimTileAt } from "@/app/canvas/actions";
+import { claimTileAt, toggleVote } from "@/app/canvas/actions";
 import { submitTile, saveDraft, reviewStatus, requestManualReview, type ReviewState } from "@/app/paint/actions";
 import { signOut, markNotificationsRead } from "@/app/actions";
 import SignInModal from "@/components/SignInModal";
@@ -51,7 +51,8 @@ function Tooltip({ hover }: { hover: { info: TileInfo; x: number; y: number } | 
   );
 }
 
-function Sidebar({ open, claimed, total }: { open: boolean; claimed: number; total: number }) {
+type Loved = { idx: number; name: string; votes: number; label: string };
+function Sidebar({ open, claimed, total, loved, onLoved }: { open: boolean; claimed: number; total: number; loved: Loved[]; onLoved: (idx: number) => void }) {
   const pct = total ? (claimed / total) * 100 : 0;
   return (
     <aside className={"side" + (open ? "" : " side--closed")} aria-hidden={!open}>
@@ -69,6 +70,23 @@ function Sidebar({ open, claimed, total }: { open: boolean; claimed: number; tot
             <li className="remain__row"><span className="dotsq dotsq--open" /><span className="remain__c">Open to claim</span><span className="remain__n">{Math.max(0, total - claimed)}</span></li>
           </ul>
         </div>
+        {loved.length > 0 && (
+          <div className="side__sec">
+            <div className="side__label">Most loved</div>
+            <ul className="remain">
+              {loved.map((l, i) => (
+                <li key={l.idx}>
+                  <button className="loved__row" onClick={() => onLoved(l.idx)}>
+                    <span className="loved__rank">{i === 0 ? "✦" : i + 1}</span>
+                    <span className="loved__name">{l.name}</span>
+                    <span className="loved__label">{l.label}</span>
+                    <span className="loved__count">♥ {l.votes}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className="side__sec">
           <div className="side__label">Take part</div>
           <ol className="howmini">
@@ -219,8 +237,29 @@ function ClaimFlow({ wall, info, version, accent, signedIn, userEmail, hasTile, 
   );
 }
 
-function TileDetail({ wall, info, version, myTile, onClose, onZoom, onEdit }: {
-  wall: Wall; info: TileInfo; version: number; myTile: MyTile | null;
+function VoteButton({ uuid, votes, voted, signedIn, onNeedSignIn }: { uuid: string; votes: number; voted: boolean; signedIn: boolean; onNeedSignIn: () => void }) {
+  const [v, setV] = useState(voted);
+  const [n, setN] = useState(votes);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { setV(voted); setN(votes); }, [uuid, voted, votes]);
+  const click = async () => {
+    if (!signedIn) { onNeedSignIn(); return; }
+    if (busy) return; setBusy(true);
+    const next = !v; setV(next); setN((c) => Math.max(0, c + (next ? 1 : -1))); // optimistic
+    const r = await toggleVote(uuid);
+    setBusy(false);
+    if (!r.ok) { setV(!next); setN((c) => Math.max(0, c + (next ? -1 : 1))); if (r.error === "auth") onNeedSignIn(); }
+    else { setV(!!r.voted); setN(r.count ?? 0); }
+  };
+  return (
+    <button className={"votebtn" + (v ? " votebtn--on" : "")} onClick={click} disabled={busy} aria-pressed={v}>
+      <span className="votebtn__h" aria-hidden>♥</span> {v ? "Loved" : "Love this tile"}{n > 0 ? ` · ${n}` : ""}
+    </button>
+  );
+}
+
+function TileDetail({ wall, info, version, myTile, signedIn, onNeedSignIn, onClose, onZoom, onEdit }: {
+  wall: Wall; info: TileInfo; version: number; myTile: MyTile | null; signedIn: boolean; onNeedSignIn: () => void;
   onClose: () => void; onZoom: () => void; onEdit: () => void;
 }) {
   const mineArt = info.mine ? (myTile?.draftUrl ?? myTile?.artUrl ?? null) : null; // show latest autosaved draft, not the older submitted image
@@ -237,6 +276,8 @@ function TileDetail({ wall, info, version, myTile, onClose, onZoom, onEdit }: {
       {info.mine
         ? <button className="btn btn--primary btn--block" style={{ marginTop: 0 }} onClick={onEdit}>{myTile?.status === "claimed" ? "Paint your tile" : "Edit your tile"}</button>
         : <button className="btn btn--ghost btn--block" style={{ marginTop: 0 }} onClick={onZoom}>Zoom to this tile</button>}
+      {!info.mine && info.uuid && <VoteButton uuid={info.uuid} votes={info.votes ?? 0} voted={!!info.voted} signedIn={signedIn} onNeedSignIn={onNeedSignIn} />}
+      {info.mine && (info.votes ?? 0) > 0 && <p className="vote__mine">♥ {info.votes} {info.votes === 1 ? "person loves" : "people love"} your tile</p>}
       {info.mine && myTile?.status === "published" && myTile.artUrl && (
         <ShareTile url={`https://ekam.ink/t/${myTile.id}`} imageUrl={myTile.artUrl} title="my tile on ekam.ink · what home looks like" />
       )}
@@ -295,10 +336,17 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
   const accent = "#e8643c";
 
   const myArt = myTile && myTile.status !== "published" ? (myTile.artUrl ?? myTile.draftUrl) : null;
+  // most loved tiles (published, at least one vote), for the crown + the sidebar list
+  const loved = tiles
+    .filter((t) => t.status === "published" && (t.votes ?? 0) > 0)
+    .sort((a, b) => (b.votes ?? 0) - (a.votes ?? 0))
+    .slice(0, 3)
+    .map((t) => ({ idx: t.y * cols + t.x, name: t.name ?? "someone", votes: t.votes ?? 0, label: "R" + String(t.y + 1).padStart(2, "0") + "·C" + String(t.x + 1).padStart(2, "0") }));
+  const topIdx = loved.length ? loved[0].idx : -1;
   useEffect(() => {
-    const w = createRealWall(cols, tiles, myIdx, () => setVer((v) => v + 1), myArt);
+    const w = createRealWall(cols, tiles, myIdx, () => setVer((v) => v + 1), myArt, topIdx);
     setWall(w); setVer((v) => v + 1);
-  }, [cols, tiles, myIdx, myArt]);
+  }, [cols, tiles, myIdx, myArt, topIdx]);
 
   // live wall: server actions broadcast on the "wall" channel whenever a tile changes;
   // refresh (debounced) so new paintings + counters land without anyone touching reload
@@ -473,7 +521,7 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
       )}
 
       {!desktop && sideOpen && <div className="side__backdrop" onClick={() => setSideOpen(false)} />}
-      <Sidebar open={sideOpen} claimed={claimed} total={total} />
+      <Sidebar open={sideOpen} claimed={claimed} total={total} loved={loved} onLoved={(idx) => { if (!wall) return; setSelected(wall.infoFor(idx)); setPanel("detail"); setHover(null); if (!desktop) setSideOpen(false); setTimeout(() => api.current?.zoomToTile(idx, 96), 60); }} />
       <button
         className={"side-fab" + (sideOpen ? " side-fab--open" : "")}
         aria-label={sideOpen ? "Hide canvas info" : "Show canvas info"}
@@ -487,7 +535,7 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
       {panel && panel !== "studio" && selected && (
         <div className="panelwrap">
           <div className="panel__grab" aria-hidden />
-          {panel === "detail" && <TileDetail wall={wall} info={selected} version={ver} myTile={myTile} onClose={closeAll} onZoom={() => api.current?.zoomToTile(selected.idx, 96)} onEdit={openStudioForEdit} />}
+          {panel === "detail" && <TileDetail wall={wall} info={selected} version={ver} myTile={myTile} signedIn={!!email} onNeedSignIn={() => setSignInOpen(true)} onClose={closeAll} onZoom={() => api.current?.zoomToTile(selected.idx, 96)} onEdit={openStudioForEdit} />}
           {panel === "claim" && <ClaimFlow wall={wall} info={selected} version={ver} accent={accent} signedIn={!!email} userEmail={email} hasTile={!!myTile} myLabel={myLabel} onClose={closeAll} onClaimed={openStudioForClaim} onZoomMine={openMine} />}
           {panel === "reviewing" && (
             <div className="panel panel--done">

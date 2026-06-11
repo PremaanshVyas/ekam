@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { supabaseAnon } from "@/lib/supabase";
+import { supabaseAnon, supabaseAdmin } from "@/lib/supabase";
 import ShareTile from "@/components/ShareTile";
 import Logo from "@/components/Logo";
 
@@ -37,6 +37,18 @@ export default async function TilePage({ params }: { params: Promise<{ id: strin
   const t = await getTile(id);
   if (!t) notFound();
   const live = t.status === "published";
+  // upvotes: this tile's count + whether it currently leads the wall (server-only reads)
+  let votes = 0, mostLoved = false;
+  if (live) {
+    try {
+      const { data: all } = await supabaseAdmin().from("tile_votes").select("tile_id");
+      const tally = new Map<string, number>();
+      for (const v of all ?? []) tally.set(v.tile_id, (tally.get(v.tile_id) ?? 0) + 1);
+      votes = tally.get(id) ?? 0;
+      const top = [...tally.entries()].sort((a, b) => b[1] - a[1])[0];
+      mostLoved = !!top && top[0] === id && votes > 0;
+    } catch { /* migration 0007 not run yet */ }
+  }
   const img = live ? artUrl(t.image_path) : null;
   const hex = live && t.image_path && t.image_path.startsWith("#") ? t.image_path : null;
   const label = "R" + String(t.y + 1).padStart(2, "0") + " · C" + String(t.x + 1).padStart(2, "0");
@@ -46,6 +58,7 @@ export default async function TilePage({ params }: { params: Promise<{ id: strin
       <div className="sharepage__home"><Logo sm /></div>
       <div className="sharepage__card">
         <div className="sharepage__eyebrow">Canvas Nº 001 · what home looks like</div>
+        {mostLoved && <div className="sharepage__laurel">✦ Most loved on the wall</div>}
         {img ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={img} alt={t.story || "a painted tile"} className="sharepage__art" />
@@ -56,7 +69,7 @@ export default async function TilePage({ params }: { params: Promise<{ id: strin
         )}
         <div className="sharepage__meta">
           <div className="sharepage__by">{live && t.artist_name ? t.artist_name : "someone"}{live && t.artist_location ? <span className="sharepage__loc"> · {t.artist_location}</span> : null}</div>
-          <div className="sharepage__id">{label}</div>
+          <div className="sharepage__id">{label}{votes > 0 ? ` · ♥ ${votes}` : ""}</div>
         </div>
         {live && t.story && <blockquote className="sharepage__story">“{t.story}”</blockquote>}
         {(img || hex) && <ShareTile url={`${SITE}/t/${id}`} imageUrl={img || ""} title={live && t.artist_name ? `${t.artist_name}’s tile on ekam.ink · what home looks like` : "A tile on ekam.ink · what home looks like"} />}
