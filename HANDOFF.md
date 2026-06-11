@@ -49,7 +49,7 @@ daily build-in-public posts.**
 - **Supabase**: Postgres + Storage (tile PNGs + the audio files are in `public/`, not Storage) + Auth (magic-code OTP).
 - **Vercel**: auto-deploys from GitHub `main`. Custom domain ekam.ink.
 - **Resend**: transactional email (magic codes) via custom SMTP in Supabase Auth; sender `hello@ekam.ink`.
-- **Figma** design system + screens (fileKey `7TpgTn27dDmmig7T5hzhs3`) built via the Figma MCP.
+- **Figma** deliverable file (fileKey `WG9t3xscFniQ7VVHAs2zAF`, https://www.figma.com/design/WG9t3xscFniQ7VVHAs2zAF) — warm-dark system faithful to prod, built 2026-06-12 via the Figma MCP: 14 pages (Cover, Foundations with variables/type/grid spec, 5 component pages with gapped layouts + variants, 5 screens, OG/social, workflow). Ledger: `.figma-ds-state.json`. Old cream file `7TpgTn27dDmmig7T5hzhs3` is legacy/archive.
 
 ## 4. Key files (in `web/`)
 - `app/page.tsx` — homepage: SiteHeader + editorial hero + Live counter + `<Explorer>` + footer. Server component, `force-dynamic`, reads auth + tiles.
