@@ -1,5 +1,5 @@
 -- ekam.ink — Supabase schema
--- Source of truth: CLAUDE_MASTER_BRIEF.md §5. Run in the Supabase SQL editor
+-- Run in the Supabase SQL editor
 -- after creating the project (action item #6). Free tier is sufficient
 -- (≤576 tiles × 512px PNGs).
 
@@ -44,7 +44,7 @@ create table moderation_log (
   created_at timestamptz default now()
 );
 
--- ── RLS posture (CLAUDE_MASTER_BRIEF.md §5) ────────────────────────────────
+-- ── RLS posture ─────────────────────────────────────────────────────────────
 -- Public SELECT on published tiles + open-tile coordinates only.
 -- Claims/submissions go through edge functions (service role).
 -- /admin gated to a single allow-listed email (Mickey).
