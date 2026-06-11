@@ -5,6 +5,7 @@ export const CLAIM_WINDOW_MS = 48 * 60 * 60 * 1000;
 
 // closes_at for the active canvas; null when unset or migration 0008 hasn't run.
 export async function canvasClosesAt(db: SupabaseClient = supabaseAdmin()): Promise<string | null> {
+  if (process.env.CLOSES_AT_TEST) return process.env.CLOSES_AT_TEST; // local probe only
   try {
     const { data, error } = await db.from("canvases").select("closes_at").eq("slug", CANVAS_SLUG).maybeSingle();
     if (error) return null;

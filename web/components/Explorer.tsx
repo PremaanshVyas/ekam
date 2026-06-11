@@ -70,7 +70,7 @@ function Sidebar({ open, claimed, total, loved, onLoved, closesAt, closed }: { o
             <div className="side__label">Deadline</div>
             {closed
               ? <p className="side__deadline">The canvas is closed ✦ the artwork is final.</p>
-              : <p className="side__deadline">Closes in <b><Countdown to={closesAt} /></b><span className="side__deadsub">{new Date(closesAt).toLocaleString("en-GB", { day: "numeric", month: "long", hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" })} IST</span></p>}
+              : <p className="side__deadline">Closes in <b><Countdown to={closesAt} /></b></p>}
           </div>
         )}
         <div className="side__sec">
