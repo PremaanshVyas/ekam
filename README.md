@@ -16,7 +16,6 @@ This is an entry for the Config Makeathon (Figma × Contra): *use Figma's suite 
 2. **Figma MCP** — the bridge. The production CSS variables and the Figma variables mirror each other 1:1, and the Figma file itself was *built programmatically through the MCP* by Claude Code — the same agent that wrote the app. Design and code never drifted because the same hands held both.
 3. **Claude Code → production** — Next.js 16 + Supabase on Vercel, shipped in small probe-verified increments (more on that below).
 4. **Claude API in the product** — not just as a build tool: every submitted tile is reviewed by a vision model in seconds (see *The AI moderator*).
-5. **Figma Weave** — film assets and social posters for the launch story.
 
 The canvas deadline is aligned to the makeathon's own submission cutoff, so the finale reveal happens live on the site during judging week.
 
@@ -117,8 +116,8 @@ Migrations live in `supabase/migrations/` (run in order in the Supabase SQL edit
 
 ---
 
-## License & credits
+## Rights & credits
 
-Code is [MIT](./LICENSE). Two carve-outs: the **tile artworks belong to the artists who painted them** (publishing here grants ekam.ink display rights, nothing more), and the lofi tracks in `web/public/audio/` are from **Pixabay** under [Pixabay's content license](https://pixabay.com/service/license-summary/), not MIT.
+© 2026 Premaansh Vyas. The source is public to read and evaluate; it is **not** licensed for reuse, redistribution, or derivative works without permission. The **tile artworks belong to the artists who painted them** (publishing on ekam.ink grants display rights, nothing more). The lofi tracks in `web/public/audio/` are **Pixabay** content under [Pixabay's content license](https://pixabay.com/service/license-summary/).
 
-Made by [Premaansh Vyas](https://github.com/PremaanshVyas) — premaanshvyas04@gmail.com · Type: Spectral, Inter, IBM Plex Mono · Built with Figma, the Figma MCP, Claude Code, and the Claude API. #ConfigMakeathon
+Made by [Premaansh Vyas](https://github.com/PremaanshVyas) — premaanshvyas04@gmail.com · Type: Spectral, Inter, IBM Plex Mono · Built with Figma, the Figma MCP, Claude Code, and the Claude API.

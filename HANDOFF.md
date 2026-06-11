@@ -118,7 +118,6 @@ daily build-in-public posts.**
 - **Resend:** domain ekam.ink verified; custom SMTP set in Supabase Auth; email templates use `{{ .Token }}` (code, not link). Free tier ≈ 100 emails/day — bump if a post goes viral.
 
 ## 10. What's left
-**Launch (human-led):** demo video, Figma Community publish, submission, social posts, recruiting painters.
 
 **Product (buildable):**
 - **Stitched-canvas high-res PNG export** (for the video + a permanent artifact) — designed/agreed, not built.
