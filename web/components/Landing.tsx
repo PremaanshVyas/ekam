@@ -5,7 +5,7 @@ import Countdown from "@/components/Countdown";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import MosaicCanvas from "@/components/MosaicCanvas";
-import { createDemoWall, type Wall } from "@/lib/demoWall";
+import { createDemoWall, drawTileArt, type Wall } from "@/lib/demoWall";
 import SignInModal from "@/components/SignInModal";
 import { signOut } from "@/app/actions";
 import Logo from "@/components/Logo";
@@ -51,9 +51,17 @@ function StaticShot({ wall, kind }: { wall: Wall | null; kind: "macro" | "mid" |
     cv.width = W * dpr; cv.height = H * dpr;
     const g = cv.getContext("2d"); if (!g) return; g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high"; g.fillStyle = wall.bg; g.fillRect(0, 0, W, H);
-    const t = wall.TILE_PX, s = Math.min(W, H);
+    const s = Math.min(W, H);
     if (kind === "macro") g.drawImage(wall.hi, 0, 0, wall.HI, wall.HI, (W - s) / 2, (H - s) / 2, s, s);
-    else { const n = kind === "mid" ? 9 : 2; const st = Math.floor((wall.GRID - n) / 2); g.drawImage(wall.hi, st * t, st * t, n * t, n * t, (W - s) / 2, (H - s) / 2, s, s); }
+    else {
+      // close ups redraw each doodle at native size — cropping the composite upscales and blurs
+      const n = kind === "mid" ? 9 : 2; const st = Math.floor((wall.GRID - n) / 2);
+      const cell = s / n, ox = (W - s) / 2, oy = (H - s) / 2;
+      for (let yy = 0; yy < n; yy++) for (let xx = 0; xx < n; xx++) {
+        const idx = (st + yy) * wall.GRID + (st + xx);
+        if (wall.isClaimed(idx)) drawTileArt(g, ox + xx * cell, oy + yy * cell, cell, idx);
+      }
+    }
   }, [wall, kind]);
   return <canvas ref={ref} className="shot__canvas" />;
 }
@@ -66,8 +74,9 @@ function TileThumb({ wall, idx }: { wall: Wall | null; idx: number }) {
     cv.width = W * dpr; cv.height = H * dpr;
     const g = cv.getContext("2d"); if (!g) return; g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
-    const t = wall.TILE_PX, x = idx % wall.GRID, y = (idx / wall.GRID) | 0;
-    g.fillStyle = wall.bg; g.fillRect(0, 0, W, H); g.drawImage(wall.hi, x * t, y * t, t, t, 0, 0, W, H);
+    // draw the doodle straight onto the card at its real pixel size — crisp on any screen
+    g.fillStyle = wall.bg; g.fillRect(0, 0, W, H);
+    drawTileArt(g, 0, 0, Math.min(W, H), idx);
   }, [wall, idx]);
   return <canvas ref={ref} className="tilethumb__canvas" />;
 }

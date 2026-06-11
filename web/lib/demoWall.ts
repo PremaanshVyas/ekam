@@ -316,7 +316,7 @@ function artSunsetWater(g: Ctx, r: Rng, X: number, Y: number, T: number, P: stri
   g.globalAlpha = 1;
 }
 
-function drawTileArt(g: Ctx, X: number, Y: number, T: number, seed: number) {
+export function drawTileArt(g: Ctx, X: number, Y: number, T: number, seed: number) {
   const r = mulberry32(((seed + 1) * 2654435761) >>> 0);
   const cx = X + T / 2 + (r() - 0.5) * T * 0.18, cy = Y + T / 2 + (r() - 0.5) * T * 0.18;
   g.save(); g.beginPath(); g.rect(X, Y, T, T); g.clip();
