@@ -26,7 +26,7 @@ export type RealTileInput = {
 const TAKEN = ["claimed", "pending", "published"];
 const pad = (n: number) => String(n).padStart(2, "0");
 
-export function createRealWall(GRID: number, tiles: RealTileInput[], myIdx: number, onProgress: () => void, myArt?: string | null, topIdx = -1): Wall {
+export function createRealWall(GRID: number, tiles: RealTileInput[], myIdx: number, onProgress: () => void, myArt?: string | null, topIdx = -1, paperBlanks = false): Wall {
   // Adaptive composite resolution: small screens get 64px/tile (24×24 → 1536²,
   // ~9MB), larger screens 128px/tile. Detail views always load the full PNG.
   const small = typeof window !== "undefined" && Math.min(window.innerWidth, window.innerHeight) < 700;
@@ -38,7 +38,8 @@ export function createRealWall(GRID: number, tiles: RealTileInput[], myIdx: numb
 
   const hi = document.createElement("canvas"); hi.width = HI; hi.height = HI;
   const g = hi.getContext("2d")!; g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
-  g.fillStyle = BG; g.fillRect(0, 0, HI, HI);
+  // at the finale the unpainted tiles read as paper, like the stitched artwork
+  g.fillStyle = paperBlanks ? PAPER : BG; g.fillRect(0, 0, HI, HI);
 
   const HONEY = "#e0a23a";
   const crown = (idx: number) => {

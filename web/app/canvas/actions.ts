@@ -4,10 +4,11 @@ import { supabaseAdmin, CANVAS_SLUG } from "@/lib/supabase";
 import { createSupabaseServer } from "@/lib/auth-server";
 import { broadcastWallChange } from "@/lib/broadcast";
 import { notify } from "@/lib/notify";
+import { canvasClosesAt, canvasClosed, claimWindowEnd } from "@/lib/deadline";
 
 export type ClaimResult =
   | { ok: true; tileId: string; x: number; y: number }
-  | { ok: false; error: "auth" | "nocanvas" | "have-tile" | "taken"; x?: number; y?: number };
+  | { ok: false; error: "auth" | "nocanvas" | "have-tile" | "taken" | "closed"; x?: number; y?: number };
 
 // Claim the SPECIFIC open tile the user clicked (idx → x,y), concurrency-safe.
 // One tile per verified email. Identity comes from the magic-code session.
@@ -20,6 +21,8 @@ export async function claimTileAt(idx: number): Promise<ClaimResult> {
   const db = supabaseAdmin();
   const { data: canvas } = await db.from("canvases").select("id, grid_cols, grid_rows").eq("slug", CANVAS_SLUG).maybeSingle();
   if (!canvas) return { ok: false, error: "nocanvas" };
+  const closesAt = await canvasClosesAt(db);
+  if (canvasClosed(closesAt) || process.env.FINALE_FORCE === "1") return { ok: false, error: "closed" };
   const cols = canvas.grid_cols ?? 24, gridRows = canvas.grid_rows ?? 24;
   if (!Number.isInteger(idx) || idx < 0 || idx >= cols * gridRows) return { ok: false, error: "taken" };
   const x = idx % cols, y = Math.floor(idx / cols);
@@ -31,14 +34,15 @@ export async function claimTileAt(idx: number): Promise<ClaimResult> {
   if (existing) return { ok: false, error: "have-tile", x: existing.x, y: existing.y };
 
   const name = user.email.split("@")[0];
-  // Concurrency-safe: only succeeds if the tile is still open.
-  const { data: rows } = await db
-    .from("tiles")
-    .update({ status: "claimed", artist_name: name, artist_email: email, claimed_at: new Date().toISOString() })
-    .eq("canvas_id", canvas.id).eq("x", x).eq("y", y).eq("status", "open")
-    .select("id");
+  // Concurrency-safe: only succeeds if the tile is still open. The 48h painting
+  // window starts now; falls back without the 0008 columns if the SQL hasn't run.
+  const base = { status: "claimed", artist_name: name, artist_email: email, claimed_at: new Date().toISOString() };
+  const claimQ = (payload: Record<string, unknown>) => db.from("tiles").update(payload)
+    .eq("canvas_id", canvas.id).eq("x", x).eq("y", y).eq("status", "open").select("id");
+  let { data: rows, error: claimErr } = await claimQ({ ...base, claim_expires_at: claimWindowEnd(closesAt), expiry_warned_at: null });
+  if (claimErr) ({ data: rows } = await claimQ(base));
   if (!rows || rows.length === 0) return { ok: false, error: "taken", x, y };
-  await notify(db, email, "claim", `Tile R${String(y + 1).padStart(2, "0")}·C${String(x + 1).padStart(2, "0")} is yours ✦`, "Paint what's in your mind and submit when you're ready.");
+  await notify(db, email, "claim", `Tile R${String(y + 1).padStart(2, "0")}·C${String(x + 1).padStart(2, "0")} is yours ✦`, "Paint what's in your mind and submit within 48 hours. If the window passes without a submission the tile reopens for someone else.");
   await broadcastWallChange();
   return { ok: true, tileId: rows[0].id, x, y };
 }

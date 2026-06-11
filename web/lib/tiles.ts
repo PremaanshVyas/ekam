@@ -5,7 +5,7 @@ export type MyTile = {
   image_path: string | null; story: string | null;
   pending_image_path: string | null; pending_story: string | null;
   draft_image_path: string | null; draft_story: string | null; draft_updated_at: string | null;
-  ai_verdict: string | null; ai_reason: string | null;
+  ai_verdict: string | null; ai_reason: string | null; claim_expires_at: string | null;
 };
 
 // Find the signed-in person's tile (by email). Tolerant of the pending_* (migration 0003)
@@ -17,8 +17,10 @@ export async function findMyTile(db: SupabaseClient, canvasId: string, email: st
     .eq("canvas_id", canvasId).eq("artist_email", e)
     .in("status", ["claimed", "pending", "published"]).limit(1).maybeSingle();
   const fill = (d: Record<string, unknown>): MyTile =>
-    ({ artist_name: null, pending_image_path: null, pending_story: null, draft_image_path: null, draft_story: null, draft_updated_at: null, ai_verdict: null, ai_reason: null, ...d } as MyTile);
+    ({ artist_name: null, pending_image_path: null, pending_story: null, draft_image_path: null, draft_story: null, draft_updated_at: null, ai_verdict: null, ai_reason: null, claim_expires_at: null, ...d } as MyTile);
 
+  const withClock = await q("id, x, y, status, artist_name, image_path, story, pending_image_path, pending_story, draft_image_path, draft_story, draft_updated_at, ai_verdict, ai_reason, claim_expires_at");
+  if (!withClock.error) return withClock.data ? fill(withClock.data as unknown as Record<string, unknown>) : null;
   const withAi = await q("id, x, y, status, artist_name, image_path, story, pending_image_path, pending_story, draft_image_path, draft_story, draft_updated_at, ai_verdict, ai_reason");
   if (!withAi.error) return withAi.data ? fill(withAi.data as unknown as Record<string, unknown>) : null;
   const full = await q("id, x, y, status, artist_name, image_path, story, pending_image_path, pending_story, draft_image_path, draft_story, draft_updated_at");

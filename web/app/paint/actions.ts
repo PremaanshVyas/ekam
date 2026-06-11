@@ -5,6 +5,7 @@ import { after } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createSupabaseServer } from "@/lib/auth-server";
 import { moderateTile } from "@/lib/moderate";
+import { canvasClosesAt, canvasClosed, claimWindowEnd } from "@/lib/deadline";
 
 export type SubmitMode = "new" | "edit-pending" | "edit-published";
 
@@ -34,10 +35,13 @@ async function ownTile(tileId: string) {
 
 export async function submitTile(
   tileId: string, dataUrl: string, thumbUrl: string | null, name: string, story: string,
-): Promise<{ ok: true; mode: SubmitMode }> {
+): Promise<{ ok: true; mode: SubmitMode } | { ok: false; error: "closed" }> {
   const owned = await ownTile(tileId);
   if (!owned) throw new Error("this isn't your tile");
   const { db, tile } = owned;
+
+  const closesAt = await canvasClosesAt(db);
+  if (canvasClosed(closesAt) || process.env.FINALE_FORCE === "1") return { ok: false, error: "closed" };
 
   const bytes = pngBytes(dataUrl, 5_000_000);
   if (!bytes) throw new Error("invalid image");
@@ -80,11 +84,17 @@ export async function submitTile(
   }
 
   // New tile, or edit of an un-approved one → goes (back) into the queue.
-  const { error } = await db.from("tiles").update({
+  // Submitting resets the 48h window: the tile stays yours while you keep trying,
+  // even if review returns it. Falls back without the 0008 columns.
+  const payload = {
     status: "pending", story: cleanStory, image_path: path,
     ...(thumbOk ? { thumb_path: thumbPath } : {}),
     ...(cleanName ? { artist_name: cleanName } : {}),
-  }).eq("id", tileId).in("status", ["claimed", "pending"]);
+  };
+  const submitQ = (extra: Record<string, unknown>) =>
+    db.from("tiles").update({ ...payload, ...extra }).eq("id", tileId).in("status", ["claimed", "pending"]);
+  let { error } = await submitQ({ claim_expires_at: claimWindowEnd(closesAt), expiry_warned_at: null });
+  if (error) ({ error } = await submitQ({}));
   if (error) throw new Error(error.message);
   await clearDraft(db, tileId);
   after(() => moderateTile(tileId)); // AI screen runs after the response is sent
@@ -92,7 +102,7 @@ export async function submitTile(
   return { ok: true, mode: tile.status === "claimed" ? "new" : "edit-pending" };
 }
 
-export type ReviewState = { state: "checking" | "live" | "returned" | "escalated" | "requested"; reason: string | null };
+export type ReviewState = { state: "checking" | "live" | "returned" | "escalated" | "requested" | "closed"; reason: string | null };
 
 // The artist's live view of their submission's review. Polled by the client after submit.
 export async function reviewStatus(tileId: string): Promise<ReviewState> {

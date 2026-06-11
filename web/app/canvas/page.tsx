@@ -1,8 +1,11 @@
+import { after } from "next/server";
 import Explorer from "@/components/Explorer";
 import { supabaseAnon, supabaseAdmin, CANVAS_SLUG } from "@/lib/supabase";
 import { createSupabaseServer } from "@/lib/auth-server";
 import { findMyTile } from "@/lib/tiles";
 import type { RealTileInput } from "@/lib/realWall";
+import { canvasClosesAt, canvasClosed } from "@/lib/deadline";
+import { sweepClaimWindows } from "@/lib/expiry";
 
 export const dynamic = "force-dynamic";
 // submit's server action runs through this route — give the post-response AI screen room
@@ -29,15 +32,18 @@ export default async function CanvasPage({ searchParams }: { searchParams: Promi
   let unread = 0;
   let published = 0;
   let finaleFrom: string | null = null, finaleTo: string | null = null;
+  let closesAt: string | null = null;
 
   try {
     const auth = await createSupabaseServer();
     const db = supabaseAnon();
     // Parallel: session + canvas row (independent round trips).
-    const [{ data: { user } }, { data: canvas }] = await Promise.all([
+    const [{ data: { user } }, { data: canvas }, closes] = await Promise.all([
       auth.auth.getUser(),
       db.from("canvases").select("id, grid_cols, grid_rows").eq("slug", CANVAS_SLUG).maybeSingle(),
+      canvasClosesAt(db),
     ]);
+    closesAt = closes;
     email = user?.email ?? null;
     cols = canvas?.grid_cols ?? 24;
     rows = canvas?.grid_rows ?? 24;
@@ -93,7 +99,7 @@ export default async function CanvasPage({ searchParams }: { searchParams: Promi
       if (mt) {
         // cache-bust the draft URL with its updated_at so a new device always pulls the latest
         const draftUrl = mt.draft_image_path ? `${artUrl(mt.draft_image_path)}?v=${encodeURIComponent(mt.draft_updated_at ?? "")}` : null;
-        myTile = { id: mt.id, idx: mt.y * cols + mt.x, status: mt.status, name: mt.artist_name, artUrl: artUrl(mt.pending_image_path || mt.image_path), story: mt.pending_story || mt.story, draftUrl, draftStory: mt.draft_story ?? null, aiVerdict: mt.ai_verdict, aiReason: mt.ai_reason };
+        myTile = { id: mt.id, idx: mt.y * cols + mt.x, status: mt.status, name: mt.artist_name, artUrl: artUrl(mt.pending_image_path || mt.image_path), story: mt.pending_story || mt.story, draftUrl, draftStory: mt.draft_story ?? null, aiVerdict: mt.ai_verdict, aiReason: mt.ai_reason, expiresAt: mt.claim_expires_at };
       }
     } else {
       loadError = true;
@@ -104,7 +110,11 @@ export default async function CanvasPage({ searchParams }: { searchParams: Promi
     loadError = true;
   }
 
-    // FINALE_FORCE is a local-only test knob (never set in prod): forces the reveal at partial fill
-  const complete = published >= cols * rows || process.env.FINALE_FORCE === "1";
-  return <Explorer cols={cols} total={cols * rows} tiles={tiles} claimed={claimed} email={email} myTile={myTile} autoOpenMine={autoOpenMine} loadError={loadError} notifs={notifs} unread={unread} complete={complete} published={published} finaleFrom={finaleFrom} finaleTo={finaleTo} />;
+  // enforce the 48h windows opportunistically after the response (cron is the daily backstop)
+  after(() => { sweepClaimWindows().catch(() => { /* best effort */ }); });
+
+  // FINALE_FORCE is a local-only test knob (never set in prod): simulates deadline day
+  const deadlinePassed = canvasClosed(closesAt) || process.env.FINALE_FORCE === "1";
+  const complete = published >= cols * rows || deadlinePassed;
+  return <Explorer cols={cols} total={cols * rows} tiles={tiles} claimed={claimed} email={email} myTile={myTile} autoOpenMine={autoOpenMine} loadError={loadError} notifs={notifs} unread={unread} complete={complete} published={published} finaleFrom={finaleFrom} finaleTo={finaleTo} closesAt={closesAt} deadlinePassed={deadlinePassed} />;
 }

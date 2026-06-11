@@ -1,5 +1,7 @@
 "use client";
 
+import Countdown from "@/components/Countdown";
+
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import MosaicCanvas from "@/components/MosaicCanvas";
@@ -84,7 +86,7 @@ const RULES = [
   { t: "It stays", d: "Once it's approved, your tile is part of the canvas, preserved when the wall completes." },
 ];
 
-export default function Landing({ total, claimed, published, email, myTile }: { total: number; claimed: number; published: number; email: string | null; myTile: { label: string } | null }) {
+export default function Landing({ total, claimed, published, email, myTile, closesAt = null }: { total: number; claimed: number; published: number; email: string | null; myTile: { label: string } | null; closesAt?: string | null }) {
   const [wall, setWall] = useState<Wall | null>(null);
   const [solid, setSolid] = useState(false);
   const [ver, setVer] = useState(0);
@@ -148,6 +150,13 @@ export default function Landing({ total, claimed, published, email, myTile }: { 
             <Link className="btn btn--primary btn--lg" href="/canvas">Claim your tile</Link>
             <a className="btn btn--ghost btn--lg" href="#how">See how it works</a>
           </div>
+          {closesAt && (
+            <p className="hero__deadline" suppressHydrationWarning>
+              {Date.parse(closesAt) > Date.now()
+                ? <>Canvas Nº 001 closes in <b><Countdown to={closesAt} /></b> ✦ claim while tiles last</>
+                : <>The canvas is closed ✦ the artwork is live on the wall</>}
+            </p>
+          )}
           <div className="hero__ticker"><LiveCounter claimed={claimed} total={total} /></div>
           <p className="hero__demo">✦ <b>The wall above is a demo preview</b>, a sense of what the canvas becomes. The live wall is just getting started; <Link href="/canvas" style={{ color: "var(--accent)" }}>open the canvas</Link> to claim a real tile.</p>
         </div>

@@ -14,8 +14,9 @@ import { signOut, markNotificationsRead } from "@/app/actions";
 import SignInModal from "@/components/SignInModal";
 import ShareTile from "@/components/ShareTile";
 import Logo from "@/components/Logo";
+import Countdown from "@/components/Countdown";
 
-type MyTile = { id: string; idx: number; status: string; name: string | null; artUrl: string | null; story: string | null; draftUrl: string | null; draftStory: string | null; aiVerdict: string | null; aiReason: string | null };
+type MyTile = { id: string; idx: number; status: string; name: string | null; artUrl: string | null; story: string | null; draftUrl: string | null; draftStory: string | null; aiVerdict: string | null; aiReason: string | null; expiresAt?: string | null };
 type Panel = "detail" | "claim" | "studio" | "reviewing" | null;
 type Notif = { id: string; kind: string; title: string; body: string | null; created_at: string; read_at: string | null };
 type ViewMode = "claimed" | "all";
@@ -53,7 +54,7 @@ function Tooltip({ hover }: { hover: { info: TileInfo; x: number; y: number } | 
 }
 
 type Loved = { idx: number; name: string; votes: number; label: string };
-function Sidebar({ open, claimed, total, loved, onLoved }: { open: boolean; claimed: number; total: number; loved: Loved[]; onLoved: (idx: number) => void }) {
+function Sidebar({ open, claimed, total, loved, onLoved, closesAt, closed }: { open: boolean; claimed: number; total: number; loved: Loved[]; onLoved: (idx: number) => void; closesAt?: string | null; closed?: boolean }) {
   const pct = total ? (claimed / total) * 100 : 0;
   return (
     <aside className={"side" + (open ? "" : " side--closed")} aria-hidden={!open}>
@@ -64,6 +65,14 @@ function Sidebar({ open, claimed, total, loved, onLoved }: { open: boolean; clai
           <div className="side__bar"><div className="side__fill" style={{ width: pct + "%" }} /></div>
           <div className="side__nums"><span className="side__big">{pct.toFixed(0)}%</span><span className="side__small">{claimed} / {total} claimed</span></div>
         </div>
+        {closesAt && (
+          <div className="side__sec">
+            <div className="side__label">Deadline</div>
+            {closed
+              ? <p className="side__deadline">The canvas is closed ✦ the artwork is final.</p>
+              : <p className="side__deadline">Closes in <b><Countdown to={closesAt} /></b><span className="side__deadsub">{new Date(closesAt).toLocaleString("en-GB", { day: "numeric", month: "long", hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" })} IST</span></p>}
+          </div>
+        )}
         <div className="side__sec">
           <div className="side__label">The wall right now</div>
           <ul className="remain">
@@ -155,9 +164,9 @@ function OTPInput({ onComplete }: { onComplete: (code: string) => void }) {
   );
 }
 
-function ClaimFlow({ wall, info, version, accent, signedIn, userEmail, hasTile, myLabel, onClose, onClaimed, onZoomMine }: {
+function ClaimFlow({ wall, info, version, accent, signedIn, userEmail, hasTile, myLabel, onClose, onClaimed, onZoomMine, closed }: {
   wall: Wall; info: TileInfo; version: number; accent: string; signedIn: boolean; userEmail: string | null; hasTile: boolean; myLabel: string;
-  onClose: () => void; onClaimed: (tileId: string) => void; onZoomMine: () => void;
+  onClose: () => void; onClaimed: (tileId: string) => void; onZoomMine: () => void; closed?: boolean;
 }) {
   const [step, setStep] = useState<"confirm" | "email" | "code">(signedIn ? "confirm" : "email");
   const [email, setEmail] = useState("");
@@ -173,6 +182,7 @@ function ClaimFlow({ wall, info, version, accent, signedIn, userEmail, hasTile, 
     setBusy(false);
     if (res.error === "have-tile") setErr("You already have a tile. Edit that one instead.");
     else if (res.error === "taken") setErr("Someone just claimed this tile. Close this and pick another.");
+    else if (res.error === "closed") setErr("The canvas closed at the deadline. No new tiles can be claimed.");
     else setErr("Couldn't claim. Try again.");
   };
   const send = async () => {
@@ -195,7 +205,13 @@ function ClaimFlow({ wall, info, version, accent, signedIn, userEmail, hasTile, 
         <button className="panel__x" onClick={onClose} aria-label="Close">✕</button>
       </div>
 
-      {hasTile ? (
+      {closed ? (
+        <>
+          <h3 className="claim__t">The canvas is closed.</h3>
+          <p className="claim__d">Canvas Nº 001 reached its deadline and no new tiles can be claimed. The finished artwork is on the wall, go see what everyone made together.</p>
+          <div className="claim__art" style={{ marginTop: 14 }}><TileArt wall={wall} idx={info.idx} region={5} version={version} className="detail__nbcanvas" /></div>
+        </>
+      ) : hasTile ? (
         <>
           <h3 className="claim__t">You already have a tile.</h3>
           <p className="claim__d">One tile per person. Yours is at <b>{myLabel}</b>, head there to paint or edit it.</p>
@@ -208,7 +224,7 @@ function ClaimFlow({ wall, info, version, accent, signedIn, userEmail, hasTile, 
           <p className="claim__d">Claim {info.id} as <b>{userEmail}</b>. It&apos;s yours to paint.</p>
           {err && <p className="claim__err">{err}</p>}
           <button className={"btn btn--primary btn--block" + (busy ? " btn--loading" : "")} disabled={busy} onClick={doClaim}>{busy ? "Claiming…" : "Claim this tile"}</button>
-          <p className="claim__fine">One tile per person.</p>
+          <p className="claim__fine">One tile per person. You&apos;ll have 48 hours to paint and submit it.</p>
           <div className="claim__art" style={{ marginTop: 14 }}><TileArt wall={wall} idx={info.idx} region={5} version={version} className="detail__nbcanvas" /></div>
         </>
       ) : step === "email" ? (
@@ -259,9 +275,9 @@ function VoteButton({ uuid, votes, voted, signedIn, onNeedSignIn }: { uuid: stri
   );
 }
 
-function TileDetail({ wall, info, version, myTile, signedIn, onNeedSignIn, onClose, onZoom, onEdit }: {
+function TileDetail({ wall, info, version, myTile, signedIn, onNeedSignIn, onClose, onZoom, onEdit, closed }: {
   wall: Wall; info: TileInfo; version: number; myTile: MyTile | null; signedIn: boolean; onNeedSignIn: () => void;
-  onClose: () => void; onZoom: () => void; onEdit: () => void;
+  onClose: () => void; onZoom: () => void; onEdit: () => void; closed?: boolean;
 }) {
   const mineArt = info.mine ? (myTile?.draftUrl ?? myTile?.artUrl ?? null) : null; // show latest autosaved draft, not the older submitted image
   const published = info.handle && info.handle !== "—" && info.handle !== "you";
@@ -275,8 +291,13 @@ function TileDetail({ wall, info, version, myTile, signedIn, onNeedSignIn, onClo
       <div className="detail__id">{info.id}<span className="detail__num">№ {info.num} of {wall.N_TOTAL}</span></div>
       {/* primary action first — never below the scroll fold */}
       {info.mine
-        ? <button className="btn btn--primary btn--block" style={{ marginTop: 0 }} onClick={onEdit}>{myTile?.status === "claimed" ? "Paint your tile" : "Edit your tile"}</button>
+        ? (closed
+          ? <p className="detail__sharehint" style={{ marginTop: 0 }}>The canvas is closed. Your tile stays exactly as it is on the artwork.</p>
+          : <button className="btn btn--primary btn--block" style={{ marginTop: 0 }} onClick={onEdit}>{myTile?.status === "claimed" ? "Paint your tile" : "Edit your tile"}</button>)
         : <button className="btn btn--ghost btn--block" style={{ marginTop: 0 }} onClick={onZoom}>Zoom to this tile</button>}
+      {info.mine && !closed && myTile?.status === "claimed" && myTile?.expiresAt && (
+        <p className="detail__clock"><Countdown to={myTile.expiresAt} /> left to paint and submit · then the tile reopens</p>
+      )}
       {!info.mine && info.uuid && <VoteButton uuid={info.uuid} votes={info.votes ?? 0} voted={!!info.voted} signedIn={signedIn} onNeedSignIn={onNeedSignIn} />}
       {info.mine && (info.votes ?? 0) > 0 && <p className="vote__mine">♥ {info.votes} {info.votes === 1 ? "person loves" : "people love"} your tile</p>}
       {info.mine && myTile?.status === "published" && myTile.artUrl && (
@@ -340,9 +361,9 @@ function ConfettiSky({ n, once = false }: { n: number; once?: boolean }) {
   );
 }
 
-export default function Explorer({ cols, total, tiles, claimed, email, myTile, autoOpenMine, loadError, notifs = [], unread = 0, complete = false, published = 0, finaleFrom = null, finaleTo = null }: {
+export default function Explorer({ cols, total, tiles, claimed, email, myTile, autoOpenMine, loadError, notifs = [], unread = 0, complete = false, published = 0, finaleFrom = null, finaleTo = null, closesAt = null, deadlinePassed = false }: {
   cols: number; total: number; tiles: RealTileInput[]; claimed: number; email: string | null; myTile: MyTile | null; autoOpenMine?: boolean; loadError?: boolean; notifs?: Notif[]; unread?: number;
-  complete?: boolean; published?: number; finaleFrom?: string | null; finaleTo?: string | null;
+  complete?: boolean; published?: number; finaleFrom?: string | null; finaleTo?: string | null; closesAt?: string | null; deadlinePassed?: boolean;
 }) {
   const router = useRouter();
   const api = useRef<MosaicApi | null>(null);
@@ -383,9 +404,9 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
     .map((t) => ({ idx: t.y * cols + t.x, name: t.name ?? "someone", votes: t.votes ?? 0, label: "R" + String(t.y + 1).padStart(2, "0") + "·C" + String(t.x + 1).padStart(2, "0") }));
   const topIdx = loved.length ? loved[0].idx : -1;
   useEffect(() => {
-    const w = createRealWall(cols, tiles, myIdx, () => setVer((v) => v + 1), myArt, topIdx);
+    const w = createRealWall(cols, tiles, myIdx, () => setVer((v) => v + 1), myArt, topIdx, complete);
     setWall(w); setVer((v) => v + 1);
-  }, [cols, tiles, myIdx, myArt, topIdx]);
+  }, [cols, tiles, myIdx, myArt, topIdx, complete]);
 
   // live wall: server actions broadcast on the "wall" channel whenever a tile changes;
   // refresh (debounced) so new paintings + counters land without anyone touching reload
@@ -454,7 +475,8 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
   const openStudioForEdit = () => { if (!myTile || !wall) return; const label = wall.infoFor(myTile.idx).id; const def = email ? email.split("@")[0] : ""; studioTarget.current = { tileId: myTile.id, idx: myTile.idx, label, artUrl: myTile.draftUrl ?? myTile.artUrl, note: myTile.draftStory ?? myTile.story ?? "", name: myTile.name && myTile.name !== def ? myTile.name : "" }; setPanel("studio"); };
   const onStudioSubmit = async (dataUrl: string, thumbUrl: string | null, name: string, note: string) => {
     const t = studioTarget.current; if (!t) return;
-    await submitTile(t.tileId, dataUrl, thumbUrl, name, note);
+    const r = await submitTile(t.tileId, dataUrl, thumbUrl, name, note);
+    if (!r.ok) { setReview({ state: "closed", reason: null }); setPanel("reviewing"); router.refresh(); return; }
     setLastArt(dataUrl); setReview({ state: "checking", reason: null }); setPanel("reviewing"); router.refresh();
   };
   // watch the AI review land in real time after a submit
@@ -598,7 +620,7 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
       )}
 
       {!artMode && !desktop && sideOpen && <div className="side__backdrop" onClick={() => setSideOpen(false)} />}
-      {!artMode && <Sidebar open={sideOpen} claimed={claimed} total={total} loved={loved} onLoved={(idx) => { if (!wall) return; setSelected(wall.infoFor(idx)); setPanel("detail"); setHover(null); if (!desktop) setSideOpen(false); setTimeout(() => api.current?.zoomToTile(idx, 96), 60); }} />}
+      {!artMode && <Sidebar open={sideOpen} claimed={claimed} total={total} loved={loved} closesAt={closesAt} closed={deadlinePassed} onLoved={(idx) => { if (!wall) return; setSelected(wall.infoFor(idx)); setPanel("detail"); setHover(null); if (!desktop) setSideOpen(false); setTimeout(() => api.current?.zoomToTile(idx, 96), 60); }} />}
       {!artMode && <button
         className={"side-fab" + (sideOpen ? " side-fab--open" : "")}
         aria-label={sideOpen ? "Hide canvas info" : "Show canvas info"}
@@ -612,14 +634,14 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
       {panel && panel !== "studio" && selected && (
         <div className="panelwrap">
           <div className="panel__grab" aria-hidden />
-          {panel === "detail" && <TileDetail wall={wall} info={selected} version={ver} myTile={myTile} signedIn={!!email} onNeedSignIn={() => setSignInOpen(true)} onClose={closeAll} onZoom={() => api.current?.zoomToTile(selected.idx, 96)} onEdit={openStudioForEdit} />}
-          {panel === "claim" && <ClaimFlow wall={wall} info={selected} version={ver} accent={accent} signedIn={!!email} userEmail={email} hasTile={!!myTile} myLabel={myLabel} onClose={closeAll} onClaimed={openStudioForClaim} onZoomMine={openMine} />}
+          {panel === "detail" && <TileDetail wall={wall} info={selected} version={ver} myTile={myTile} signedIn={!!email} onNeedSignIn={() => setSignInOpen(true)} onClose={closeAll} onZoom={() => api.current?.zoomToTile(selected.idx, 96)} onEdit={openStudioForEdit} closed={deadlinePassed} />}
+          {panel === "claim" && <ClaimFlow wall={wall} info={selected} version={ver} accent={accent} signedIn={!!email} userEmail={email} hasTile={!!myTile} myLabel={myLabel} onClose={closeAll} onClaimed={openStudioForClaim} onZoomMine={openMine} closed={deadlinePassed} />}
           {panel === "reviewing" && (
             <div className="panel panel--done">
               {review.state === "live" && <div className="confetti" aria-hidden>{Array.from({ length: CONFETTI_N }).map((_, i) => <i key={i} />)}</div>}
               <div className="panel__head">
                 <span className="panel__eyebrow"><span className="studio__dot" style={{ background: accent }} />
-                  {review.state === "checking" ? "Reviewing" : review.state === "live" ? "Live" : review.state === "returned" ? "Returned" : review.state === "requested" ? "With the moderator" : "In review"}
+                  {review.state === "checking" ? "Reviewing" : review.state === "live" ? "Live" : review.state === "returned" ? "Returned" : review.state === "requested" ? "With the moderator" : review.state === "closed" ? "Closed" : "In review"}
                 </span>
                 <button className="panel__x" onClick={() => { closeAll(); }} aria-label="Close">✕</button>
               </div>
@@ -649,6 +671,12 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
                   <h3 className="done__t">With the moderator.</h3>
                   <p className="done__d">A human will review your tile and you&apos;ll get the decision in your notifications here.</p>
                   <button className="btn btn--primary btn--block" onClick={() => { closeAll(); router.refresh(); }}>Back to the wall</button>
+                </>)}
+                {review.state === "closed" && (<>
+                  <div className="done__warn">✕</div>
+                  <h3 className="done__t">The canvas is closed.</h3>
+                  <p className="done__d">Canvas Nº 001 stopped accepting paintings at the deadline. Thank you for being part of it.</p>
+                  <button className="btn btn--primary btn--block" onClick={() => { closeAll(); router.refresh(); }}>See the artwork</button>
                 </>)}
                 {review.state === "escalated" && (<>
                   <div className="done__check done__check--pop" style={{ background: "transparent", border: "2px solid var(--accent)", color: "var(--accent)" }}>👁</div>

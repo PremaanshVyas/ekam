@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { reopenExpiredClaims } from "@/lib/expiry";
+import { sweepClaimWindows } from "@/lib/expiry";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +10,6 @@ export async function GET(req: Request) {
   if (secret && req.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  const reopened = await reopenExpiredClaims();
-  return NextResponse.json({ reopened });
+  const result = await sweepClaimWindows(true);
+  return NextResponse.json(result);
 }
