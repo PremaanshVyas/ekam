@@ -462,6 +462,29 @@ body[data-panel] .mp-root{display:none}
 @media(prefers-reduced-motion:reduce){.ex__nudge{animation:none}}
 @media(max-width:480px){.ex__nudge{font-size:11px;padding:10px 14px}}
 @media(max-width:899px){.ex__hint{display:none}.ex__edno{display:none}.authchip{display:none}}
+/* ---- topbar responsiveness: the signed-in cluster (live · bell · Your tile · Sign out)
+   must fit 320px-wide phones without anything sliding off screen ---- */
+@media(max-width:640px){
+  .ex__topbar{gap:8px;padding-left:10px;padding-right:10px}
+  .ex__topright{gap:8px;flex:1 1 auto;justify-content:flex-end}
+  .ex__topright .linkbtn{padding:8px 10px;font-size:13px;min-height:34px;border-radius:8px}
+  .bell{width:34px;height:34px;border-radius:8px}
+  .bell__dot{top:5px;right:6px}
+  .ex__edition{font-size:11.5px}
+  .ex__live{letter-spacing:.06em}
+}
+@media(max-width:460px){
+  /* signed in (bell present) the cluster is crowded: trade the LIVE chip for the
+     full wordmark — the bell + live wall already signal liveness. Signed out keeps LIVE. */
+  .ex__topright:has(.bell) .ex__edition{display:none}
+  .ex__topright{gap:6px}
+  .ex__topright .linkbtn{padding:7px 9px;font-size:12.5px}
+}
+@media(max-width:340px){
+  .ex__topbar .ekam-wordmark{display:none}
+  .ex__topbar .ekam-logo{gap:0}
+}
+
 
 /* =================== STUDIO =================== */
 .studio__stage{display:flex;flex-direction:column;align-items:center;margin-bottom:16px}
