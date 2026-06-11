@@ -239,16 +239,27 @@ export default function MusicPlayer() {
 
   const onDragStart = (e: React.PointerEvent) => {
     const el = cardRef.current; if (!el) return;
+    // a drag must never start a text selection sweep across the page underneath
+    e.preventDefault();
+    const prevSelect = document.body.style.userSelect;
+    document.body.style.userSelect = "none";
+    (document.body.style as unknown as Record<string, string>).webkitUserSelect = "none";
+    window.getSelection()?.removeAllRanges();
     const rect = el.getBoundingClientRect();
     const offX = e.clientX - rect.left, offY = e.clientY - rect.top;
     const move = (ev: PointerEvent) => {
+      ev.preventDefault();
       setPos({
         x: Math.max(8, Math.min(window.innerWidth - rect.width - 8, ev.clientX - offX)),
         y: Math.max(8, Math.min(window.innerHeight - rect.height - 8, ev.clientY - offY)),
       });
     };
-    const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
-    window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
+    const up = () => {
+      document.body.style.userSelect = prevSelect;
+      (document.body.style as unknown as Record<string, string>).webkitUserSelect = prevSelect;
+      window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); window.removeEventListener("pointercancel", up);
+    };
+    window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); window.addEventListener("pointercancel", up);
   };
 
   const place: React.CSSProperties = pos ? { left: pos.x, top: pos.y } : { right: 14, bottom: "calc(14px + env(safe-area-inset-bottom))" };
@@ -272,7 +283,7 @@ export default function MusicPlayer() {
 
       {open ? (
         <div ref={cardRef} style={{ position: "fixed", ...place, zIndex: 27, width: "min(272px, calc(100vw - 20px))", background: "var(--color-bg-elevated)", border: "1px solid var(--color-border-default)", borderRadius: 12, boxShadow: "0 14px 38px rgba(0,0,0,.35)", fontFamily: "var(--font-ui), sans-serif", overflow: "hidden" }}>
-          <div onPointerDown={onDragStart} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", cursor: "grab", borderBottom: "1px solid var(--color-border-default)", background: "var(--color-bg-surface)", touchAction: "none" }}>
+          <div onPointerDown={onDragStart} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", cursor: "grab", borderBottom: "1px solid var(--color-border-default)", background: "var(--color-bg-surface)", touchAction: "none", userSelect: "none", WebkitUserSelect: "none" }}>
             <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--color-text-muted)" }}>♪ studio radio</span>
             <button onClick={() => setOpen(false)} aria-label="Minimize player" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-text-muted)", fontSize: 18, lineHeight: 1, padding: "2px 8px" }}>–</button>
           </div>
