@@ -264,6 +264,11 @@ export default function Landing({ total, claimed, published, email, myTile, clos
           <div className="foot__col"><span className="foot__h">Canvas</span><Link href="/canvas">The wall</Link><a href="#how">How it works</a><a href="#rules">The rules</a></div>
           <div className="foot__col"><span className="foot__h">About</span><a href="#manifesto">Manifesto</a><a href="#wall">Three ways to look</a><a href="#how">How it works</a></div>
           <div className="foot__col"><span className="foot__h">More</span><a href="/admin">Moderation</a></div>
+          <div className="foot__col"><span className="foot__h">Made by</span>
+            <a href="https://github.com/PremaanshVyas" target="_blank" rel="noopener noreferrer">GitHub</a>
+            <a href="mailto:premaanshvyas04@gmail.com">Email</a>
+            <span className="foot__by">Premaansh Vyas</span>
+          </div>
         </div>
         <div className="foot__legal">© 2026 ekam.ink · many hands, one canvas.</div>
       </footer>
