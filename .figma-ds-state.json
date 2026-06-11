@@ -68,7 +68,13 @@
     "Panel\u00b7CanvasClosed": "27:32",
     "FinaleToggle": "29:6",
     "FinaleCaption": "29:11",
-    "FinaleCelebration": "29:23"
+    "FinaleCelebration": "29:23",
+    "MusicPlayer \u00b7 expanded": "40:3",
+    "MusicPlayer \u00b7 mini": "40:48",
+    "Panel\u00b7ClaimEmail": "42:4",
+    "Panel\u00b7ClaimCode (OTP)": "42:19",
+    "Panel\u00b7WithModerator": "42:42",
+    "Panel\u00b7NeedsHumanLook": "42:54"
   },
   "screens": {
     "Landing": "30:2",
@@ -80,6 +86,7 @@
     "OG": "36:2",
     "TileOG": "36:9",
     "IGPoster": "36:19",
-    "Workflow": "37:2"
+    "Workflow": "37:2",
+    "CanvasExplorerMobile": "43:162"
   }
 }
