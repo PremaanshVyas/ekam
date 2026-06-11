@@ -1,4 +1,4 @@
-# ekam.ink — many hands, one canvas
+# ekam.ink - many hands, one canvas
 
 One shared 24×24 canvas. 576 strangers each verify with their email, claim one tile, hand-paint it in the browser, and leave a one-line story. Zoomed out it reads as a single collective artwork; zoomed in, every square is one person's hand. When the canvas closes, the wall reveals itself as one seamless piece with a credits reel of every artist, downloadable by everyone who made it.
 
