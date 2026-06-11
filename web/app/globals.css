@@ -626,6 +626,7 @@ body[data-panel] .mp-root{display:none}
 /* ---- deadline ---- */
 .side__deadline{font-family:var(--sans);font-size:13.5px;color:var(--ink);margin:0;display:flex;flex-direction:column;gap:3px}
 .side__deadline b{color:#e0a23a;font-weight:600;font-variant-numeric:tabular-nums}
+.side__deadnext{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);letter-spacing:.03em;margin-top:2px}
 .detail__clock{font-family:var(--mono);font-size:11px;color:#e0a23a;letter-spacing:.02em;margin:8px 0 0;text-align:center}
 .hero__deadline{font-family:var(--mono);font-size:12.5px;color:var(--ink-2);letter-spacing:.05em;margin:14px 0 0}
 .hero__deadline b{color:#e0a23a;font-weight:600;font-variant-numeric:tabular-nums}

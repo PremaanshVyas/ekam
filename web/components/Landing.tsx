@@ -163,7 +163,7 @@ export default function Landing({ total, claimed, published, email, myTile, clos
             <p className="hero__deadline" suppressHydrationWarning>
               {Date.parse(closesAt) > Date.now()
                 ? <>Canvas Nº 001 closes in <b><Countdown to={closesAt} /></b> ✦ claim while tiles last</>
-                : <>The canvas is closed ✦ the artwork is live on the wall</>}
+                : <>The canvas is closed ✦ the artwork is live on the wall ✦ Canvas Nº 002 opens next month</>}
             </p>
           )}
           <div className="hero__ticker"><LiveCounter claimed={claimed} total={total} /></div>

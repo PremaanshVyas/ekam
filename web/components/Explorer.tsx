@@ -69,7 +69,7 @@ function Sidebar({ open, claimed, total, loved, onLoved, closesAt, closed }: { o
           <div className="side__sec">
             <div className="side__label">Deadline</div>
             {closed
-              ? <p className="side__deadline">The canvas is closed ✦ the artwork is final.</p>
+              ? <p className="side__deadline">The canvas is closed ✦ the artwork is final.<span className="side__deadnext">Canvas Nº 002 opens next month.</span></p>
               : <p className="side__deadline">Closes in <b><Countdown to={closesAt} /></b></p>}
           </div>
         )}
@@ -208,7 +208,7 @@ function ClaimFlow({ wall, info, version, accent, signedIn, userEmail, hasTile, 
       {closed ? (
         <>
           <h3 className="claim__t">The canvas is closed.</h3>
-          <p className="claim__d">Canvas Nº 001 reached its deadline and no new tiles can be claimed. The finished artwork is on the wall, go see what everyone made together.</p>
+          <p className="claim__d">Canvas Nº 001 reached its deadline and no new tiles can be claimed. The finished artwork is on the wall, go see what everyone made together. Canvas Nº 002 opens next month, come back for a tile of your own.</p>
           <div className="claim__art" style={{ marginTop: 14 }}><TileArt wall={wall} idx={info.idx} region={5} version={version} className="detail__nbcanvas" /></div>
         </>
       ) : hasTile ? (
@@ -292,7 +292,7 @@ function TileDetail({ wall, info, version, myTile, signedIn, onNeedSignIn, onClo
       {/* primary action first — never below the scroll fold */}
       {info.mine
         ? (closed
-          ? <p className="detail__sharehint" style={{ marginTop: 0 }}>The canvas is closed. Your tile stays exactly as it is on the artwork.</p>
+          ? <p className="detail__sharehint" style={{ marginTop: 0 }}>The canvas is closed. Your tile stays exactly as it is on the artwork. Canvas Nº 002 opens next month.</p>
           : <button className="btn btn--primary btn--block" style={{ marginTop: 0 }} onClick={onEdit}>{myTile?.status === "claimed" ? "Paint your tile" : "Edit your tile"}</button>)
         : <button className="btn btn--ghost btn--block" style={{ marginTop: 0 }} onClick={onZoom}>Zoom to this tile</button>}
       {info.mine && !closed && myTile?.status === "claimed" && myTile?.expiresAt && (
@@ -675,7 +675,7 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
                 {review.state === "closed" && (<>
                   <div className="done__warn">✕</div>
                   <h3 className="done__t">The canvas is closed.</h3>
-                  <p className="done__d">Canvas Nº 001 stopped accepting paintings at the deadline. Thank you for being part of it.</p>
+                  <p className="done__d">Canvas Nº 001 stopped accepting paintings at the deadline. Thank you for being part of it. Canvas Nº 002 opens next month.</p>
                   <button className="btn btn--primary btn--block" onClick={() => { closeAll(); router.refresh(); }}>See the artwork</button>
                 </>)}
                 {review.state === "escalated" && (<>
