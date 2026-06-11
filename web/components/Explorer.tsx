@@ -43,7 +43,7 @@ function Tooltip({ hover }: { hover: { info: TileInfo; x: number; y: number } | 
   return (
     <div className="tip" style={{ left: x + (flip ? -16 : 16), top: y + 16, transform: flip ? "translateX(-100%)" : "none" }}>
       {info.claimed ? (
-        <><div className="tip__row"><span className="tip__handle">{info.mine ? "Your tile" : info.handle && info.handle !== "—" ? info.handle : "Claimed"}</span></div><div className="tip__meta">{info.id} · {info.handle === "—" ? "being painted" : "on the wall"}</div></>
+        <><div className="tip__row"><span className="tip__handle">{info.mine ? "Your tile" : info.handle && info.handle !== "—" ? info.handle : "Claimed"}</span></div><div className="tip__meta">{info.id} · {info.stage ?? (info.handle === "—" ? "being painted" : "on the wall")}</div></>
       ) : (
         <><div className="tip__row"><span className="tip__handle">Open tile</span></div><div className="tip__meta">{info.id}</div><div className="tip__cta">Click to claim →</div></>
       )}

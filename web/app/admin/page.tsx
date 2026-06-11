@@ -46,6 +46,7 @@ function AiChip({ verdict, reason }: { verdict: string | null; reason: string | 
     approve: { bg: "rgba(47,158,110,.16)", fg: "#5fcf8f", label: "AI: looks safe" },
     review: { bg: "rgba(224,162,58,.16)", fg: "#e0a23a", label: "AI: take a look" },
     reject: { bg: "rgba(211,87,63,.18)", fg: "#e8643c", label: "AI: flagged" },
+    checking: { bg: "rgba(239,233,225,.08)", fg: "var(--color-text-muted)", label: "AI: checking…" },
     error: { bg: "rgba(239,233,225,.08)", fg: "var(--color-text-muted)", label: "AI: error" },
   };
   const l = look[verdict] ?? look.error;

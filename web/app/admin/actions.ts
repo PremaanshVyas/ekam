@@ -10,6 +10,8 @@ import { notify } from "@/lib/notify";
 // Re-run the AI screen on one tile (also handy as a one-click live test).
 export async function screenTile(id: string) {
   if (!(await isAdmin())) throw new Error("unauthorized");
+  // clear the previous verdict so the screening lock treats this as a fresh cycle
+  await supabaseAdmin().from("tiles").update({ ai_verdict: null, ai_reason: null, ai_checked_at: null }).eq("id", id);
   const { moderateTile } = await import("@/lib/moderate");
   await moderateTile(id);
   revalidatePath("/admin");

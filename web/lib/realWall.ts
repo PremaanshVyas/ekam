@@ -68,7 +68,14 @@ export function createRealWall(GRID: number, tiles: RealTileInput[], myIdx: numb
     if (!t || t.status !== "published" || !t.img) {
       const X = (myIdx % GRID) * TILE_PX, Y = ((myIdx / GRID) | 0) * TILE_PX;
       const im = new Image();
-      im.onload = () => { g.fillStyle = PAPER; g.fillRect(X, Y, TILE_PX, TILE_PX); g.drawImage(im, X, Y, TILE_PX, TILE_PX); onProgress(); };
+      im.onload = () => {
+        // dimmed + dashed ember frame: unmistakably "yours, but not approved yet"
+        g.fillStyle = PAPER; g.fillRect(X, Y, TILE_PX, TILE_PX);
+        g.save(); g.globalAlpha = 0.55; g.drawImage(im, X, Y, TILE_PX, TILE_PX); g.restore();
+        g.save(); g.strokeStyle = ACCENT; g.lineWidth = Math.max(2, TILE_PX * 0.03); g.setLineDash([TILE_PX * 0.09, TILE_PX * 0.07]);
+        const inset = g.lineWidth; g.strokeRect(X + inset, Y + inset, TILE_PX - inset * 2, TILE_PX - inset * 2); g.restore();
+        onProgress();
+      };
       im.src = myArt;
     }
   }
@@ -80,9 +87,9 @@ export function createRealWall(GRID: number, tiles: RealTileInput[], myIdx: numb
     const x = idx % GRID, y = (idx / GRID) | 0; const t = byIdx.get(idx);
     const claimed = !!t && TAKEN.includes(t.status);
     const info: TileInfo = { idx, x, y, claimed, id: "R" + pad(y + 1) + "·C" + pad(x + 1), num: idx + 1, mine: idx === myIdx };
-    if (t && t.status === "published") { info.handle = t.name || "someone"; if (t.story) info.note = t.story; }
-    else if (info.mine) { info.claimed = true; info.handle = "you"; } // your own claim always reads as yours
-    else if (claimed) { info.handle = "—"; } // taken, not yet on the wall
+    if (t && t.status === "published") { info.handle = t.name || "someone"; if (t.story) info.note = t.story; info.stage = "on the wall"; }
+    else if (info.mine) { info.claimed = true; info.handle = "you"; info.stage = t?.status === "pending" ? "in review" : "not submitted yet"; }
+    else if (claimed) { info.handle = "—"; info.stage = "being painted"; }
     return info;
   };
 
