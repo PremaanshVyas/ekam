@@ -17,7 +17,7 @@ This is an entry for the Config Makeathon (Figma × Contra): *use Figma's suite 
 3. **Claude Code → production** — Next.js 16 + Supabase on Vercel, shipped in small probe-verified increments (more on that below).
 4. **Claude API in the product** — not just as a build tool: every submitted tile is reviewed by a vision model in seconds (see *The AI moderator*).
 
-The canvas deadline is aligned to the makeathon's own submission cutoff, so the finale reveal happens live on the site during judging week.
+The canvas closes during the makeathon's judging week, so the finale reveal happens live on the site before winners are announced.
 
 ---
 

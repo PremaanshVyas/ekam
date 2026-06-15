@@ -10,6 +10,6 @@ alter table canvases add column if not exists closes_at timestamptz;
 alter table tiles    add column if not exists claim_expires_at timestamptz;
 alter table tiles    add column if not exists expiry_warned_at timestamptz;
 
--- Canvas Nº 001 closes WITH the makeathon submission window:
--- 18 June 2026, 11:59pm PDT (= 19 June 06:59:59 UTC)
-update canvases set closes_at = '2026-06-19T06:59:59Z';
+-- Canvas Nº 001 closes during the makeathon judging week, before winners
+-- are announced: 21 June 2026, 11:59pm PDT (= 22 June 06:59:59 UTC).
+update canvases set closes_at = '2026-06-22T06:59:59Z';
