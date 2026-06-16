@@ -9,12 +9,12 @@ import { canvasClosesAt, canvasClosed, claimWindowEnd } from "@/lib/deadline";
 
 export type SubmitMode = "new" | "edit-pending" | "edit-published";
 
-// Decode + validate a PNG data URL: real base64, real PNG signature, capped size.
-function pngBytes(dataUrl: string, maxBytes: number): Buffer | null {
-  if (!dataUrl.startsWith("data:image/png;base64,")) return null;
-  const b64 = dataUrl.split(",")[1];
-  if (!b64) return null;
-  const bytes = Buffer.from(b64, "base64");
+// Read + validate an uploaded PNG. The image arrives as binary (a Blob), NOT a base64
+// data URL: a 1024² PNG is ~1MB and React rejects megabyte string args to a Server
+// Action ("Maximum array nesting exceeded"). Binary is streamed as multipart instead.
+async function pngFromBlob(blob: Blob | null, maxBytes: number): Promise<Buffer | null> {
+  if (!blob || typeof blob.arrayBuffer !== "function") return null;
+  const bytes = Buffer.from(await blob.arrayBuffer());
   if (bytes.length > maxBytes || bytes.length < 8) return null;
   const sig = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
   for (let i = 0; i < 8; i++) if (bytes[i] !== sig[i]) return null;
@@ -34,7 +34,7 @@ async function ownTile(tileId: string) {
 }
 
 export async function submitTile(
-  tileId: string, dataUrl: string, thumbUrl: string | null, name: string, story: string,
+  tileId: string, image: Blob, thumb: Blob | null, name: string, story: string,
 ): Promise<{ ok: true; mode: SubmitMode } | { ok: false; error: "closed" }> {
   const owned = await ownTile(tileId);
   if (!owned) throw new Error("this isn't your tile");
@@ -43,9 +43,9 @@ export async function submitTile(
   const closesAt = await canvasClosesAt(db);
   if (canvasClosed(closesAt) || process.env.FINALE_FORCE === "1") return { ok: false, error: "closed" };
 
-  const bytes = pngBytes(dataUrl, 5_000_000);
+  const bytes = await pngFromBlob(image, 5_000_000);
   if (!bytes) throw new Error("invalid image");
-  const thumbBytes = thumbUrl ? pngBytes(thumbUrl, 300_000) : null;
+  const thumbBytes = thumb ? await pngFromBlob(thumb, 300_000) : null;
 
   const cleanStory = story.slice(0, 140);
   const cleanName = name.trim().slice(0, 40); // the display name the artist chose, replaces the email-derived default
@@ -153,12 +153,12 @@ async function clearDraft(db: ReturnType<typeof supabaseAdmin>, tileId: string) 
 
 // Autosave the in-progress canvas so the artist can resume on another device.
 // Private-by-obscurity (unguessable path, returned only to the owner); never public.
-export async function saveDraft(tileId: string, dataUrl: string, story: string): Promise<{ ok: boolean; updatedAt?: string }> {
+export async function saveDraft(tileId: string, image: Blob, story: string): Promise<{ ok: boolean; updatedAt?: string }> {
   const owned = await ownTile(tileId);
   if (!owned) return { ok: false };
   const { db } = owned;
 
-  const bytes = pngBytes(dataUrl, 5_000_000);
+  const bytes = await pngFromBlob(image, 5_000_000);
   if (!bytes) return { ok: false };
 
   const path = `draft-${tileId}.png`;

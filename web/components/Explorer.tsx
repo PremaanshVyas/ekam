@@ -475,7 +475,11 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
   const openStudioForEdit = () => { if (!myTile || !wall) return; const label = wall.infoFor(myTile.idx).id; const def = email ? email.split("@")[0] : ""; studioTarget.current = { tileId: myTile.id, idx: myTile.idx, label, artUrl: myTile.draftUrl ?? myTile.artUrl, note: myTile.draftStory ?? myTile.story ?? "", name: myTile.name && myTile.name !== def ? myTile.name : "" }; setPanel("studio"); };
   const onStudioSubmit = async (dataUrl: string, thumbUrl: string | null, name: string, note: string) => {
     const t = studioTarget.current; if (!t) return;
-    const r = await submitTile(t.tileId, dataUrl, thumbUrl, name, note);
+    // Send the PNGs as binary blobs, not megabyte base64 strings — large string args
+    // overflow Server Action serialization ("Maximum array nesting exceeded").
+    const image = await (await fetch(dataUrl)).blob();
+    const thumb = thumbUrl ? await (await fetch(thumbUrl)).blob() : null;
+    const r = await submitTile(t.tileId, image, thumb, name, note);
     if (!r.ok) { setReview({ state: "closed", reason: null }); setPanel("reviewing"); router.refresh(); return; }
     setLastArt(dataUrl); setReview({ state: "checking", reason: null }); setPanel("reviewing"); router.refresh();
   };
@@ -509,7 +513,7 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
     studioTarget.current = { ...t, artUrl: lastArt ?? t.artUrl };
     setPanel("studio");
   };
-  const onSaveDraft = async (dataUrl: string, note: string) => { const t = studioTarget.current; if (!t) return { ok: false }; return await saveDraft(t.tileId, dataUrl, note); };
+  const onSaveDraft = async (dataUrl: string, note: string) => { const t = studioTarget.current; if (!t) return { ok: false }; const image = await (await fetch(dataUrl)).blob(); return await saveDraft(t.tileId, image, note); };
 
   // the finale: one full picture, seen once with a celebration, then a quiet toggle
   const artMode = complete && finaleMode === "art";
