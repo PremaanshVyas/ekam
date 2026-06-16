@@ -264,8 +264,15 @@ export default function Studio({
     // small thumb for the wall composite — the wall loads these instead of full PNGs
     const th = document.createElement("canvas"); th.width = 192; th.height = 192;
     const tg = th.getContext("2d")!; tg.imageSmoothingEnabled = true; tg.imageSmoothingQuality = "high"; tg.drawImage(bufRef.current!, 0, 0, 192, 192);
+    const img = out.toDataURL("image/png"), thumb = th.toDataURL("image/png");
+    // Keep the payload under the Server Action body limit (4mb); base64 chars ≈ bytes.
+    // Without this, an oversized image is rejected by the framework as an opaque server error.
+    if (img.length + thumb.length > 3_900_000) {
+      setSubmitErr("This drawing is a little too detailed to submit. Try simplifying it slightly, then submit again.");
+      return;
+    }
     setSubmitting(true); setSubmitErr("");
-    try { await onSubmit(out.toDataURL("image/png"), th.toDataURL("image/png"), name.trim(), note.trim()); }
+    try { await onSubmit(img, thumb, name.trim(), note.trim()); }
     catch (err) { setSubmitting(false); setSubmitErr("Couldn't submit: " + ((err as Error).message || "try again in a moment.")); }
   };
 
