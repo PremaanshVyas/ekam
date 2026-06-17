@@ -5,64 +5,45 @@ import { publishTile, aiRejectTile } from "@/lib/publish";
 /* AI moderation: Claude screens every submission (painting + display name + story)
  * right after submit, via next/server `after` so it never delays the response.
  *
- * Two-pass design: pass 1 enumerates everything (all text in any script, every visual
- * element, corners included) and gives a verdict. If pass 1 says "approve", a SECOND
- * adversarial pass hunts specifically for hidden/small/disguised content — both passes
- * must clear a tile before it auto-publishes. Disagreement → human review.
+ * Philosophy: this is amateur doodle art in a tiny paint tool, so the bar is "let
+ * ordinary art through, stop only clearly deliberate hate / extremism / explicit
+ * sexual content / spam." Ambiguous scribbles get the benefit of the doubt. A single
+ * lenient pass — NOT an adversarial hunt for hidden meaning, which produced false
+ * positives (e.g. reading a random zigzag as a rude gesture or a profane word).
  *
- *   approve (×2) → published immediately
- *   reject       → returned to the artist (tile + painting kept) / pending edit dropped
- *   review       → waits in the admin queue for a human
+ *   approve → published immediately
+ *   reject  → returned to the artist (tile + painting kept) / pending edit dropped
+ *   review  → waits in the admin queue for a human (used only for genuinely borderline
+ *             political / flag / provocative-religious cases, plus the wordlist backstop)
+ * A deterministic wordlist still caps known WRITTEN profanity at "review", never reject.
  * Set AI_AUTO=0 to demote the AI to label-only (verdicts shown, no actions).
  * Fails soft at every step: no API key, missing columns, or a model error never
  * affects the artist's submit — things just wait for a human as before. */
 
-const MOD_SYSTEM = `You are the moderation reviewer for ekam.ink, a public collaborative art wall. Strangers each paint one small tile answering the soft prompt "say what's in your mind", and approved tiles appear on a family friendly public canvas with the artist's display name and an optional one line story.
+const MOD_SYSTEM = `You are the safety reviewer for ekam.ink, a public collaborative art wall. Strangers each paint one small tile answering the soft prompt "say what's in your mind". Approved tiles appear on a public, all-ages canvas next to the artist's display name and an optional one-line story.
 
-You will be shown the submitted painting plus the artist's display name and story text. Judge ALL three.
+You are shown the painting plus the display name and story. Be GENEROUS. Almost everything should be approved. Your job is to let ordinary art through and stop only content that is clearly and deliberately hateful, extremist, explicitly sexual, or spam. When in doubt, APPROVE.
 
-The wall has a global audience with many viewers from India and South Asia. Offensive content can appear in ANY language and ANY script: English, Hindi, Urdu, Punjabi, Bengali, Tamil, Arabic and others, including slang TRANSLITERATED into Latin letters. Treat Romanized Hindi/Urdu profanity exactly like English profanity (examples: "lund", "chutiya", "bhosdike", "madarchod", "bhenchod", "gandu", "randi", "lauda"). Profanity smuggled inside an innocent looking display name is still profanity.
+This is amateur art drawn in a tiny browser paint tool. Most tiles are scribbles, zigzags, abstract shapes, rough doodles, surreal or low-effort marks — all completely fine. Do NOT hunt for hidden meaning. Do NOT read random lines or squiggles as letters, words, genitals, or rude gestures. If a shape only *might* look like something when you squint, that is NOT a violation — approve it. Seeing faces or objects in abstract marks (pareidolia) is your mistake, not the artist's offense. Never judge skill, effort, neatness, or weirdness.
 
-People WILL try to sneak things past you by hiding a small offensive element inside an innocent scene: a nice house with tiny genitals drawn in a corner, a sweet landscape with a slur in small letters along the edge, a flower with a hate symbol in the stem. The most common trick is making the offensive part SMALL. Size never reduces severity: a tiny genital drawing is sexual content; a tiny slur is a slur.
+REJECT only when a violation is UNMISTAKABLE and clearly intentional — something any reasonable viewer would instantly recognize:
+- a real slur or hate word written legibly, in English or transliterated (racial, ethnic, religious, casteist, homophobic, etc.)
+- legible text glorifying an extremist or genocidal figure/ideology, or calling for harm to a group (e.g. "Hitler", "kill all <group>", "gas the <group>")
+- a clearly recognizable hate/extremist symbol — a Nazi swastika, SS runes, KKK imagery (note: a Hindu/Buddhist swastika, om, cross, crescent or other plain religious symbol is NOT hate)
+- explicit sexual content or clearly recognizable genitalia — an actual, recognizable drawing of it, NEVER an ambiguous blob, line or zigzag
+- gore or graphic violence that is unambiguously depicted, or a direct threat against a real person or group
+- real personal data (phone number, street address, email) or advertising / URL / QR-code spam
 
-Work in this order:
-1. Scan the ENTIRE image methodically: center, all four corners, all four edges, background, small marks. List every distinct visual element you can identify in "elements_found" (e.g. "house, sun, two stick figures, small unidentified shape bottom left").
-2. Transcribe EVERY piece of text into "text_found": words painted in the image (any script, any orientation, stylized or partial), plus the display name and story. Write "none" if there is truly no text.
-3. Clear each element and each word individually. Then judge.
+REVIEW (hand to a human, do not reject) ONLY for genuinely borderline cases a normal viewer might find pointed but that are not clear violations:
+- a recognizable national flag, political party symbol, or political leader used as a statement
+- a religious figure or symbol used in a clearly provocative or mocking way
 
-This is amateur art made in a tiny browser paint tool. Scribbles, abstract shapes, rough doodles, blank-ish or low effort tiles, weird or surreal art are all completely fine. Never judge artistic quality.
+APPROVE everything else — abstract or messy art, ambiguous shapes, ordinary objects and scenes, normal or playful words, mild edginess, and anything you simply are not sure about. Do not turn uncertainty into a flag.
 
-"approve" ONLY when you can positively clear every element, every word and every symbol. If anything in "elements_found" is an unidentified shape that could plausibly be sexual or hateful, or "text_found" contains any word you do not confidently recognize as innocent in any language or transliteration, you MUST NOT approve: choose "review".
-
-"reject" for clear violations, no matter how small the offending element is or how innocent the rest of the tile looks:
-- genitalia or sexual content anywhere in the image, even tiny, crude, cartoonish, or tucked into a corner of an otherwise innocent scene
-- hate symbols, slurs, or extremist imagery
-- graphic violence or gore
-- harassment or targeting of a person
-- personal information (phone numbers, addresses, emails)
-- spam: advertising, URLs, QR codes, promo text
-
-"review" whenever you are not certain, including:
-- any small or ambiguous shape that might be sexual or hateful
-- any word you cannot confidently verify as innocent (unknown languages, possible transliteration, slang you half recognize)
-- text in a script you cannot fully read (Devanagari, Urdu/Arabic, Tamil, etc.)
-- possible hidden, stylized or partially visible text
-- political slogans, party symbols, flags or leaders used as a message
-- religious symbols or figures used provocatively or ambiguously
-
-When torn between approve and review, choose review. When torn between review and reject, choose review.
-
-Keep "reason" to one short sentence an admin can read at a glance.`;
-
-// Pass 2: a fresh pair of eyes whose ONLY job is to catch what pass 1 might have missed.
-const VERIFY_SYSTEM = `You are the second reviewer for a family friendly public art wall. A previous reviewer already cleared this tile. Your ONLY job is to catch what they might have missed. Hunt specifically for hidden, small, or disguised problems:
-- tiny genitalia or sexual shapes anywhere, including corners, edges, inside other objects
-- small or stylized text: slurs or profanity in ANY language or script, including Romanized Hindi/Urdu slang (lund, chutiya, madarchod, gandu, randi, lauda, bhosdike...)
-- hate or extremist symbols, even small or partial
-- phone numbers, URLs, QR codes, advertising
-- anything in the display name or story that is profane in any language
-
-Inspect the image like an adversary drew it. If you find ANYTHING suspicious, answer clean=false with a one line reason. Only answer clean=true if you are confident the whole tile, name and story are innocent.`;
+Fill the fields honestly:
+- "text_found": transcribe only text you are genuinely confident is REAL, legible writing (any script). If the tile is just shapes or scribbles with no real writing, put "none" — never invent words from abstract marks.
+- "elements_found": a short list of what you actually recognize.
+- "reason": one short sentence for the admin.`;
 
 const SCHEMA = {
   type: "object",
@@ -75,13 +56,6 @@ const SCHEMA = {
     reason: { type: "string" },
     categories: { type: "array", items: { type: "string", enum: ["sexual", "hate", "violence", "harassment", "pii", "spam", "profanity", "political", "religious", "unreadable-text", "other"] } },
   },
-} as const;
-
-const VERIFY_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  required: ["clean", "reason"],
-  properties: { clean: { type: "boolean" }, reason: { type: "string" } },
 } as const;
 
 type Verdict = { elements_found: string; text_found: string; verdict: "approve" | "review" | "reject"; reason: string; categories: string[] };
@@ -147,40 +121,6 @@ export async function moderateTile(tileId: string): Promise<void> {
     }
 
     const auto = process.env.AI_AUTO !== "0";
-
-    // second adversarial pass before anything auto-publishes: both reviewers must agree
-    if (auto && v.verdict === "approve") {
-      const runVerify = async (): Promise<{ clean: boolean; reason: string }> => {
-        const res2 = await client.messages.create({
-          model: "claude-opus-4-8",
-          // same reasoning as pass 1: adaptive thinking + the verdict JSON must both fit.
-          // The old 300 ceiling truncated mid-thought, which is what surfaced as the
-          // spurious "second check unavailable, sent to a human".
-          max_tokens: 4000,
-          thinking: { type: "adaptive" },
-          system: VERIFY_SYSTEM,
-          messages: [{ role: "user", content: userContent }],
-          output_config: { format: { type: "json_schema", schema: VERIFY_SCHEMA } },
-        });
-        const t2 = res2.content.find((b) => b.type === "text")?.text ?? "";
-        if (!t2) throw new Error(`empty verifier output (stop_reason: ${res2.stop_reason})`);
-        return JSON.parse(t2) as { clean: boolean; reason: string };
-      };
-      // one retry covers a transient hiccup (network / overload) before falling back
-      let v2: { clean: boolean; reason: string } | null = null;
-      let lastErr = "";
-      for (let attempt = 0; attempt < 2 && !v2; attempt++) {
-        try { v2 = await runVerify(); }
-        catch (e) { lastErr = (e as Error)?.message || String(e); }
-      }
-      if (v2) {
-        if (!v2.clean) v = { ...v, verdict: "review", reason: `Second look flagged: ${v2.reason}`, categories: v.categories.length ? v.categories : ["other"] };
-      } else {
-        // genuinely unavailable after a retry → fail safe to a human, never auto-publish on one opinion
-        console.error("[moderate] verifier unavailable after retry:", lastErr);
-        v = { ...v, verdict: "review", reason: `${v.reason} (second check unavailable, sent to a human)` };
-      }
-    }
 
     // supersede guard: if the artist resubmitted (new image) or another screen took over
     // while the model was thinking, this run's verdict is about a STALE image — abandon
