@@ -31,16 +31,17 @@ export async function approve(id: string) {
 export async function reject(id: string) {
   if (!(await isAdmin())) throw new Error("unauthorized");
   const db = supabaseAdmin();
-  const { data: tile } = await db.from("tiles").select("pending_image_path, artist_email, x, y, status").eq("id", id).maybeSingle();
+  const { data: tile } = await db.from("tiles").select("pending_image_path, artist_email, artist_user_id, x, y, status").eq("id", id).maybeSingle();
   if (!tile) return;
   const lbl = `R${String(tile.y + 1).padStart(2, "0")}·C${String(tile.x + 1).padStart(2, "0")}`;
+  const who = { email: tile.artist_email, userId: tile.artist_user_id };
 
   if (tile.pending_image_path) {
     await db.from("tiles").update({ pending_image_path: null, pending_story: null, pending_submitted_at: null }).eq("id", id);
-    await notify(db, tile.artist_email, "mod-rejected", `Your update to ${lbl} was rejected`, "The moderator reviewed your new version and rejected it. Your previously approved tile stays live on the wall. You can paint a different update anytime.");
+    await notify(db, who, "mod-rejected", `Your update to ${lbl} was rejected`, "The moderator reviewed your new version and rejected it. Your previously approved tile stays live on the wall. You can paint a different update anytime.");
   } else {
     await db.from("tiles").update({ status: "claimed" }).eq("id", id).eq("status", "pending");
-    await notify(db, tile.artist_email, "mod-rejected", `Your tile ${lbl} was rejected`, "The moderator reviewed your tile manually and rejected it. The tile is still yours. Paint something new and submit again.");
+    await notify(db, who, "mod-rejected", `Your tile ${lbl} was rejected`, "The moderator reviewed your tile manually and rejected it. The tile is still yours. Paint something new and submit again.");
   }
   await db.from("tiles").update({ review_requested_at: null }).eq("id", id); // best-effort (0006)
   await db.from("moderation_log").insert({ tile_id: id, action: "rejected" });
@@ -55,7 +56,7 @@ export async function removeTile(id: string) {
   if (!(await isAdmin())) throw new Error("unauthorized");
   const db = supabaseAdmin();
   const full = {
-    status: "open", artist_name: null, artist_email: null, artist_location: null,
+    status: "open", artist_name: null, artist_email: null, artist_user_id: null, artist_location: null,
     story: null, image_path: null, thumb_path: null, claimed_at: null, claim_expires_at: null,
     published_at: null, pending_image_path: null, pending_story: null, pending_submitted_at: null,
   };

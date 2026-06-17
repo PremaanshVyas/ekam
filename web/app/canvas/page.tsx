@@ -2,6 +2,7 @@ import { after } from "next/server";
 import Explorer from "@/components/Explorer";
 import { supabaseAnon, supabaseAdmin, CANVAS_SLUG } from "@/lib/supabase";
 import { createSupabaseServer } from "@/lib/auth-server";
+import { identityOf, ownerOr } from "@/lib/identity";
 import { findMyTile } from "@/lib/tiles";
 import type { RealTileInput } from "@/lib/realWall";
 import { canvasClosesAt, canvasClosed } from "@/lib/deadline";
@@ -26,6 +27,7 @@ export default async function CanvasPage({ searchParams }: { searchParams: Promi
   let tiles: RealTileInput[] = [];
   let claimed = 0;
   let email: string | null = null;
+  let signedIn = false;
   let myTile = null;
   let loadError = false;
   let notifs: { id: string; kind: string; title: string; body: string | null; created_at: string; read_at: string | null }[] = [];
@@ -44,7 +46,9 @@ export default async function CanvasPage({ searchParams }: { searchParams: Promi
       canvasClosesAt(db),
     ]);
     closesAt = closes;
-    email = user?.email ?? null;
+    const me = identityOf(user);
+    email = me?.email ?? null;
+    signedIn = !!me;
     cols = canvas?.grid_cols ?? 24;
     rows = canvas?.grid_rows ?? 24;
 
@@ -54,7 +58,7 @@ export default async function CanvasPage({ searchParams }: { searchParams: Promi
         db.from("public_tiles")
           .select("id, x, y, status, artist_name, artist_location, story, image_path, thumb_path, published_at")
           .eq("canvas_id", canvas.id),
-        email ? findMyTile(supabaseAdmin(), canvas.id, email) : Promise.resolve(null),
+        me ? findMyTile(supabaseAdmin(), canvas.id, me) : Promise.resolve(null),
       ]);
 
       // upvotes: aggregate counts + the viewer's own votes (server-only reads; emails stay private)
@@ -63,7 +67,7 @@ export default async function CanvasPage({ searchParams }: { searchParams: Promi
       try {
         const [allVotes, mine] = await Promise.all([
           supabaseAdmin().from("tile_votes").select("tile_id"),
-          email ? supabaseAdmin().from("tile_votes").select("tile_id").eq("voter_email", email.toLowerCase()) : Promise.resolve({ data: [] as { tile_id: string }[] }),
+          me ? supabaseAdmin().from("tile_votes").select("tile_id").or(ownerOr(me, "voter_user_id", "voter_email")) : Promise.resolve({ data: [] as { tile_id: string }[] }),
         ]);
         for (const v of allVotes.data ?? []) voteCount.set(v.tile_id, (voteCount.get(v.tile_id) ?? 0) + 1);
         for (const v of mine.data ?? []) myVotes.add(v.tile_id);
@@ -86,11 +90,11 @@ export default async function CanvasPage({ searchParams }: { searchParams: Promi
       });
       if (tilesRes.error) loadError = true;
 
-      if (email) {
+      if (me) {
         try {
           const { data: nd } = await supabaseAdmin().from("notifications")
             .select("id, kind, title, body, created_at, read_at")
-            .eq("artist_email", email.toLowerCase()).order("created_at", { ascending: false }).limit(12);
+            .or(ownerOr(me)).order("created_at", { ascending: false }).limit(12);
           notifs = nd ?? [];
           unread = notifs.filter((n) => !n.read_at).length;
         } catch { /* migration 0006 not run yet */ }
@@ -116,5 +120,5 @@ export default async function CanvasPage({ searchParams }: { searchParams: Promi
   // FINALE_FORCE is a local-only test knob (never set in prod): simulates deadline day
   const deadlinePassed = canvasClosed(closesAt) || process.env.FINALE_FORCE === "1";
   const complete = published >= cols * rows || deadlinePassed;
-  return <Explorer cols={cols} total={cols * rows} tiles={tiles} claimed={claimed} email={email} myTile={myTile} autoOpenMine={autoOpenMine} loadError={loadError} notifs={notifs} unread={unread} complete={complete} published={published} finaleFrom={finaleFrom} finaleTo={finaleTo} closesAt={closesAt} deadlinePassed={deadlinePassed} />;
+  return <Explorer cols={cols} total={cols * rows} tiles={tiles} claimed={claimed} email={email} signedIn={signedIn} myTile={myTile} autoOpenMine={autoOpenMine} loadError={loadError} notifs={notifs} unread={unread} complete={complete} published={published} finaleFrom={finaleFrom} finaleTo={finaleTo} closesAt={closesAt} deadlinePassed={deadlinePassed} />;
 }

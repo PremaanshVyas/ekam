@@ -1,7 +1,7 @@
 "use server";
 
 import { supabaseAdmin, CANVAS_SLUG } from "@/lib/supabase";
-import { createSupabaseServer } from "@/lib/auth-server";
+import { currentIdentity, ownerOr, owns } from "@/lib/identity";
 import { broadcastWallChange } from "@/lib/broadcast";
 import { notify } from "@/lib/notify";
 import { canvasClosesAt, canvasClosed, claimWindowEnd } from "@/lib/deadline";
@@ -11,12 +11,11 @@ export type ClaimResult =
   | { ok: false; error: "auth" | "nocanvas" | "have-tile" | "taken" | "closed"; x?: number; y?: number };
 
 // Claim the SPECIFIC open tile the user clicked (idx → x,y), concurrency-safe.
-// One tile per verified email. Identity comes from the magic-code session.
+// One tile per identity. Identity is the session's auth user id (anonymous or email) — no
+// email is required to claim; the silent anonymous session is created on the client first.
 export async function claimTileAt(idx: number): Promise<ClaimResult> {
-  const auth = await createSupabaseServer();
-  const { data: { user } } = await auth.auth.getUser();
-  if (!user?.email) return { ok: false, error: "auth" };
-  const email = user.email.toLowerCase();
+  const me = await currentIdentity();
+  if (!me) return { ok: false, error: "auth" };
 
   const db = supabaseAdmin();
   const { data: canvas } = await db.from("canvases").select("id, grid_cols, grid_rows").eq("slug", CANVAS_SLUG).maybeSingle();
@@ -27,48 +26,53 @@ export async function claimTileAt(idx: number): Promise<ClaimResult> {
   if (!Number.isInteger(idx) || idx < 0 || idx >= cols * gridRows) return { ok: false, error: "taken" };
   const x = idx % cols, y = Math.floor(idx / cols);
 
-  // One tile per person — if they already have one, send them to it.
+  // One tile per person — if they already have one (this device, or an email they used
+  // before), send them to it.
   const { data: existing } = await db
-    .from("tiles").select("id, x, y").eq("canvas_id", canvas.id).eq("artist_email", email)
+    .from("tiles").select("id, x, y").eq("canvas_id", canvas.id).or(ownerOr(me))
     .in("status", ["claimed", "pending", "published"]).limit(1).maybeSingle();
   if (existing) return { ok: false, error: "have-tile", x: existing.x, y: existing.y };
 
-  const name = user.email.split("@")[0];
-  // Concurrency-safe: only succeeds if the tile is still open. The 48h painting
-  // window starts now; falls back without the 0008 columns if the SQL hasn't run.
-  const base = { status: "claimed", artist_name: name, artist_email: email, claimed_at: new Date().toISOString() };
+  // The display name is chosen at submit; default to the email local part for an email
+  // session, else leave blank (anonymous painters type their name in the studio).
+  const name = me.email ? me.email.split("@")[0] : null;
+  // Concurrency-safe: only succeeds if the tile is still open. The 48h painting window starts
+  // now; falls back without the 0008 columns if that SQL hasn't run.
+  const base: Record<string, unknown> = {
+    status: "claimed", artist_user_id: me.userId, artist_name: name, claimed_at: new Date().toISOString(),
+    ...(me.email ? { artist_email: me.email } : {}),
+  };
   const claimQ = (payload: Record<string, unknown>) => db.from("tiles").update(payload)
     .eq("canvas_id", canvas.id).eq("x", x).eq("y", y).eq("status", "open").select("id");
   let { data: rows, error: claimErr } = await claimQ({ ...base, claim_expires_at: claimWindowEnd(closesAt), expiry_warned_at: null });
   if (claimErr) ({ data: rows } = await claimQ(base));
   if (!rows || rows.length === 0) return { ok: false, error: "taken", x, y };
-  await notify(db, email, "claim", `Tile R${String(y + 1).padStart(2, "0")}·C${String(x + 1).padStart(2, "0")} is yours ✦`, "Paint what's in your mind and submit within 48 hours. If the window passes without a submission the tile reopens for someone else.");
+  await notify(db, { email: me.email, userId: me.userId }, "claim", `Tile R${String(y + 1).padStart(2, "0")}·C${String(x + 1).padStart(2, "0")} is yours ✦`, "Paint what's in your mind and submit within 48 hours. If the window passes without a submission the tile reopens for someone else.");
   await broadcastWallChange();
   return { ok: true, tileId: rows[0].id, x, y };
 }
 
 export type VoteResult = { ok: boolean; voted?: boolean; count?: number; error?: "auth" | "own" | "unavailable" };
 
-// Upvote toggle: one vote per published tile per verified email, never your own tile.
+// Upvote toggle: one vote per published tile per identity, never your own tile. Works for
+// anonymous and email sessions alike (keyed on the auth user id).
 export async function toggleVote(tileId: string): Promise<VoteResult> {
-  const auth = await createSupabaseServer();
-  const { data: { user } } = await auth.auth.getUser();
-  if (!user?.email) return { ok: false, error: "auth" };
-  const email = user.email.toLowerCase();
+  const me = await currentIdentity();
+  if (!me) return { ok: false, error: "auth" };
 
   const db = supabaseAdmin();
-  const { data: tile } = await db.from("tiles").select("id, status, artist_email, artist_name, x, y").eq("id", tileId).maybeSingle();
+  const { data: tile } = await db.from("tiles").select("id, status, artist_email, artist_user_id, artist_name, x, y").eq("id", tileId).maybeSingle();
   if (!tile || tile.status !== "published") return { ok: false, error: "unavailable" };
-  if (tile.artist_email === email) return { ok: false, error: "own" };
+  if (owns(me, tile)) return { ok: false, error: "own" };
 
-  const { data: mine, error: selErr } = await db.from("tile_votes").select("tile_id").eq("tile_id", tileId).eq("voter_email", email).maybeSingle();
-  if (selErr) return { ok: false, error: "unavailable" }; // migration 0007 not run yet
+  const { data: mine, error: selErr } = await db.from("tile_votes").select("tile_id").eq("tile_id", tileId).eq("voter_user_id", me.userId).maybeSingle();
+  if (selErr) return { ok: false, error: "unavailable" }; // migration 0007/0010 not run yet
   let voted: boolean;
   if (mine) {
-    await db.from("tile_votes").delete().eq("tile_id", tileId).eq("voter_email", email);
+    await db.from("tile_votes").delete().eq("tile_id", tileId).eq("voter_user_id", me.userId);
     voted = false;
   } else {
-    await db.from("tile_votes").insert({ tile_id: tileId, voter_email: email });
+    await db.from("tile_votes").insert({ tile_id: tileId, voter_user_id: me.userId, ...(me.email ? { voter_email: me.email } : {}) });
     voted = true;
   }
   const { count } = await db.from("tile_votes").select("tile_id", { count: "exact", head: true }).eq("tile_id", tileId);
@@ -80,11 +84,13 @@ export async function toggleVote(tileId: string): Promise<VoteResult> {
       const tally = new Map<string, number>();
       for (const r of counts ?? []) tally.set(r.tile_id, (tally.get(r.tile_id) ?? 0) + 1);
       const top = [...tally.entries()].sort((a, b) => b[1] - a[1])[0];
-      if (top && top[0] === tileId && tile.artist_email) {
-        const { data: prior } = await db.from("notifications").select("id").eq("artist_email", tile.artist_email).eq("kind", "top").limit(1).maybeSingle();
+      if (top && top[0] === tileId && (tile.artist_user_id || tile.artist_email)) {
+        let priorQ = db.from("notifications").select("id").eq("kind", "top").limit(1);
+        priorQ = tile.artist_user_id ? priorQ.eq("artist_user_id", tile.artist_user_id) : priorQ.eq("artist_email", tile.artist_email as string);
+        const { data: prior } = await priorQ.maybeSingle();
         if (!prior) {
           const lbl = `R${String(tile.y + 1).padStart(2, "0")}·C${String(tile.x + 1).padStart(2, "0")}`;
-          await notify(db, tile.artist_email, "top", `Your tile ${lbl} is the most loved on the wall ✦`, "It wears the golden frame on the canvas right now. Share it while it reigns.");
+          await notify(db, { email: tile.artist_email, userId: tile.artist_user_id }, "top", `Your tile ${lbl} is the most loved on the wall ✦`, "It wears the golden frame on the canvas right now. Share it while it reigns.");
         }
       }
     } catch { /* best effort */ }

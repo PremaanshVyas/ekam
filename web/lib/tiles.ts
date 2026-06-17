@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { ownerOr, type Identity } from "@/lib/identity";
 
 export type MyTile = {
   id: string; x: number; y: number; status: string; artist_name: string | null;
@@ -8,13 +9,14 @@ export type MyTile = {
   ai_verdict: string | null; ai_reason: string | null; claim_expires_at: string | null;
 };
 
-// Find the signed-in person's tile (by email). Tolerant of the pending_* (migration 0003)
-// and draft_* (migration 0004) columns not existing yet — progressively falls back to the
-// always-present columns so the dashboard / painter never hard-error before a migration runs.
-export async function findMyTile(db: SupabaseClient, canvasId: string, email: string): Promise<MyTile | null> {
-  const e = email.toLowerCase();
+// Find the signed-in person's tile (by anonymous user id, or legacy email). Tolerant of the
+// pending_* (migration 0003) and draft_* (migration 0004) columns not existing yet —
+// progressively falls back to the always-present columns so the dashboard / painter never
+// hard-error before a migration runs.
+export async function findMyTile(db: SupabaseClient, canvasId: string, who: Identity): Promise<MyTile | null> {
+  const filter = ownerOr(who);
   const q = (cols: string) => db.from("tiles").select(cols)
-    .eq("canvas_id", canvasId).eq("artist_email", e)
+    .eq("canvas_id", canvasId).or(filter)
     .in("status", ["claimed", "pending", "published"]).limit(1).maybeSingle();
   const fill = (d: Record<string, unknown>): MyTile =>
     ({ artist_name: null, pending_image_path: null, pending_story: null, draft_image_path: null, draft_story: null, draft_updated_at: null, ai_verdict: null, ai_reason: null, claim_expires_at: null, ...d } as MyTile);

@@ -23,14 +23,14 @@ export async function sweepClaimWindows(force = false): Promise<{ reopened: numb
 
   try {
     const { data: lapsed } = await db.from("tiles")
-      .select("id, x, y, artist_email")
+      .select("id, x, y, artist_email, artist_user_id")
       .eq("status", "claimed")
       .not("claim_expires_at", "is", null)
       .lt("claim_expires_at", nowIso);
     for (const t of lapsed ?? []) {
       // concurrency-safe: only flips if still claimed (a submit in flight wins)
       const reset: Record<string, unknown> = {
-        status: "open", artist_name: null, artist_email: null, artist_location: null,
+        status: "open", artist_name: null, artist_email: null, artist_user_id: null, artist_location: null,
         story: null, image_path: null, thumb_path: null,
         pending_image_path: null, pending_story: null, pending_submitted_at: null,
         draft_image_path: null, draft_story: null, draft_updated_at: null,
@@ -43,7 +43,7 @@ export async function sweepClaimWindows(force = false): Promise<{ reopened: numb
       if (flipErr) ({ data: rows } = await flip(reset)); // expiry_warned_at may not exist before 0008
       if (rows && rows.length) {
         reopened++;
-        await notify(db, t.artist_email, "expired", `Tile ${lbl(t.x, t.y)} reopened`,
+        await notify(db, { email: t.artist_email, userId: t.artist_user_id }, "expired", `Tile ${lbl(t.x, t.y)} reopened`,
           "The 48 hour painting window passed without a submission, so the tile went back to the wall. You can claim another open tile anytime.");
         try { await db.from("moderation_log").insert({ tile_id: t.id, action: "expired", reason: "48h claim window lapsed without a submission" }); } catch { /* log table optional */ }
       }
@@ -53,7 +53,7 @@ export async function sweepClaimWindows(force = false): Promise<{ reopened: numb
   try {
     const warnBefore = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
     const { data: closing } = await db.from("tiles")
-      .select("id, x, y, artist_email, claim_expires_at")
+      .select("id, x, y, artist_email, artist_user_id, claim_expires_at")
       .eq("status", "claimed")
       .is("expiry_warned_at", null)
       .not("claim_expires_at", "is", null)
@@ -66,7 +66,7 @@ export async function sweepClaimWindows(force = false): Promise<{ reopened: numb
       if (rows && rows.length) {
         warned++;
         const hrs = Math.max(1, Math.round((Date.parse(t.claim_expires_at) - Date.now()) / 3600000));
-        await notify(db, t.artist_email, "expiring", `${hrs} ${hrs === 1 ? "hour" : "hours"} left on tile ${lbl(t.x, t.y)}`,
+        await notify(db, { email: t.artist_email, userId: t.artist_user_id }, "expiring", `${hrs} ${hrs === 1 ? "hour" : "hours"} left on tile ${lbl(t.x, t.y)}`,
           "Submit your painting before the window closes to keep your tile. Drafts don't count, only a submission does.");
       }
     }

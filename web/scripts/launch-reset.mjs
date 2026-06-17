@@ -25,7 +25,7 @@ const tag = COMMIT ? "COMMIT" : "DRY RUN";
 
 const OPEN = {
   status: "open",
-  artist_name: null, artist_email: null, artist_location: null, story: null,
+  artist_name: null, artist_email: null, artist_user_id: null, artist_location: null, story: null,
   image_path: null, thumb_path: null,
   claimed_at: null, claim_expires_at: null, published_at: null,
   pending_image_path: null, pending_story: null, pending_submitted_at: null,

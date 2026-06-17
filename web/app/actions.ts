@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createSupabaseServer } from "@/lib/auth-server";
+import { currentIdentity, ownerOr } from "@/lib/identity";
 import { supabaseAdmin } from "@/lib/supabase";
 
 export async function signOut() {
@@ -11,11 +12,10 @@ export async function signOut() {
 }
 
 export async function markNotificationsRead() {
-  const supabase = await createSupabaseServer();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user?.email) return;
+  const me = await currentIdentity();
+  if (!me) return;
   try {
     await supabaseAdmin().from("notifications").update({ read_at: new Date().toISOString() })
-      .eq("artist_email", user.email.toLowerCase()).is("read_at", null);
+      .or(ownerOr(me)).is("read_at", null);
   } catch { /* table may not exist yet */ }
 }

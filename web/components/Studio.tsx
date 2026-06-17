@@ -26,7 +26,7 @@ export default function Studio({
   tileLabel, initialArtUrl, initialNote = "", initialName = "", accent = "#e8643c", onClose, onSubmit, onSaveDraft,
 }: {
   tileLabel: string; initialArtUrl: string | null; initialNote?: string; initialName?: string; accent?: string;
-  onClose: () => void; onSubmit: (dataUrl: string, thumbUrl: string | null, name: string, note: string) => Promise<void>;
+  onClose: () => void; onSubmit: (dataUrl: string, thumbUrl: string | null, name: string, note: string, email: string) => Promise<void>;
   onSaveDraft?: (dataUrl: string, note: string) => Promise<{ ok: boolean; updatedAt?: string }>;
 }) {
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -43,6 +43,7 @@ export default function Studio({
   const [mirror, setMirror] = useState(false);
   const [note, setNote] = useState(initialNote);
   const [name, setName] = useState(initialName);
+  const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitErr, setSubmitErr] = useState("");
   const [loadingArt, setLoadingArt] = useState<boolean>(!!initialArtUrl);
@@ -272,7 +273,7 @@ export default function Studio({
       return;
     }
     setSubmitting(true); setSubmitErr("");
-    try { await onSubmit(img, thumb, name.trim(), note.trim()); }
+    try { await onSubmit(img, thumb, name.trim(), note.trim(), email.trim()); }
     catch (err) { setSubmitting(false); setSubmitErr("Couldn't submit: " + ((err as Error).message || "try again in a moment.")); }
   };
 
@@ -366,6 +367,7 @@ export default function Studio({
             <input className="studio__noteinput" maxLength={140} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Say a line: where were you when home looked like this?" />
             <span className="studio__count">{note.length}/140</span>
           </div>
+          <input className="studio__noteinput" style={{ marginTop: 8, paddingRight: 13 }} type="email" maxLength={120} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email (optional), to find this tile again" />
           {submitErr && <p className="studio__err">{submitErr}</p>}
           <button className="btn btn--primary btn--block" disabled={!dirtyRef.current || !name.trim() || submitting} onClick={submit}>{submitting ? "Submitting…" : !dirtyRef.current ? "Paint something first" : !name.trim() ? "Add your name to submit" : "Submit your tile"}</button>
         </div>

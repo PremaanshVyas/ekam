@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { createSupabaseServer } from "@/lib/auth-server";
+import { currentIdentity, owns } from "@/lib/identity";
 import { moderateTile } from "@/lib/moderate";
 import { canvasClosesAt, canvasClosed, claimWindowEnd } from "@/lib/deadline";
 
@@ -22,19 +22,17 @@ async function pngFromBlob(blob: Blob | null, maxBytes: number): Promise<Buffer 
 }
 
 async function ownTile(tileId: string) {
-  const auth = await createSupabaseServer();
-  const { data: { user } } = await auth.auth.getUser();
-  if (!user?.email) return null;
-  const email = user.email.toLowerCase();
+  const me = await currentIdentity();
+  if (!me) return null;
   const db = supabaseAdmin();
-  const { data: tile } = await db.from("tiles").select("artist_email, status").eq("id", tileId).maybeSingle();
-  if (!tile || tile.artist_email !== email) return null;
+  const { data: tile } = await db.from("tiles").select("artist_email, artist_user_id, status").eq("id", tileId).maybeSingle();
+  if (!tile || !owns(me, tile)) return null;
   if (!["claimed", "pending", "published"].includes(tile.status)) return null;
-  return { db, tile, email };
+  return { db, tile, me };
 }
 
 export async function submitTile(
-  tileId: string, image: Blob, thumb: Blob | null, name: string, story: string,
+  tileId: string, image: Blob, thumb: Blob | null, name: string, story: string, email?: string | null,
 ): Promise<{ ok: true; mode: SubmitMode } | { ok: false; error: "closed" }> {
   const owned = await ownTile(tileId);
   if (!owned) throw new Error("this isn't your tile");
@@ -49,6 +47,9 @@ export async function submitTile(
 
   const cleanStory = story.slice(0, 140);
   const cleanName = name.trim().slice(0, 40); // the display name the artist chose, replaces the email-derived default
+  // Optional, unverified contact email captured at submit (cross-device recovery + Edition-0
+  // list). Only ever set when a valid one is given — an empty field never nulls an existing one.
+  const cleanEmail = email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ? email.trim().toLowerCase().slice(0, 120) : null;
 
   // Versioned filenames so a re-submit never collides with a cached copy of the old
   // image (browser + Supabase CDN cache by URL). The thumb shares the timestamp so
@@ -75,6 +76,7 @@ export async function submitTile(
     const { error } = await db.from("tiles").update({
       pending_image_path: path, pending_story: cleanStory, pending_submitted_at: new Date().toISOString(),
       ...(cleanName ? { artist_name: cleanName } : {}),
+      ...(cleanEmail ? { artist_email: cleanEmail } : {}),
     }).eq("id", tileId).eq("status", "published");
     if (error) throw new Error(error.message);
     await clearDraft(db, tileId);
@@ -90,6 +92,7 @@ export async function submitTile(
     status: "pending", story: cleanStory, image_path: path,
     ...(thumbOk ? { thumb_path: thumbPath } : {}),
     ...(cleanName ? { artist_name: cleanName } : {}),
+    ...(cleanEmail ? { artist_email: cleanEmail } : {}),
   };
   const submitQ = (extra: Record<string, unknown>) =>
     db.from("tiles").update({ ...payload, ...extra }).eq("id", tileId).in("status", ["claimed", "pending"]);
@@ -140,7 +143,7 @@ export async function requestManualReview(tileId: string): Promise<{ ok: boolean
   }
   const { error } = await db.from("tiles").update({ review_requested_at: new Date().toISOString() }).eq("id", tileId);
   if (error) return { ok: false }; // migration 0006 not run yet
-  await db.from("moderation_log").insert({ tile_id: tileId, action: "review-requested", reason: `artist (${tile.artist_email}) asked for a human review` });
+  await db.from("moderation_log").insert({ tile_id: tileId, action: "review-requested", reason: `artist (${tile.artist_email ?? tile.artist_user_id ?? "anonymous"}) asked for a human review` });
   revalidatePath("/admin");
   return { ok: true };
 }

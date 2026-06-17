@@ -1,6 +1,7 @@
 import Landing from "@/components/Landing";
 import { supabaseAnon, supabaseAdmin, CANVAS_SLUG } from "@/lib/supabase";
 import { createSupabaseServer } from "@/lib/auth-server";
+import { identityOf } from "@/lib/identity";
 import { findMyTile } from "@/lib/tiles";
 import { canvasClosesAt } from "@/lib/deadline";
 
@@ -21,7 +22,8 @@ export default async function Home() {
       auth.auth.getUser(),
       db.from("canvases").select("id, grid_cols, grid_rows").eq("slug", CANVAS_SLUG).maybeSingle(),
     ]);
-    email = user?.email ?? null;
+    const me = identityOf(user);
+    email = me?.email ?? null;
     const cols = canvas?.grid_cols ?? 24;
     const rows = canvas?.grid_rows ?? 24;
     total = cols * rows;
@@ -31,7 +33,7 @@ export default async function Home() {
       const [claimedRes, publishedRes, mt] = await Promise.all([
         db.from("public_tiles").select("id", { count: "exact", head: true }).eq("canvas_id", canvas.id).in("status", ["claimed", "pending", "published"]),
         db.from("public_tiles").select("id", { count: "exact", head: true }).eq("canvas_id", canvas.id).eq("status", "published"),
-        email ? findMyTile(supabaseAdmin(), canvas.id, email) : Promise.resolve(null),
+        me ? findMyTile(supabaseAdmin(), canvas.id, me) : Promise.resolve(null),
       ]);
       claimed = claimedRes.count ?? 0;
       published = publishedRes.count ?? 0;

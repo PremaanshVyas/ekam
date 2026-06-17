@@ -16,6 +16,17 @@ import ShareTile from "@/components/ShareTile";
 import Logo from "@/components/Logo";
 import Countdown from "@/components/Countdown";
 
+// Ensure there is *some* session before a write — an anonymous one is created silently if
+// needed (no email, no code). Idempotent: reuses any existing session (anon or email), so a
+// second action never spawns a second identity. Returns false only if sign-in actually fails.
+async function ensureSession(): Promise<boolean> {
+  const supa = createSupabaseBrowser();
+  const { data: { session } } = await supa.auth.getSession();
+  if (session) return true;
+  const { error } = await supa.auth.signInAnonymously();
+  return !error;
+}
+
 type MyTile = { id: string; idx: number; status: string; name: string | null; artUrl: string | null; story: string | null; draftUrl: string | null; draftStory: string | null; aiVerdict: string | null; aiReason: string | null; expiresAt?: string | null };
 type Panel = "detail" | "claim" | "studio" | "reviewing" | null;
 type Notif = { id: string; kind: string; title: string; body: string | null; created_at: string; read_at: string | null };
@@ -135,67 +146,25 @@ function Dock({ api, viewMode, setViewMode, zoomLabel }: { api: React.MutableRef
   );
 }
 
-const OTP_LEN = 8; // ekam's Supabase issues 8 digit email codes
-function OTPInput({ onComplete }: { onComplete: (code: string) => void }) {
-  const [vals, setVals] = useState<string[]>(() => Array(OTP_LEN).fill(""));
-  const refs = useRef<(HTMLInputElement | null)[]>([]);
-  const fill = (start: number, digits: string) => {
-    const next = vals.slice();
-    for (let k = 0; k < digits.length && start + k < OTP_LEN; k++) next[start + k] = digits[k];
-    setVals(next);
-    const last = Math.min(start + digits.length, OTP_LEN - 1); refs.current[last]?.focus();
-    if (next.every((c) => c !== "")) onComplete(next.join(""));
-  };
-  const set = (i: number, raw: string) => {
-    const digits = raw.replace(/\D/g, "");
-    if (digits.length > 1) { fill(i, digits); return; } // paste support
-    const next = vals.slice(); next[i] = digits.slice(-1); setVals(next);
-    if (digits && i < OTP_LEN - 1) refs.current[i + 1]?.focus();
-    if (next.every((c) => c !== "")) onComplete(next.join(""));
-  };
-  const key = (i: number, e: React.KeyboardEvent) => { if (e.key === "Backspace" && !vals[i] && i > 0) refs.current[i - 1]?.focus(); };
-  return (
-    <div className="otp">
-      {vals.map((v, i) => (
-        <input key={i} ref={(el) => { refs.current[i] = el; }} className="otp__box" inputMode="numeric" aria-label={"Code digit " + (i + 1)}
-          value={v} onChange={(e) => set(i, e.target.value)} onKeyDown={(e) => key(i, e)} autoFocus={i === 0} />
-      ))}
-    </div>
-  );
-}
-
-function ClaimFlow({ wall, info, version, accent, signedIn, userEmail, hasTile, myLabel, onClose, onClaimed, onZoomMine, closed }: {
-  wall: Wall; info: TileInfo; version: number; accent: string; signedIn: boolean; userEmail: string | null; hasTile: boolean; myLabel: string;
+function ClaimFlow({ wall, info, version, accent, hasTile, myLabel, onClose, onClaimed, onZoomMine, closed }: {
+  wall: Wall; info: TileInfo; version: number; accent: string; hasTile: boolean; myLabel: string;
   onClose: () => void; onClaimed: (tileId: string) => void; onZoomMine: () => void; closed?: boolean;
 }) {
-  const [step, setStep] = useState<"confirm" | "email" | "code">(signedIn ? "confirm" : "email");
-  const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
-  const [signedOk, setSignedOk] = useState(false);
   const [err, setErr] = useState("");
-  const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
   const doClaim = async () => {
     setBusy(true); setErr("");
+    // create a silent anonymous session if there isn't one yet — no email, no code
+    if (!(await ensureSession())) { setBusy(false); setErr("Couldn't start a session. Check your connection and try again."); return; }
     const res = await claimTileAt(info.idx);
     if (res.ok) { onClaimed(res.tileId); return; }
     setBusy(false);
     if (res.error === "have-tile") setErr("You already have a tile. Edit that one instead.");
     else if (res.error === "taken") setErr("Someone just claimed this tile. Close this and pick another.");
     else if (res.error === "closed") setErr("The canvas closed at the deadline. No new tiles can be claimed.");
+    else if (res.error === "auth") setErr("Couldn't start a session. Check your connection and try again.");
     else setErr("Couldn't claim. Try again.");
-  };
-  const send = async () => {
-    if (!valid) return; setBusy(true); setErr("");
-    const { error } = await createSupabaseBrowser().auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
-    setBusy(false); if (error) setErr(error.message); else setStep("code");
-  };
-  const verify = async (code: string) => {
-    if (busy) return; setBusy(true); setErr("");
-    const { error } = await createSupabaseBrowser().auth.verifyOtp({ email, token: code.trim(), type: "email" });
-    if (error) { setBusy(false); setErr(error.message); return; }
-    setSignedOk(true);
-    await doClaim();
   };
 
   return (
@@ -218,50 +187,29 @@ function ClaimFlow({ wall, info, version, accent, signedIn, userEmail, hasTile, 
           <button className="btn btn--primary btn--block" onClick={onZoomMine}>Go to your tile</button>
           <div className="claim__art" style={{ marginTop: 18 }}><TileArt wall={wall} idx={info.idx} region={5} version={version} className="detail__nbcanvas" /></div>
         </>
-      ) : step === "confirm" ? (
-        <>
-          <h3 className="claim__t">This tile is open.</h3>
-          <p className="claim__d">Claim {info.id} as <b>{userEmail}</b>. It&apos;s yours to paint.</p>
-          {err && <p className="claim__err">{err}</p>}
-          <button className={"btn btn--primary btn--block" + (busy ? " btn--loading" : "")} disabled={busy} onClick={doClaim}>{busy ? "Claiming…" : "Claim this tile"}</button>
-          <p className="claim__fine">One tile per person. You&apos;ll have 48 hours to paint and submit it.</p>
-          <div className="claim__art" style={{ marginTop: 14 }}><TileArt wall={wall} idx={info.idx} region={5} version={version} className="detail__nbcanvas" /></div>
-        </>
-      ) : step === "email" ? (
-        <>
-          <h3 className="claim__t">This tile is open.</h3>
-          <p className="claim__d">Claim it with your email. We&apos;ll send a code to prove it&apos;s you, no password, no account.</p>
-          <div className="co__field"><label>Email</label>
-            <input className="co__input co__inputlive" type="email" placeholder="you@email.com" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} />
-          </div>
-          {err && <p className="claim__err">{err}</p>}
-          <button className={"btn btn--primary btn--block" + (busy ? " btn--loading" : "")} disabled={!valid || busy} onClick={send}>{busy ? "Sending code…" : "Send me a code"}</button>
-          <p className="claim__fine">We only use your email to verify this one tile.</p>
-          <div className="claim__art" style={{ marginTop: 14 }}><TileArt wall={wall} idx={info.idx} region={5} version={version} className="detail__nbcanvas" /></div>
-        </>
       ) : (
         <>
-          <button className="panel__back" onClick={() => setStep("email")}>‹ Back</button>
-          <div className="claim__mail">✉</div>
-          <h3 className="claim__t">Check your inbox.</h3>
-          <p className="claim__d">We sent a code to <b>{email}</b>. Enter it to claim {info.id}.</p>
-          <OTPInput onComplete={verify} />
+          <h3 className="claim__t">This tile is open.</h3>
+          <p className="claim__d">Claim {info.id} and it&apos;s yours to paint. No sign up, no email, just start painting.</p>
           {err && <p className="claim__err">{err}</p>}
-          <p className="claim__fine">{signedOk ? "Signed in ✓ · claiming your tile…" : busy ? "Verifying…" : "The code submits itself when you finish typing."}</p>
+          <button className={"btn btn--primary btn--block" + (busy ? " btn--loading" : "")} disabled={busy} onClick={doClaim}>{busy ? "Claiming…" : "Claim this tile"}</button>
+          <p className="claim__fine">One tile per person, kept on this device. You&apos;ll have 48 hours to paint and submit it.</p>
+          <div className="claim__art" style={{ marginTop: 14 }}><TileArt wall={wall} idx={info.idx} region={5} version={version} className="detail__nbcanvas" /></div>
         </>
       )}
     </div>
   );
 }
 
-function VoteButton({ uuid, votes, voted, signedIn, onNeedSignIn }: { uuid: string; votes: number; voted: boolean; signedIn: boolean; onNeedSignIn: () => void }) {
+function VoteButton({ uuid, votes, voted, onNeedSignIn }: { uuid: string; votes: number; voted: boolean; onNeedSignIn: () => void }) {
   const [v, setV] = useState(voted);
   const [n, setN] = useState(votes);
   const [busy, setBusy] = useState(false);
   useEffect(() => { setV(voted); setN(votes); }, [uuid, voted, votes]);
   const click = async () => {
-    if (!signedIn) { onNeedSignIn(); return; }
     if (busy) return; setBusy(true);
+    // anonymous voters are fine — make a silent session if there isn't one, else fall back to sign-in
+    if (!(await ensureSession())) { setBusy(false); onNeedSignIn(); return; }
     const next = !v; setV(next); setN((c) => Math.max(0, c + (next ? 1 : -1))); // optimistic
     const r = await toggleVote(uuid);
     setBusy(false);
@@ -275,8 +223,8 @@ function VoteButton({ uuid, votes, voted, signedIn, onNeedSignIn }: { uuid: stri
   );
 }
 
-function TileDetail({ wall, info, version, myTile, signedIn, onNeedSignIn, onClose, onZoom, onEdit, closed }: {
-  wall: Wall; info: TileInfo; version: number; myTile: MyTile | null; signedIn: boolean; onNeedSignIn: () => void;
+function TileDetail({ wall, info, version, myTile, onNeedSignIn, onClose, onZoom, onEdit, closed }: {
+  wall: Wall; info: TileInfo; version: number; myTile: MyTile | null; onNeedSignIn: () => void;
   onClose: () => void; onZoom: () => void; onEdit: () => void; closed?: boolean;
 }) {
   const mineArt = info.mine ? (myTile?.draftUrl ?? myTile?.artUrl ?? null) : null; // show latest autosaved draft, not the older submitted image
@@ -298,7 +246,7 @@ function TileDetail({ wall, info, version, myTile, signedIn, onNeedSignIn, onClo
       {info.mine && !closed && myTile?.status === "claimed" && myTile?.expiresAt && (
         <p className="detail__clock"><Countdown to={myTile.expiresAt} /> left to paint and submit · then the tile reopens</p>
       )}
-      {!info.mine && info.uuid && <VoteButton uuid={info.uuid} votes={info.votes ?? 0} voted={!!info.voted} signedIn={signedIn} onNeedSignIn={onNeedSignIn} />}
+      {!info.mine && info.uuid && <VoteButton uuid={info.uuid} votes={info.votes ?? 0} voted={!!info.voted} onNeedSignIn={onNeedSignIn} />}
       {info.mine && (info.votes ?? 0) > 0 && <p className="vote__mine">♥ {info.votes} {info.votes === 1 ? "person loves" : "people love"} your tile</p>}
       {info.mine && myTile?.status === "published" && myTile.artUrl && (
         <ShareTile url={`https://ekam.ink/t/${myTile.id}`} imageUrl={myTile.artUrl} title="my tile on ekam.ink · many hands, one canvas" />
@@ -361,8 +309,8 @@ function ConfettiSky({ n, once = false }: { n: number; once?: boolean }) {
   );
 }
 
-export default function Explorer({ cols, total, tiles, claimed, email, myTile, autoOpenMine, loadError, notifs = [], unread = 0, complete = false, published = 0, finaleFrom = null, finaleTo = null, closesAt = null, deadlinePassed = false }: {
-  cols: number; total: number; tiles: RealTileInput[]; claimed: number; email: string | null; myTile: MyTile | null; autoOpenMine?: boolean; loadError?: boolean; notifs?: Notif[]; unread?: number;
+export default function Explorer({ cols, total, tiles, claimed, email, signedIn = false, myTile, autoOpenMine, loadError, notifs = [], unread = 0, complete = false, published = 0, finaleFrom = null, finaleTo = null, closesAt = null, deadlinePassed = false }: {
+  cols: number; total: number; tiles: RealTileInput[]; claimed: number; email: string | null; signedIn?: boolean; myTile: MyTile | null; autoOpenMine?: boolean; loadError?: boolean; notifs?: Notif[]; unread?: number;
   complete?: boolean; published?: number; finaleFrom?: string | null; finaleTo?: string | null; closesAt?: string | null; deadlinePassed?: boolean;
 }) {
   const router = useRouter();
@@ -473,13 +421,13 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
   const openStudioForClaim = (tileId: string) => { if (!selected) return; studioTarget.current = { tileId, idx: selected.idx, label: selected.id, artUrl: null, note: "", name: "" }; setPanel("studio"); };
   // Resume from the latest autosaved draft if there is one; else the submitted/published image.
   const openStudioForEdit = () => { if (!myTile || !wall) return; const label = wall.infoFor(myTile.idx).id; const def = email ? email.split("@")[0] : ""; studioTarget.current = { tileId: myTile.id, idx: myTile.idx, label, artUrl: myTile.draftUrl ?? myTile.artUrl, note: myTile.draftStory ?? myTile.story ?? "", name: myTile.name && myTile.name !== def ? myTile.name : "" }; setPanel("studio"); };
-  const onStudioSubmit = async (dataUrl: string, thumbUrl: string | null, name: string, note: string) => {
+  const onStudioSubmit = async (dataUrl: string, thumbUrl: string | null, name: string, note: string, email: string) => {
     const t = studioTarget.current; if (!t) return;
     // Send the PNGs as binary blobs, not megabyte base64 strings — large string args
     // overflow Server Action serialization ("Maximum array nesting exceeded").
     const image = await (await fetch(dataUrl)).blob();
     const thumb = thumbUrl ? await (await fetch(thumbUrl)).blob() : null;
-    const r = await submitTile(t.tileId, image, thumb, name, note);
+    const r = await submitTile(t.tileId, image, thumb, name, note, email);
     if (!r.ok) { setReview({ state: "closed", reason: null }); setPanel("reviewing"); router.refresh(); return; }
     setLastArt(dataUrl); setReview({ state: "checking", reason: null }); setPanel("reviewing"); router.refresh();
   };
@@ -583,15 +531,17 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
         <Logo sm />
         <div className="ex__topright">
           <span className="ex__edition"><span className="ex__edno">Canvas Nº 001 · </span><span className="ex__live"><span className="livedot" />live</span></span>
-          {email ? (
+          {signedIn ? (
             <>
               <button className="bell" aria-label="Notifications" aria-expanded={notifOpen} onClick={() => { setNotifOpen((o) => !o); if (!notifOpen && unread > 0) markNotificationsRead(); }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
                 {unread > 0 && <span className="bell__dot" />}
               </button>
-              <span className="authchip" title={email}>{email}</span>
+              {email && <span className="authchip" title={email}>{email}</span>}
               {myTile && <button className="linkbtn" onClick={openMine}>Your tile</button>}
-              <form action={signOut} style={{ display: "inline" }}><button type="submit" className="linkbtn">Sign out</button></form>
+              {email
+                ? <form action={signOut} style={{ display: "inline" }}><button type="submit" className="linkbtn">Sign out</button></form>
+                : !myTile && <button className="linkbtn" onClick={() => setSignInOpen(true)}>Sign in</button>}
             </>
           ) : (
             <button className="linkbtn" onClick={() => setSignInOpen(true)}>Sign in</button>
@@ -638,8 +588,8 @@ export default function Explorer({ cols, total, tiles, claimed, email, myTile, a
       {panel && panel !== "studio" && selected && (
         <div className="panelwrap">
           <div className="panel__grab" aria-hidden />
-          {panel === "detail" && <TileDetail wall={wall} info={selected} version={ver} myTile={myTile} signedIn={!!email} onNeedSignIn={() => setSignInOpen(true)} onClose={closeAll} onZoom={() => api.current?.zoomToTile(selected.idx, 96)} onEdit={openStudioForEdit} closed={deadlinePassed} />}
-          {panel === "claim" && <ClaimFlow wall={wall} info={selected} version={ver} accent={accent} signedIn={!!email} userEmail={email} hasTile={!!myTile} myLabel={myLabel} onClose={closeAll} onClaimed={openStudioForClaim} onZoomMine={openMine} closed={deadlinePassed} />}
+          {panel === "detail" && <TileDetail wall={wall} info={selected} version={ver} myTile={myTile} onNeedSignIn={() => setSignInOpen(true)} onClose={closeAll} onZoom={() => api.current?.zoomToTile(selected.idx, 96)} onEdit={openStudioForEdit} closed={deadlinePassed} />}
+          {panel === "claim" && <ClaimFlow wall={wall} info={selected} version={ver} accent={accent} hasTile={!!myTile} myLabel={myLabel} onClose={closeAll} onClaimed={openStudioForClaim} onZoomMine={openMine} closed={deadlinePassed} />}
           {panel === "reviewing" && (
             <div className="panel panel--done">
               {review.state === "live" && <div className="confetti" aria-hidden>{Array.from({ length: CONFETTI_N }).map((_, i) => <i key={i} />)}</div>}
