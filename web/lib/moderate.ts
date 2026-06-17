@@ -126,13 +126,17 @@ export async function moderateTile(tileId: string): Promise<void> {
     const client = new Anthropic();
     const res = await client.messages.create({
       model: "claude-opus-4-8",
-      max_tokens: 700,
+      // adaptive thinking spends tokens BEFORE the output — max_tokens must cover both,
+      // or the JSON gets truncated and JSON.parse throws. 4000 is ample for a tile verdict
+      // (you only pay for tokens actually generated, so the high ceiling is free).
+      max_tokens: 4000,
       thinking: { type: "adaptive" },
       system: MOD_SYSTEM,
       messages: [{ role: "user", content: userContent }],
       output_config: { format: { type: "json_schema", schema: SCHEMA } },
     });
     const text = res.content.find((b) => b.type === "text")?.text ?? "";
+    if (!text) throw new Error(`empty screen output (stop_reason: ${res.stop_reason})`);
     let v = JSON.parse(text) as Verdict;
 
     // wordlist backstop on the text fields — known profanity can never auto-approve
@@ -146,20 +150,34 @@ export async function moderateTile(tileId: string): Promise<void> {
 
     // second adversarial pass before anything auto-publishes: both reviewers must agree
     if (auto && v.verdict === "approve") {
-      try {
+      const runVerify = async (): Promise<{ clean: boolean; reason: string }> => {
         const res2 = await client.messages.create({
           model: "claude-opus-4-8",
-          max_tokens: 300,
+          // same reasoning as pass 1: adaptive thinking + the verdict JSON must both fit.
+          // The old 300 ceiling truncated mid-thought, which is what surfaced as the
+          // spurious "second check unavailable, sent to a human".
+          max_tokens: 4000,
           thinking: { type: "adaptive" },
           system: VERIFY_SYSTEM,
           messages: [{ role: "user", content: userContent }],
           output_config: { format: { type: "json_schema", schema: VERIFY_SCHEMA } },
         });
         const t2 = res2.content.find((b) => b.type === "text")?.text ?? "";
-        const v2 = JSON.parse(t2) as { clean: boolean; reason: string };
+        if (!t2) throw new Error(`empty verifier output (stop_reason: ${res2.stop_reason})`);
+        return JSON.parse(t2) as { clean: boolean; reason: string };
+      };
+      // one retry covers a transient hiccup (network / overload) before falling back
+      let v2: { clean: boolean; reason: string } | null = null;
+      let lastErr = "";
+      for (let attempt = 0; attempt < 2 && !v2; attempt++) {
+        try { v2 = await runVerify(); }
+        catch (e) { lastErr = (e as Error)?.message || String(e); }
+      }
+      if (v2) {
         if (!v2.clean) v = { ...v, verdict: "review", reason: `Second look flagged: ${v2.reason}`, categories: v.categories.length ? v.categories : ["other"] };
-      } catch {
-        // verifier unavailable → don't auto-publish on a single opinion
+      } else {
+        // genuinely unavailable after a retry → fail safe to a human, never auto-publish on one opinion
+        console.error("[moderate] verifier unavailable after retry:", lastErr);
         v = { ...v, verdict: "review", reason: `${v.reason} (second check unavailable, sent to a human)` };
       }
     }
