@@ -406,6 +406,9 @@ export default function Studio({
           </div>
           <input className="studio__noteinput" style={{ marginTop: 8, paddingRight: 13 }} type="email" maxLength={120} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email (optional)" />
           <p className="studio__emailhint">Add your email to edit this tile from any device — we&apos;ll send a quick code to confirm. Leave it blank and you can only edit it on this browser.</p>
+        </div>
+        {/* submit stays pinned to the bottom of the dock so it's always reachable on a phone without scrolling past every tool */}
+        <div className="studio__submitbar">
           {emailErr && <p className="studio__err">{emailErr}</p>}
           {submitErr && <p className="studio__err">{submitErr}</p>}
           <button className="btn btn--primary btn--block" disabled={!dirty || !name.trim() || submitting || emailBusy} onClick={submit}>{submitting ? "Submitting…" : emailBusy ? "Sending code…" : !dirty ? "Paint something first" : !name.trim() ? "Add your name to submit" : (email.trim() && email.trim().toLowerCase() !== verifiedEmail) ? "Verify email & submit" : "Submit your tile"}</button>

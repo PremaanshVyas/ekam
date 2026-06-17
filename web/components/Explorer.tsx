@@ -332,6 +332,7 @@ export default function Explorer({ cols, total, tiles, claimed, email, signedIn 
   const studioTarget = useRef<{ tileId: string; idx: number; label: string; artUrl: string | null; note: string; name: string } | null>(null);
   const [signInOpen, setSignInOpen] = useState(false);
   const [lastArt, setLastArt] = useState<string | null>(null);
+  const [lastTileId, setLastTileId] = useState<string | null>(null); // mirror of the submitted tile id, read in the live panel without touching the ref during render
   const [nudge, setNudge] = useState(false);
   const openedMine = useRef(false);
   const [finaleMode, setFinaleMode] = useState<"art" | "tiles">("art");
@@ -429,7 +430,7 @@ export default function Explorer({ cols, total, tiles, claimed, email, signedIn 
     const thumb = thumbUrl ? await (await fetch(thumbUrl)).blob() : null;
     const r = await submitTile(t.tileId, image, thumb, name, note);
     if (!r.ok) { setReview({ state: "closed", reason: null }); setPanel("reviewing"); router.refresh(); return; }
-    setLastArt(dataUrl); setReview({ state: "checking", reason: null }); setPanel("reviewing"); router.refresh();
+    setLastArt(dataUrl); setLastTileId(t.tileId); setReview({ state: "checking", reason: null }); setPanel("reviewing"); router.refresh();
   };
   // Optional email at submit → LINKED to the (anonymous) session so the tile is editable from
   // any device, verified with a 6-digit code. updateUser keeps the SAME user id (the tile stays
@@ -622,9 +623,12 @@ export default function Explorer({ cols, total, tiles, claimed, email, signedIn 
                 {review.state === "live" && (<>
                   <div className="done__check done__check--pop">✓</div>
                   <h3 className="done__t">It&apos;s live!</h3>
-                  <p className="done__d">Your tile cleared review and just joined the wall with your name. Share it from your tile panel.</p>
-                  {lastArt && <button className="btn btn--ghost btn--block" style={{ marginBottom: 10 }} onClick={() => { const a = document.createElement("a"); a.href = lastArt; a.download = "my-tile-ekam.png"; document.body.appendChild(a); a.click(); a.remove(); }}>Download your tile</button>}
-                  <button className="btn btn--primary btn--block" onClick={() => { closeAll(); router.refresh(); }}>Back to the wall</button>
+                  <p className="done__d">Your tile cleared review and just joined the wall with your name.</p>
+                  {email
+                    ? <p className="done__note done__note--ok">✓ Saved to your email — you can edit it from any device.</p>
+                    : <p className="done__note">This tile lives in this browser. Add your email when you edit it to reach it from anywhere.</p>}
+                  {lastTileId && <ShareTile url={`https://ekam.ink/t/${lastTileId}`} imageUrl={lastArt ?? ""} title="my tile on ekam.ink · many hands, one canvas" />}
+                  <button className="btn btn--primary btn--block" style={{ marginTop: 12 }} onClick={() => { closeAll(); router.refresh(); }}>Back to the wall</button>
                 </>)}
                 {review.state === "returned" && (<>
                   <div className="done__warn">!</div>
@@ -664,7 +668,15 @@ export default function Explorer({ cols, total, tiles, claimed, email, signedIn 
       )}
 
       {nudge && !panel && !complete && (
-        <button className="ex__nudge" onClick={dismissNudge}>✦ {coarse ? "Tap" : "Click"} any open tile to make it yours</button>
+        <div className="ex__intro" role="dialog" aria-label="How it works">
+          <button className="ex__introx" onClick={dismissNudge} aria-label="Dismiss">✕</button>
+          <div className="ex__introsteps">
+            <span><b>1</b>{coarse ? "Tap" : "Click"} any open tile to claim it</span>
+            <span><b>2</b>Paint your piece — no sign up, no email</span>
+            <span><b>3</b>Submit; it joins the wall with your name</span>
+          </div>
+          <button className="ex__introcta" onClick={dismissNudge}>Got it ✦</button>
+        </div>
       )}
       {!artMode && <div className="ex__hint">{coarse ? "Pinch to zoom · drag to pan · tap a tile" : "Scroll to zoom · drag to pan · click a tile"}</div>}
       {complete && (
