@@ -33,13 +33,13 @@ export default function SignInModal({ onClose }: { onClose: () => void }) {
     <div className="modal-scrim" onClick={step === "done" ? undefined : onClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="panel__head">
-          <span className="panel__eyebrow"><span className="studio__dot" style={{ background: "var(--accent)" }} />Sign in</span>
+          <span className="panel__eyebrow"><span className="studio__dot" style={{ background: "var(--accent)" }} />Find your tile</span>
           <button className="panel__x" onClick={onClose} aria-label="Close">✕</button>
         </div>
         {step === "email" ? (
           <>
-            <h3 className="claim__t">Welcome back.</h3>
-            <p className="claim__d">Enter your email and we&apos;ll send a code. This is how you get back to your tile to paint or edit it.</p>
+            <h3 className="claim__t">Find your tile.</h3>
+            <p className="claim__d">Already painted one and saved it with your email? Enter that email and we&apos;ll send a code, so you can get back to your tile to paint or edit it from any device. No account needed.</p>
             <div className="co__field"><label>Email</label>
               <input className="co__input co__inputlive" type="email" placeholder="you@email.com" value={email} autoFocus onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} />
             </div>
@@ -51,7 +51,7 @@ export default function SignInModal({ onClose }: { onClose: () => void }) {
           <>
             <button className="panel__back" onClick={() => { setStep("email"); setErr(""); }}>‹ Back</button>
             <h3 className="claim__t">Check your inbox.</h3>
-            <p className="claim__d">We sent a code to <b>{email}</b>. Enter it to sign in.</p>
+            <p className="claim__d">We sent a code to <b>{email}</b>. Enter it to find your tile.</p>
             <div className="co__field"><label>Code</label>
               <input className="co__input co__inputlive" inputMode="numeric" autoFocus placeholder="your code"
                 value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 8))} onKeyDown={(e) => e.key === "Enter" && verify()}
@@ -63,8 +63,8 @@ export default function SignInModal({ onClose }: { onClose: () => void }) {
         ) : (
           <div className="done" style={{ paddingTop: 14, paddingBottom: 8 }}>
             <div className="done__check done__check--pop">✓</div>
-            <h3 className="done__t">Signed in.</h3>
-            <p className="done__d">Welcome back, you&apos;re all set.</p>
+            <h3 className="done__t">Found it.</h3>
+            <p className="done__d">Your tile is here — opening it now.</p>
           </div>
         )}
       </div>

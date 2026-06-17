@@ -32,11 +32,11 @@ async function ownTile(tileId: string) {
 }
 
 export async function submitTile(
-  tileId: string, image: Blob, thumb: Blob | null, name: string, story: string, email?: string | null,
+  tileId: string, image: Blob, thumb: Blob | null, name: string, story: string,
 ): Promise<{ ok: true; mode: SubmitMode } | { ok: false; error: "closed" }> {
   const owned = await ownTile(tileId);
   if (!owned) throw new Error("this isn't your tile");
-  const { db, tile } = owned;
+  const { db, tile, me } = owned;
 
   const closesAt = await canvasClosesAt(db);
   if (canvasClosed(closesAt) || process.env.FINALE_FORCE === "1") return { ok: false, error: "closed" };
@@ -47,9 +47,9 @@ export async function submitTile(
 
   const cleanStory = story.slice(0, 140);
   const cleanName = name.trim().slice(0, 40); // the display name the artist chose, replaces the email-derived default
-  // Optional, unverified contact email captured at submit (cross-device recovery + Edition-0
-  // list). Only ever set when a valid one is given — an empty field never nulls an existing one.
-  const cleanEmail = email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ? email.trim().toLowerCase().slice(0, 120) : null;
+  // The contact email is the VERIFIED one on the session (set when the artist linked an email in
+  // the studio); we trust the session, never a raw client string. Anonymous tiles stay null.
+  const cleanEmail = me.email ?? null;
 
   // Versioned filenames so a re-submit never collides with a cached copy of the old
   // image (browser + Supabase CDN cache by URL). The thumb shares the timestamp so

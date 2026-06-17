@@ -23,11 +23,13 @@ const BRUSHES: Record<BrushType, { alpha: number; blend: GlobalCompositeOperatio
 const BRUSH_LIST = Object.keys(BRUSHES) as BrushType[];
 
 export default function Studio({
-  tileLabel, initialArtUrl, initialNote = "", initialName = "", accent = "#e8643c", onClose, onSubmit, onSaveDraft,
+  tileLabel, initialArtUrl, initialNote = "", initialName = "", initialEmail = "", accent = "#e8643c", onClose, onSubmit, onSaveDraft, onSendCode, onVerifyCode,
 }: {
-  tileLabel: string; initialArtUrl: string | null; initialNote?: string; initialName?: string; accent?: string;
-  onClose: () => void; onSubmit: (dataUrl: string, thumbUrl: string | null, name: string, note: string, email: string) => Promise<void>;
+  tileLabel: string; initialArtUrl: string | null; initialNote?: string; initialName?: string; initialEmail?: string; accent?: string;
+  onClose: () => void; onSubmit: (dataUrl: string, thumbUrl: string | null, name: string, note: string) => Promise<void>;
   onSaveDraft?: (dataUrl: string, note: string) => Promise<{ ok: boolean; updatedAt?: string }>;
+  onSendCode?: (email: string) => Promise<{ ok: boolean; error?: string }>;
+  onVerifyCode?: (email: string, code: string) => Promise<{ ok: boolean; error?: string }>;
 }) {
   const stageRef = useRef<HTMLDivElement | null>(null);
   const dispRef = useRef<HTMLCanvasElement | null>(null);
@@ -43,12 +45,19 @@ export default function Studio({
   const [mirror, setMirror] = useState(false);
   const [note, setNote] = useState(initialNote);
   const [name, setName] = useState(initialName);
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(initialEmail);
+  // an optional email is VERIFIED (linked to your session) so editing from another device works
+  const [emailStep, setEmailStep] = useState<"idle" | "code">("idle");
+  const [code, setCode] = useState("");
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [emailErr, setEmailErr] = useState("");
+  const [verifiedEmail, setVerifiedEmail] = useState(initialEmail.trim().toLowerCase()); // already-signed-in email skips the check
   const [submitting, setSubmitting] = useState(false);
   const [submitErr, setSubmitErr] = useState("");
   const [loadingArt, setLoadingArt] = useState<boolean>(!!initialArtUrl);
   const [recent, setRecent] = useState<string[]>([]);
   const dirtyRef = useRef(false);
+  const [dirty, setDirty] = useState(false); // mirrors dirtyRef so the submit button reacts without reading a ref during render
   const undoRef = useRef<ImageData[]>([]);
   const redoRef = useRef<ImageData[]>([]);
   const drawingRef = useRef(false);
@@ -141,7 +150,7 @@ export default function Studio({
     if (!initialArtUrl) { setLoadingArt(false); return; }
     setLoadingArt(true);
     const img = new Image(); img.crossOrigin = "anonymous";
-    img.onload = () => { const g = bufRef.current!.getContext("2d")!; g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high"; g.drawImage(img, 0, 0, DRAW_RES, DRAW_RES); dirtyRef.current = true; renderDisplay(); setLoadingArt(false); force((n) => n + 1); };
+    img.onload = () => { const g = bufRef.current!.getContext("2d")!; g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high"; g.drawImage(img, 0, 0, DRAW_RES, DRAW_RES); dirtyRef.current = true; setDirty(true); renderDisplay(); setLoadingArt(false); force((n) => n + 1); };
     img.onerror = () => setLoadingArt(false);
     img.src = initialArtUrl;
   }, [initialArtUrl]);
@@ -177,7 +186,7 @@ export default function Studio({
       if (Math.abs(tr - nr) + Math.abs(tg - ng) + Math.abs(tb - nb) < 12) return;
       const tol = 48, stack = [sy * W + sx], seen = new Uint8Array(W * W);
       while (stack.length) { const i = stack.pop()!; if (seen[i]) continue; seen[i] = 1; const o = i * 4; if (Math.abs(data[o] - tr) + Math.abs(data[o + 1] - tg) + Math.abs(data[o + 2] - tb) > tol) continue; data[o] = nr; data[o + 1] = ng; data[o + 2] = nb; data[o + 3] = 255; const x = i % W, y = (i / W) | 0; if (x > 0) stack.push(i - 1); if (x < W - 1) stack.push(i + 1); if (y > 0) stack.push(i - W); if (y < W - 1) stack.push(i + W); }
-      g.putImageData(img, 0, 0); dirtyRef.current = true;
+      g.putImageData(img, 0, 0); dirtyRef.current = true; setDirty(true);
     };
     const commit = () => { if (isEraser()) return; const g = buf(); const p = BRUSHES[live.current.brushType]; g.save(); g.globalAlpha = p.alpha * live.current.opacity; g.globalCompositeOperation = p.blend; g.drawImage(strokeRef.current!, 0, 0); g.restore(); sc().clearRect(0, 0, DRAW_RES, DRAW_RES); };
     const drawShape = (a: Pt, b: Pt, kind: string) => {
@@ -207,10 +216,10 @@ export default function Studio({
       if (t === "eyedropper") { pick(p); return; }
       snapshot();
       if (t === "fill") { fill(p); renderDisplay(); force((n) => n + 1); autosaveRef.current(); return; }
-      if (SHAPES.has(t)) { sc().clearRect(0, 0, DRAW_RES, DRAW_RES); shapeStartRef.current = p; drawingRef.current = true; ptsRef.current = [p]; try { cv.setPointerCapture(e.pointerId); } catch {} dirtyRef.current = true; return; }
+      if (SHAPES.has(t)) { sc().clearRect(0, 0, DRAW_RES, DRAW_RES); shapeStartRef.current = p; drawingRef.current = true; ptsRef.current = [p]; try { cv.setPointerCapture(e.pointerId); } catch {} dirtyRef.current = true; setDirty(true); return; }
       if (!isEraser()) sc().clearRect(0, 0, DRAW_RES, DRAW_RES);
       drawingRef.current = true; ptsRef.current = [p]; try { cv.setPointerCapture(e.pointerId); } catch {}
-      dot(p); renderDisplay(); dirtyRef.current = true;
+      dot(p); renderDisplay(); dirtyRef.current = true; setDirty(true);
     };
     const move = (e: PointerEvent) => {
       if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -258,8 +267,9 @@ export default function Studio({
   const snapBuf = () => bufRef.current!.getContext("2d")!.getImageData(0, 0, DRAW_RES, DRAW_RES);
   const undo = () => { if (!undoRef.current.length) return; redoRef.current.push(snapBuf()); bufRef.current!.getContext("2d")!.putImageData(undoRef.current.pop()!, 0, 0); renderDisplay(); force((n) => n + 1); autosaveRef.current(); };
   const redo = () => { if (!redoRef.current.length) return; undoRef.current.push(snapBuf()); bufRef.current!.getContext("2d")!.putImageData(redoRef.current.pop()!, 0, 0); renderDisplay(); force((n) => n + 1); autosaveRef.current(); };
-  const clearAll = () => { snapshot(); const g = bufRef.current!.getContext("2d")!; g.fillStyle = PAPER; g.fillRect(0, 0, DRAW_RES, DRAW_RES); dirtyRef.current = false; renderDisplay(); force((n) => n + 1); autosaveRef.current(); };
-  const submit = async () => {
+  const clearAll = () => { snapshot(); const g = bufRef.current!.getContext("2d")!; g.fillStyle = PAPER; g.fillRect(0, 0, DRAW_RES, DRAW_RES); dirtyRef.current = false; setDirty(false); renderDisplay(); force((n) => n + 1); autosaveRef.current(); };
+  // Ship the painting. The optional-email gate (below) runs before this.
+  const doSubmit = async () => {
     if (!dirtyRef.current || !name.trim() || submitting) return;
     const out = document.createElement("canvas"); out.width = DRAW_RES; out.height = DRAW_RES; out.getContext("2d")!.drawImage(bufRef.current!, 0, 0);
     // small thumb for the wall composite — the wall loads these instead of full PNGs
@@ -273,9 +283,36 @@ export default function Studio({
       return;
     }
     setSubmitting(true); setSubmitErr("");
-    try { await onSubmit(img, thumb, name.trim(), note.trim(), email.trim()); }
+    try { await onSubmit(img, thumb, name.trim(), note.trim()); }
     catch (err) { setSubmitting(false); setSubmitErr("Couldn't submit: " + ((err as Error).message || "try again in a moment.")); }
   };
+  // If a NEW email was entered, verify it first: a 6-digit code is mailed, then linked to your
+  // session so the tile becomes editable from any device. No email → submit straight away.
+  const submit = async () => {
+    if (!dirtyRef.current || !name.trim() || submitting || emailBusy) return;
+    const em = email.trim().toLowerCase();
+    if (em && em !== verifiedEmail && onSendCode) {
+      setEmailBusy(true); setEmailErr(""); setSubmitErr("");
+      const res = await onSendCode(em);
+      setEmailBusy(false);
+      if (res.ok) { setCode(""); setEmailStep("code"); }
+      else setEmailErr(res.error || "Couldn't send a code to that email. Check it and try again.");
+      return;
+    }
+    await doSubmit();
+  };
+  const confirmCode = async () => {
+    if (emailBusy || code.trim().length < 6 || !onVerifyCode) return;
+    const em = email.trim().toLowerCase();
+    setEmailBusy(true); setEmailErr("");
+    const res = await onVerifyCode(em, code.trim());
+    setEmailBusy(false);
+    if (!res.ok) { setEmailErr(res.error || "That code didn't match. Try again."); return; }
+    setVerifiedEmail(em); setEmailStep("idle");
+    await doSubmit();
+  };
+  // bail out of the email step and submit anonymously (editable on this browser only)
+  const skipEmail = async () => { setEmailStep("idle"); setEmail(""); setVerifiedEmail(""); await doSubmit(); };
 
   const pickColor = (c: string) => { setColor(c); if (tool === "eraser" || tool === "eyedropper") setTool("brush"); };
   const customActive = !EDITOR_PALETTE.includes(color);
@@ -364,15 +401,39 @@ export default function Studio({
         <div className="studio__group">
           <input className="studio__noteinput" style={{ marginBottom: 8, paddingRight: 13 }} maxLength={40} value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name, shown on your tile" />
           <div className="studio__note" style={{ marginBottom: 0 }}>
-            <input className="studio__noteinput" maxLength={140} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Say a line: where were you when home looked like this?" />
+            <input className="studio__noteinput" maxLength={140} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Say a line about your tile (optional)" />
             <span className="studio__count">{note.length}/140</span>
           </div>
-          <input className="studio__noteinput" style={{ marginTop: 8, paddingRight: 13 }} type="email" maxLength={120} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email (optional), to find this tile again" />
+          <input className="studio__noteinput" style={{ marginTop: 8, paddingRight: 13 }} type="email" maxLength={120} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email (optional)" />
+          <p className="studio__emailhint">Add your email to edit this tile from any device — we&apos;ll send a quick code to confirm. Leave it blank and you can only edit it on this browser.</p>
+          {emailErr && <p className="studio__err">{emailErr}</p>}
           {submitErr && <p className="studio__err">{submitErr}</p>}
-          <button className="btn btn--primary btn--block" disabled={!dirtyRef.current || !name.trim() || submitting} onClick={submit}>{submitting ? "Submitting…" : !dirtyRef.current ? "Paint something first" : !name.trim() ? "Add your name to submit" : "Submit your tile"}</button>
+          <button className="btn btn--primary btn--block" disabled={!dirty || !name.trim() || submitting || emailBusy} onClick={submit}>{submitting ? "Submitting…" : emailBusy ? "Sending code…" : !dirty ? "Paint something first" : !name.trim() ? "Add your name to submit" : (email.trim() && email.trim().toLowerCase() !== verifiedEmail) ? "Verify email & submit" : "Submit your tile"}</button>
         </div>
       </div>
       </div>
+
+      {emailStep === "code" && (
+        <div className="modal-scrim" onClick={() => { if (!emailBusy) setEmailStep("idle"); }}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="panel__head">
+              <span className="panel__eyebrow"><span className="studio__dot" style={{ background: accent }} />Save to your email</span>
+              <button className="panel__x" onClick={() => { if (!emailBusy) setEmailStep("idle"); }} aria-label="Close">✕</button>
+            </div>
+            <h3 className="claim__t">Check your inbox.</h3>
+            <p className="claim__d">We sent a code to <b>{email.trim()}</b>. Enter it to save your tile to your email so you can edit it from any device.</p>
+            <div className="co__field"><label>Code</label>
+              <input className="co__input co__inputlive" inputMode="numeric" autoFocus placeholder="your code"
+                value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 8))} onKeyDown={(e) => e.key === "Enter" && confirmCode()}
+                style={{ letterSpacing: 6, textAlign: "center", fontFamily: "var(--mono)", fontSize: 20 }} />
+            </div>
+            {emailErr && <p className="claim__err">{emailErr}</p>}
+            <button className={"btn btn--primary btn--block" + (emailBusy ? " btn--loading" : "")} disabled={emailBusy || code.trim().length < 6} onClick={confirmCode}>{emailBusy ? "Verifying…" : "Verify & submit"}</button>
+            <button className="studio__skip" onClick={skipEmail} disabled={emailBusy}>Skip — submit without saving to email</button>
+            <p className="claim__fine">Skipping is fine. You&apos;ll just be able to edit this tile on this browser only.</p>
+          </div>
+        </div>
+      )}
 
       <input ref={colorInputRef} type="color" value={color} onChange={(e) => { setColor(e.target.value); if (tool === "eraser" || tool === "eyedropper") setTool("brush"); }} aria-hidden tabIndex={-1} style={{ position: "fixed", width: 1, height: 1, opacity: 0, pointerEvents: "none", left: 16, bottom: 16 }} />
     </div>

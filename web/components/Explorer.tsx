@@ -421,15 +421,29 @@ export default function Explorer({ cols, total, tiles, claimed, email, signedIn 
   const openStudioForClaim = (tileId: string) => { if (!selected) return; studioTarget.current = { tileId, idx: selected.idx, label: selected.id, artUrl: null, note: "", name: "" }; setPanel("studio"); };
   // Resume from the latest autosaved draft if there is one; else the submitted/published image.
   const openStudioForEdit = () => { if (!myTile || !wall) return; const label = wall.infoFor(myTile.idx).id; const def = email ? email.split("@")[0] : ""; studioTarget.current = { tileId: myTile.id, idx: myTile.idx, label, artUrl: myTile.draftUrl ?? myTile.artUrl, note: myTile.draftStory ?? myTile.story ?? "", name: myTile.name && myTile.name !== def ? myTile.name : "" }; setPanel("studio"); };
-  const onStudioSubmit = async (dataUrl: string, thumbUrl: string | null, name: string, note: string, email: string) => {
+  const onStudioSubmit = async (dataUrl: string, thumbUrl: string | null, name: string, note: string) => {
     const t = studioTarget.current; if (!t) return;
     // Send the PNGs as binary blobs, not megabyte base64 strings — large string args
     // overflow Server Action serialization ("Maximum array nesting exceeded").
     const image = await (await fetch(dataUrl)).blob();
     const thumb = thumbUrl ? await (await fetch(thumbUrl)).blob() : null;
-    const r = await submitTile(t.tileId, image, thumb, name, note, email);
+    const r = await submitTile(t.tileId, image, thumb, name, note);
     if (!r.ok) { setReview({ state: "closed", reason: null }); setPanel("reviewing"); router.refresh(); return; }
     setLastArt(dataUrl); setReview({ state: "checking", reason: null }); setPanel("reviewing"); router.refresh();
+  };
+  // Optional email at submit → LINKED to the (anonymous) session so the tile is editable from
+  // any device, verified with a 6-digit code. updateUser keeps the SAME user id (the tile stays
+  // owned); verifyOtp(type "email_change") confirms the mailed code.
+  const sendEmailCode = async (em: string): Promise<{ ok: boolean; error?: string }> => {
+    if (!(await ensureSession())) return { ok: false, error: "Couldn't start a session. Check your connection and try again." };
+    const { error } = await createSupabaseBrowser().auth.updateUser({ email: em });
+    return error ? { ok: false, error: error.message } : { ok: true };
+  };
+  const verifyEmailCode = async (em: string, code: string): Promise<{ ok: boolean; error?: string }> => {
+    const { error } = await createSupabaseBrowser().auth.verifyOtp({ email: em, token: code, type: "email_change" });
+    if (error) return { ok: false, error: error.message };
+    router.refresh(); // the session now carries the verified email
+    return { ok: true };
   };
   // watch the AI review land in real time after a submit
   useEffect(() => {
@@ -541,10 +555,10 @@ export default function Explorer({ cols, total, tiles, claimed, email, signedIn 
               {myTile && <button className="linkbtn" onClick={openMine}>Your tile</button>}
               {email
                 ? <form action={signOut} style={{ display: "inline" }}><button type="submit" className="linkbtn">Sign out</button></form>
-                : !myTile && <button className="linkbtn" onClick={() => setSignInOpen(true)}>Sign in</button>}
+                : !myTile && <button className="linkbtn" onClick={() => setSignInOpen(true)}>Find your tile</button>}
             </>
           ) : (
-            <button className="linkbtn" onClick={() => setSignInOpen(true)}>Sign in</button>
+            <button className="linkbtn" onClick={() => setSignInOpen(true)}>Find your tile</button>
           )}
         </div>
       </div>
@@ -646,7 +660,7 @@ export default function Explorer({ cols, total, tiles, claimed, email, signedIn 
       )}
 
       {panel === "studio" && studioTarget.current && (
-        <Studio tileLabel={studioTarget.current.label} initialArtUrl={studioTarget.current.artUrl} initialNote={studioTarget.current.note} initialName={studioTarget.current.name} accent={accent} onClose={() => setPanel(myTile ? "detail" : null)} onSubmit={onStudioSubmit} onSaveDraft={onSaveDraft} />
+        <Studio tileLabel={studioTarget.current.label} initialArtUrl={studioTarget.current.artUrl} initialNote={studioTarget.current.note} initialName={studioTarget.current.name} initialEmail={email ?? ""} accent={accent} onClose={() => setPanel(myTile ? "detail" : null)} onSubmit={onStudioSubmit} onSaveDraft={onSaveDraft} onSendCode={sendEmailCode} onVerifyCode={verifyEmailCode} />
       )}
 
       {nudge && !panel && !complete && (

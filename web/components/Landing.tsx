@@ -137,7 +137,7 @@ export default function Landing({ total, claimed, published, email, myTile, clos
             </>
           ) : (
             <>
-              <button className="linkbtn" onClick={() => setSignInOpen(true)}>Sign in</button>
+              <button className="linkbtn" onClick={() => setSignInOpen(true)}>Find your tile</button>
               <Link className="btn btn--primary" href="/canvas">Open the canvas</Link>
             </>
           )}
