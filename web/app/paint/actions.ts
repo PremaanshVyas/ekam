@@ -173,5 +173,20 @@ export async function saveDraft(tileId: string, image: Blob, story: string): Pro
     .update({ draft_image_path: path, draft_story: story.slice(0, 140), draft_updated_at: updatedAt })
     .eq("id", tileId);
   if (error) return { ok: false }; // draft_* columns missing → migration 0004 not run yet
+  await promoteFromGrace(db, tileId);
   return { ok: true, updatedAt };
+}
+
+// The first real stroke (this draft save) escapes the 1h grace hold: promote a still-claimed
+// tile to the full 48h window, once. Best-effort — a still-on-grace tile has claim_expires_at
+// well under 6h out, while a tile already on the 48h window (or resubmitted) is left alone.
+async function promoteFromGrace(db: ReturnType<typeof supabaseAdmin>, tileId: string) {
+  try {
+    const { data: t } = await db.from("tiles").select("status, claim_expires_at").eq("id", tileId).maybeSingle();
+    if (t?.status === "claimed" && t.claim_expires_at && Date.parse(t.claim_expires_at) < Date.now() + 6 * 60 * 60 * 1000) {
+      await db.from("tiles")
+        .update({ claim_expires_at: claimWindowEnd(await canvasClosesAt(db)), expiry_warned_at: null })
+        .eq("id", tileId).eq("status", "claimed");
+    }
+  } catch { /* claim_expires_at / expiry_warned_at may not exist before migration 0008 */ }
 }

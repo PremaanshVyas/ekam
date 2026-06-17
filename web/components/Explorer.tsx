@@ -148,17 +148,19 @@ function Dock({ api, viewMode, setViewMode, zoomLabel }: { api: React.MutableRef
 
 function ClaimFlow({ wall, info, version, accent, hasTile, myLabel, onClose, onClaimed, onZoomMine, closed }: {
   wall: Wall; info: TileInfo; version: number; accent: string; hasTile: boolean; myLabel: string;
-  onClose: () => void; onClaimed: (tileId: string) => void; onZoomMine: () => void; closed?: boolean;
+  onClose: () => void; onClaimed: (tileId: string, name: string) => void; onZoomMine: () => void; closed?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [name, setName] = useState("");
 
   const doClaim = async () => {
+    if (busy || !name.trim()) return;
     setBusy(true); setErr("");
     // create a silent anonymous session if there isn't one yet — no email, no code
     if (!(await ensureSession())) { setBusy(false); setErr("Couldn't start a session. Check your connection and try again."); return; }
-    const res = await claimTileAt(info.idx);
-    if (res.ok) { onClaimed(res.tileId); return; }
+    const res = await claimTileAt(info.idx, name.trim());
+    if (res.ok) { onClaimed(res.tileId, name.trim()); return; }
     setBusy(false);
     if (res.error === "have-tile") setErr("You already have a tile. Edit that one instead.");
     else if (res.error === "taken") setErr("Someone just claimed this tile. Close this and pick another.");
@@ -190,10 +192,14 @@ function ClaimFlow({ wall, info, version, accent, hasTile, myLabel, onClose, onC
       ) : (
         <>
           <h3 className="claim__t">This tile is open.</h3>
-          <p className="claim__d">Claim {info.id} and it&apos;s yours to paint. No sign up, no email, just start painting.</p>
+          <p className="claim__d">Add your name and start painting {info.id}. No sign up, no email.</p>
+          <div className="co__field"><label>Your name</label>
+            <input className="co__input co__inputlive" maxLength={40} autoFocus placeholder="shown on your tile" value={name}
+              onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && doClaim()} />
+          </div>
           {err && <p className="claim__err">{err}</p>}
-          <button className={"btn btn--primary btn--block" + (busy ? " btn--loading" : "")} disabled={busy} onClick={doClaim}>{busy ? "Claiming…" : "Claim this tile"}</button>
-          <p className="claim__fine">One tile per person, kept on this device. You&apos;ll have 48 hours to paint and submit it.</p>
+          <button className={"btn btn--primary btn--block" + (busy ? " btn--loading" : "")} disabled={busy || !name.trim()} onClick={doClaim}>{busy ? "Claiming…" : name.trim() ? "Start painting" : "Add your name to start"}</button>
+          <p className="claim__fine">One tile per person, kept on this device. Make your first stroke within <b>60 minutes</b> to keep it — then it&apos;s yours for <b>48 hours</b> to finish and submit. Leave it untouched and it returns to the wall.</p>
           <div className="claim__art" style={{ marginTop: 14 }}><TileArt wall={wall} idx={info.idx} region={5} version={version} className="detail__nbcanvas" /></div>
         </>
       )}
@@ -419,7 +425,7 @@ export default function Explorer({ cols, total, tiles, claimed, email, signedIn 
     setTimeout(() => api.current?.zoomToTile(mi, 96), 90);
   }, [autoOpenMine, myTile, wall]);
 
-  const openStudioForClaim = (tileId: string) => { if (!selected) return; studioTarget.current = { tileId, idx: selected.idx, label: selected.id, artUrl: null, note: "", name: "" }; setPanel("studio"); };
+  const openStudioForClaim = (tileId: string, name: string) => { if (!selected) return; studioTarget.current = { tileId, idx: selected.idx, label: selected.id, artUrl: null, note: "", name }; setPanel("studio"); };
   // Resume from the latest autosaved draft if there is one; else the submitted/published image.
   const openStudioForEdit = () => { if (!myTile || !wall) return; const label = wall.infoFor(myTile.idx).id; const def = email ? email.split("@")[0] : ""; studioTarget.current = { tileId: myTile.id, idx: myTile.idx, label, artUrl: myTile.draftUrl ?? myTile.artUrl, note: myTile.draftStory ?? myTile.story ?? "", name: myTile.name && myTile.name !== def ? myTile.name : "" }; setPanel("studio"); };
   const onStudioSubmit = async (dataUrl: string, thumbUrl: string | null, name: string, note: string) => {

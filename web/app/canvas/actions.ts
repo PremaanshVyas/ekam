@@ -4,7 +4,7 @@ import { supabaseAdmin, CANVAS_SLUG } from "@/lib/supabase";
 import { currentIdentity, ownerOr, owns } from "@/lib/identity";
 import { broadcastWallChange } from "@/lib/broadcast";
 import { notify } from "@/lib/notify";
-import { canvasClosesAt, canvasClosed, claimWindowEnd } from "@/lib/deadline";
+import { canvasClosesAt, canvasClosed, graceWindowEnd } from "@/lib/deadline";
 
 export type ClaimResult =
   | { ok: true; tileId: string; x: number; y: number }
@@ -13,7 +13,7 @@ export type ClaimResult =
 // Claim the SPECIFIC open tile the user clicked (idx → x,y), concurrency-safe.
 // One tile per identity. Identity is the session's auth user id (anonymous or email) — no
 // email is required to claim; the silent anonymous session is created on the client first.
-export async function claimTileAt(idx: number): Promise<ClaimResult> {
+export async function claimTileAt(idx: number, displayName?: string): Promise<ClaimResult> {
   const me = await currentIdentity();
   if (!me) return { ok: false, error: "auth" };
 
@@ -33,21 +33,23 @@ export async function claimTileAt(idx: number): Promise<ClaimResult> {
     .in("status", ["claimed", "pending", "published"]).limit(1).maybeSingle();
   if (existing) return { ok: false, error: "have-tile", x: existing.x, y: existing.y };
 
-  // The display name is chosen at submit; default to the email local part for an email
-  // session, else leave blank (anonymous painters type their name in the studio).
-  const name = me.email ? me.email.split("@")[0] : null;
-  // Concurrency-safe: only succeeds if the tile is still open. The 48h painting window starts
-  // now; falls back without the 0008 columns if that SQL hasn't run.
+  // The display name is captured here at claim time (so a held-but-unpainted tile still
+  // shows who has it in admin). Anonymous painters typed it in the claim panel; for an
+  // email session fall back to the email local part if they left it blank.
+  const name = (displayName ?? "").trim().slice(0, 40) || (me.email ? me.email.split("@")[0] : null);
+  // Concurrency-safe: only succeeds if the tile is still open. A just-claimed tile gets a
+  // SHORT grace hold (1h); the first painted stroke promotes it to the full 48h window.
+  // Falls back without the 0008 columns if that SQL hasn't run.
   const base: Record<string, unknown> = {
     status: "claimed", artist_user_id: me.userId, artist_name: name, claimed_at: new Date().toISOString(),
     ...(me.email ? { artist_email: me.email } : {}),
   };
   const claimQ = (payload: Record<string, unknown>) => db.from("tiles").update(payload)
     .eq("canvas_id", canvas.id).eq("x", x).eq("y", y).eq("status", "open").select("id");
-  let { data: rows, error: claimErr } = await claimQ({ ...base, claim_expires_at: claimWindowEnd(closesAt), expiry_warned_at: null });
+  let { data: rows, error: claimErr } = await claimQ({ ...base, claim_expires_at: graceWindowEnd(closesAt), expiry_warned_at: null });
   if (claimErr) ({ data: rows } = await claimQ(base));
   if (!rows || rows.length === 0) return { ok: false, error: "taken", x, y };
-  await notify(db, { email: me.email, userId: me.userId }, "claim", `Tile R${String(y + 1).padStart(2, "0")}·C${String(x + 1).padStart(2, "0")} is yours ✦`, "Paint what's in your mind and submit within 48 hours. If the window passes without a submission the tile reopens for someone else.");
+  await notify(db, { email: me.email, userId: me.userId }, "claim", `Tile R${String(y + 1).padStart(2, "0")}·C${String(x + 1).padStart(2, "0")} is yours ✦`, "Make your first stroke within the hour to keep it. Once you start painting it's yours for 48 hours to finish and submit.");
   await broadcastWallChange();
   return { ok: true, tileId: rows[0].id, x, y };
 }

@@ -40,6 +40,26 @@ async function fetchQueue(db: ReturnType<typeof supabaseAdmin>): Promise<Row[]> 
     .filter((r) => r.status === "pending" || !r.pending_image_path || r.ai_verdict !== "reject" || !!r.review_requested_at);
 }
 
+// Held = claimed but not yet submitted. Shows who's holding the tile (name captured at
+// claim) so an abandoned claim can be released without waiting for the auto-reopen sweep.
+type Held = { id: string; x: number; y: number; artist_name: string | null; artist_email: string | null; claimed_at: string | null; claim_expires_at: string | null; draft_image_path: string | null };
+async function fetchHeld(db: ReturnType<typeof supabaseAdmin>): Promise<Held[]> {
+  const res = await db.from("tiles").select("id,x,y,artist_name,artist_email,claimed_at,claim_expires_at,draft_image_path").eq("status", "claimed").order("claim_expires_at", { ascending: true });
+  if (!res.error) return (res.data as unknown as Held[]) ?? [];
+  const safe = await db.from("tiles").select("id,x,y,artist_name,artist_email").eq("status", "claimed"); // pre-0008 fallback
+  return ((safe.data as unknown as Partial<Held>[]) ?? []).map((r) => ({ claimed_at: null, claim_expires_at: null, draft_image_path: null, ...r } as Held));
+}
+
+// human "reopens in …" for the held list (rendered server-side, refreshes with the page)
+function reopensIn(expiresAt: string | null): { text: string; soon: boolean } {
+  if (!expiresAt) return { text: "no timer", soon: false };
+  const ms = Date.parse(expiresAt) - Date.now();
+  if (ms <= 0) return { text: "reopening now", soon: true };
+  const mins = Math.round(ms / 60000);
+  if (mins < 90) return { text: `${mins} min`, soon: mins < 60 };
+  return { text: `${Math.round(ms / 3600000)} h`, soon: false };
+}
+
 // AI verdict chip: at-a-glance triage colour + the model's one-line reason.
 function AiChip({ verdict, reason }: { verdict: string | null; reason: string | null }) {
   if (!verdict) return null;
@@ -76,7 +96,7 @@ const LOG_LOOK: Record<string, { fg: string; label: string }> = {
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   if (!(await isAdmin())) redirect("/admin/login");
   const rawTab = (await searchParams).tab;
-  const tab = rawTab === "painted" ? "painted" : rawTab === "log" ? "log" : rawTab === "stitch" ? "stitch" : "queue";
+  const tab = rawTab === "painted" ? "painted" : rawTab === "held" ? "held" : rawTab === "log" ? "log" : rawTab === "stitch" ? "stitch" : "queue";
   const db = supabaseAdmin();
   const base = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/tiles/`;
 
@@ -85,8 +105,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   let queueCount = 0;
   const qc = await db.from("tiles").select("id", { count: "exact", head: true }).or("status.eq.pending,pending_image_path.not.is.null");
   queueCount = qc.error ? ((await db.from("tiles").select("id", { count: "exact", head: true }).eq("status", "pending")).count ?? 0) : (qc.count ?? 0);
+  const heldCount = (await db.from("tiles").select("id", { count: "exact", head: true }).eq("status", "claimed")).count ?? 0;
 
   const queue = tab === "queue" ? await fetchQueue(db) : [];
+  const held = tab === "held" ? await fetchHeld(db) : [];
   const painted = tab === "painted"
     ? ((await db.from("tiles").select(SAFE_COLS).eq("status", "published").order("published_at", { ascending: false })).data as Row[]) ?? []
     : [];
@@ -128,6 +150,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
         <div style={{ display: "flex", gap: 22, borderBottom: "1px solid var(--color-border-default)" }}>
           <Link href="/admin?tab=queue" style={tabStyle(tab === "queue")}>moderation queue · {queueCount}</Link>
+          <Link href="/admin?tab=held" style={tabStyle(tab === "held")}>held · {heldCount}</Link>
           <Link href="/admin?tab=painted" style={tabStyle(tab === "painted")}>painted tiles · {paintedCount}</Link>
           <Link href="/admin?tab=log" style={tabStyle(tab === "log")}>log</Link>
           <Link href="/admin?tab=stitch" style={tabStyle(tab === "stitch")}>the artwork</Link>
@@ -160,6 +183,31 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                     </form>
                     <form action={screenTile.bind(null, r.id)}>
                       <button type="submit" title="Run the AI screen on this tile now" style={{ width: "100%", fontFamily: "var(--font-ui), sans-serif", fontSize: 12, color: "var(--color-text-secondary)", background: "none", border: "1px solid var(--color-border-default)", borderRadius: 4, padding: 6, cursor: "pointer" }}>AI screen</button>
+                    </form>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : tab === "held" ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <p style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 13, color: "var(--color-text-muted)", margin: 0 }}>Claimed but not yet submitted. With no painted stroke a tile auto-reopens ~1h after it&apos;s claimed; once painting starts it holds for 48h. “release” frees one now.</p>
+            {held.length === 0 && <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 20, color: "var(--color-text-secondary)" }}>no tiles held right now ✦</p>}
+            {held.map((r) => {
+              const painting = !!r.draft_image_path;
+              const t = reopensIn(r.claim_expires_at);
+              return (
+                <div key={r.id} style={{ display: "flex", gap: 16, alignItems: "center", background: "var(--color-bg-elevated)", border: "1px solid var(--color-border-default)", borderRadius: 8, padding: 12 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: "inline-block", fontFamily: "var(--font-ui), sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--color-text-inverse)", background: painting ? "var(--palette-pine)" : "var(--palette-honey)", borderRadius: 4, padding: "2px 7px", marginBottom: 5 }}>{painting ? "painting" : "no strokes yet"}</span>
+                    <div style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 18, color: "var(--color-text-primary)" }}>{r.artist_name || "— no name —"}</div>
+                    <div style={meta}>tile R{String(r.y + 1).padStart(2, "0")}·C{String(r.x + 1).padStart(2, "0")}{r.claimed_at ? ` · claimed ${r.claimed_at.slice(5, 16).replace("T", " · ")}` : ""}</div>
+                    {r.artist_email && <div style={emailStyle}>{r.artist_email}</div>}
+                    <div style={{ fontFamily: "var(--font-ui), sans-serif", fontSize: 12.5, color: t.soon ? "var(--palette-rust)" : "var(--color-text-secondary)", marginTop: 4 }}>{painting ? "window ends in " : "grace ends in "}{t.text}</div>
+                  </div>
+                  <div style={{ width: 96 }}>
+                    <form action={removeTile.bind(null, r.id)}>
+                      <button type="submit" style={{ width: "100%", fontFamily: "var(--font-ui), sans-serif", fontSize: 14, fontWeight: 500, color: "var(--palette-rust)", background: "var(--color-bg-surface)", border: "1px solid var(--palette-rust)", borderRadius: 4, padding: 8, cursor: "pointer" }}>release</button>
                     </form>
                   </div>
                 </div>
