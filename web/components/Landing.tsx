@@ -82,14 +82,14 @@ function TileThumb({ wall, idx }: { wall: Wall | null; idx: number }) {
 }
 
 const HOW_STEPS = [
-  { n: "01", t: "Claim a tile", d: "Open the canvas, tap any open tile, and enter your email. We send you a code; type it back and the tile is yours. No password, no account, just proof it's really you." },
+  { n: "01", t: "Claim a tile", d: "Open the canvas, tap any open tile, and it's instantly yours. No sign up, no email, no account — just start painting." },
   { n: "02", t: "Paint what's in your mind", d: "A little paint studio opens on your blank tile. Brushes, colours, your hand. A window, a kitchen, a feeling. No curation of style, just your mark." },
   { n: "03", t: "Submit it", d: "Hit submit and your tile goes in for a quick review, then joins the wall with your name beside it and a line about why you made it." },
   { n: "04", t: "Watch it fill", d: "Zoom from the whole wall, hundreds of strangers' tiles at once, down to a single hand. The canvas is never the same twice." },
 ];
 
 const RULES = [
-  { t: "One tile, one person", d: "Each email claims a single tile. Everyone is exactly the same size here." },
+  { t: "One tile, one person", d: "One tile per person, kept on your device. Everyone is exactly the same size here." },
   { t: "One small square", d: "Every tile is the same tiny canvas. Constraint is what makes it beautiful together." },
   { t: "Paint your answer", d: "Say what's in your mind. One square of one canvas, in your hand." },
   { t: "It stays", d: "Once it's approved, your tile is part of the canvas, preserved when the wall completes." },
@@ -154,7 +154,7 @@ export default function Landing({ total, claimed, published, email, myTile, clos
         <div className="hero__inner">
           <div className="hero__eyebrow"><span className="livedot" /> {fmt(open)} tiles still open on this canvas</div>
           <h1 className="hero__title">Leave the words.<br />Draw the lines.<br /><em>Say what&apos;s in your mind.</em></h1>
-          <p className="hero__sub">Claim a tile with your email and paint what's in your mind. Something surreal is forming here: one canvas, hundreds of strangers, each holding one small square. Just your email and a few minutes.</p>
+          <p className="hero__sub">Claim a tile and paint what's in your mind. Something surreal is forming here: one canvas, hundreds of strangers, each holding one small square. No sign up, just a few minutes.</p>
           <div className="hero__cta">
             <Link className="btn btn--primary btn--lg" href="/canvas">Claim your tile</Link>
             <a className="btn btn--ghost btn--lg" href="#how">See how it works</a>
@@ -178,7 +178,7 @@ export default function Landing({ total, claimed, published, email, myTile, clos
           <div className="statbig"><div className="statbig__v">{fmt(claimed)}</div><div className="statbig__l">tiles claimed</div><div className="statbig__s">of {fmt(total)}</div></div>
           <div className="statbig"><div className="statbig__v">{fmt(open)}</div><div className="statbig__l">tiles open</div><div className="statbig__s">claim one now</div></div>
           <div className="statbig"><div className="statbig__v">{fmt(published)}</div><div className="statbig__l">on the wall</div><div className="statbig__s">painted &amp; approved</div></div>
-          <div className="statbig"><div className="statbig__v">1</div><div className="statbig__l">tile per person</div><div className="statbig__s">verified by email</div></div>
+          <div className="statbig"><div className="statbig__v">1</div><div className="statbig__l">tile per person</div><div className="statbig__s">no sign up needed</div></div>
         </Reveal>
       </section>
 

@@ -111,12 +111,12 @@ function Sidebar({ open, claimed, total, loved, onLoved, closesAt, closed }: { o
         <div className="side__sec">
           <div className="side__label">Take part</div>
           <ol className="howmini">
-            <li><b>Tap an open tile</b> and verify your email with a code.</li>
+            <li><b>Tap an open tile</b> and it&apos;s yours. No sign up, no email.</li>
             <li><b>Paint what&apos;s in your mind</b> on your blank tile.</li>
             <li><b>Submit.</b> After a quick review it joins the wall with your name.</li>
           </ol>
         </div>
-        <div className="side__foot"><span className="freebadge">1 / 1</span><div className="side__collab"><span className="side__cname">One tile per person</span><span className="side__crole">verified by email, once</span></div></div>
+        <div className="side__foot"><span className="freebadge">1 / 1</span><div className="side__collab"><span className="side__cname">One tile per person</span><span className="side__crole">no sign up, one per device</span></div></div>
       </div>
     </aside>
   );

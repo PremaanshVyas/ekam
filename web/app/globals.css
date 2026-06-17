@@ -127,6 +127,18 @@ em{font-style:italic}
 .nav__right{display:flex;align-items:center;gap:16px}
 @media(max-width:880px){.nav__links,.nav__edition{display:none}}
 @media(max-width:640px){.livepill__count{display:none}.livepill{padding:6px 10px}.nav__right{gap:9px}}
+/* nav cluster on phones: compact so "Find your tile" + "Open the canvas" never clip */
+@media(max-width:600px){
+  .nav{padding:0 14px}
+  .nav__right{gap:7px}
+  .nav .linkbtn{padding:7px 10px;font-size:12.5px;min-height:34px}
+  .nav__right .btn{padding:9px 13px;font-size:13px}
+}
+@media(max-width:380px){
+  /* drop the wordmark (the ensō mark + the hero still carry the brand) to free the last bit of room */
+  .nav .ekam-wordmark{display:none}
+  .nav .ekam-logo{gap:0}
+}
 @media(max-width:480px){
   .hero__title{font-size:clamp(32px,10.5vw,44px)}
   .hero__inner{padding-top:96px}
