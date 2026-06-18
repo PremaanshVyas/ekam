@@ -1,0 +1,20 @@
+import puppeteer from "puppeteer-core";
+const BASE = process.env.BASE || "http://localhost:3100";
+const b = await puppeteer.launch({ executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", headless: "new", args: ["--no-sandbox"] });
+const page = await b.newPage();
+await page.setViewport({ width: 1200, height: 800, deviceScaleFactor: 1 });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+for (let i = 0; i < 30; i++) { try { const r = await fetch(BASE + "/"); if (r.ok) break; } catch {} await sleep(1000); }
+await page.goto(BASE + "/canvas", { waitUntil: "domcontentloaded" }); await sleep(2200);
+const disp = () => page.evaluate(() => ({ e: getComputedStyle(document.querySelector(".embers")).display, t: getComputedStyle(document.querySelector(".paint-cursor")).display }));
+const before = await disp();
+await page.evaluate(() => { const d = document.createElement("div"); d.className = "studio-full"; d.id = "__t"; document.body.appendChild(d); });
+await sleep(200); const during = await disp();
+await page.evaluate(() => document.getElementById("__t").remove());
+await sleep(200); const after = await disp();
+const ok = before.e !== "none" && before.t !== "none" && during.e === "none" && during.t === "none" && after.e !== "none" && after.t !== "none";
+console.log("studio CLOSED :", JSON.stringify(before), "(ambient visible)");
+console.log("studio OPEN   :", JSON.stringify(during), "(ambient hidden)");
+console.log("studio CLOSED :", JSON.stringify(after), "(ambient back)");
+console.log(ok ? "\n:has() HIDE OK ✓" : "\n:has() MISMATCH ✗");
+await b.close();
