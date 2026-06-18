@@ -51,6 +51,7 @@ export default function MusicPlayer() {
   // after the tab has been hidden (or the audio device changed), the context can be wired
   // to a stale output and stay "healthy" by every probe — so the next play rebuilds, period
   const staleRef = useRef(false);
+  const hiddenAtRef = useRef(0); // when the tab was last hidden — a long hide needs a full rebuild, not a resume
 
   useEffect(() => {
     fetch("/audio/playlist.json").then((r) => r.json())
@@ -125,10 +126,18 @@ export default function MusicPlayer() {
     a.volume = volRef.current;
     pendingSeekRef.current = r.time;
     if (r.src) a.src = r.src; else return;
-    ensureGraph(); acRef.current?.resume().catch(() => {});
+    ensureGraph();
     if (r.play) {
       setLoading(true);
-      a.play().then(() => { setPlaying(true); setLoading(false); }).catch(() => { setPlaying(false); setLoading(false); });
+      const ac = acRef.current;
+      (async () => {
+        try { await ac?.resume(); } catch { /* may need a user gesture */ }
+        // a context rebuilt without a user gesture can't reach "running" — it would play the
+        // element THROUGH a suspended graph = silent. Don't claim "playing" then; show paused
+        // so a single click rebuilds + plays audibly (and never the silent-playing state).
+        if (ac && (ac.state as string) !== "running") { try { a.pause(); } catch { /* fine */ } setPlaying(false); setLoading(false); return; }
+        try { await a.play(); setPlaying(true); } catch { setPlaying(false); } finally { setLoading(false); }
+      })();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [audioKey]);
@@ -153,9 +162,16 @@ export default function MusicPlayer() {
   // that we were hidden, so the next play press rebuilds onto the current audio device.
   useEffect(() => {
     const resume = () => {
-      if (document.hidden) { if (acRef.current) staleRef.current = true; return; }
-      const ac = acRef.current;
-      if (ac && ac.state === "suspended" && playingRef.current) ac.resume().catch(() => {});
+      if (document.hidden) { hiddenAtRef.current = Date.now(); if (acRef.current) staleRef.current = true; return; }
+      const ac = acRef.current; if (!ac || !playingRef.current) return;
+      const hiddenAt = hiddenAtRef.current; hiddenAtRef.current = 0;
+      // THE "comes back after ~30 min, shows playing + equalizer but silent" BUG: after a long
+      // hide the audio pipeline / output device is stale even though the clock still ticks, so
+      // every probe says it's healthy — resuming it just keeps it silently "playing". A long
+      // absence must REBUILD onto the current device (the restore effect keeps it audible or
+      // shows paused, never silent). Short tab-switches still just resume.
+      if (hiddenAt && Date.now() - hiddenAt > 20000) { staleRef.current = false; lastRebuildRef.current = 0; rebuildPipeline(true); }
+      else if (ac.state === "suspended") ac.resume().catch(() => {});
     };
     const deviceChanged = () => {
       if (!acRef.current) return;
