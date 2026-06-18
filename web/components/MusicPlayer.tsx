@@ -18,16 +18,36 @@ const iconBtn: React.CSSProperties = {
 const fmt = (s: number) => { if (!isFinite(s) || s < 0) return "0:00"; const m = Math.floor(s / 60); const ss = Math.floor(s % 60); return `${m}:${ss < 10 ? "0" : ""}${ss}`; };
 
 const VIZ_W = 480, VIZ_H = 96, BARS = 32;
+// ekam's tile palette as a left→right rainbow across the bars
+const VIZ_COLORS = ["#9C4A33", "#C76B4A", "#E0A33E", "#8A9A5B", "#4F6F52", "#6E94BE", "#4E5C8A", "#8A5A78"];
 
+/* AUDIO ARCHITECTURE — read before changing.
+ *
+ * Audio output is 100% the NATIVE <audio> element (.play()/.pause()/.volume). The browser's
+ * media stack survives tab backgrounding, long idle, and output-device changes — unlike a Web
+ * Audio graph. The old player routed output through createMediaElementSource → … → destination;
+ * after a long idle the AudioContext wedges (clock still runs, so the equalizer animated) while
+ * its output sink died → "playing" + moving bars + NO SOUND, and a captured element can never
+ * fall back to native playback. That whole class of bug is gone here.
+ *
+ * The visualizer uses a SEPARATE, analysis-only graph fed by audio.captureStream() (which does
+ * NOT redirect the element's output). It connects analyser → gain(0) → destination only to keep
+ * the analyser "pulled"; it is silent and can never affect what you hear. If captureStream is
+ * unavailable (Safari/iOS) or stops feeding, the bars fall back to a faux animation. Audio is
+ * never involved in any of that.
+ *
+ * DO NOT reintroduce createMediaElementSource / GainNode-for-volume / rebuild-on-idle here. */
 export default function MusicPlayer() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const cardRef = useRef<HTMLDivElement | null>(null);
   const vizRef = useRef<HTMLCanvasElement | null>(null);
+
+  // analysis-only graph (visualizer). NEVER in the audio output path.
   const acRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const gainRef = useRef<GainNode | null>(null);
-  const srcNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
-  const rafRef = useRef<number | null>(null);
+  const attachedRef = useRef(false);          // captureStream attach attempted once
+  const lastRealAtRef = useRef(0);            // last time the analyser had live data (seconds)
+  const energyRef = useRef(0);                // eased 0..1 for the faux animation
 
   const [tracks, setTracks] = useState<Track[]>(DEFAULT);
   const [open, setOpen] = useState(false); // opens on mount for desktop only — on phones the card would cover the canvas
@@ -40,217 +60,132 @@ export default function MusicPlayer() {
   const [dur, setDur] = useState(0);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const playingRef = useRef(false); playingRef.current = playing;
-  // self-healing pipeline: after long idle Chrome can kill the AudioContext's renderer
-  // while reporting it healthy — and a captured <audio> element can never be re-captured,
-  // so the ONLY cure is a fresh element + fresh context. audioKey swaps the element.
-  const [audioKey, setAudioKey] = useState(0);
-  const restoreRef = useRef<{ src: string; time: number; play: boolean } | null>(null);
-  const pendingSeekRef = useRef(0);
-  const lastRebuildRef = useRef(0);
-  const volRef = useRef(vol); volRef.current = vol;
-  // after the tab has been hidden (or the audio device changed), the context can be wired
-  // to a stale output and stay "healthy" by every probe — so the next play rebuilds, period
-  const staleRef = useRef(false);
-  const hiddenAtRef = useRef(0); // when the tab was last hidden — a long hide needs a full rebuild, not a resume
 
   useEffect(() => {
     fetch("/audio/playlist.json").then((r) => r.json())
       .then((d) => { if (Array.isArray(d) && d.length && d.every((t) => t?.src)) setTracks(d); })
       .catch(() => { /* keep DEFAULT */ });
-    // ignore near-zero saved volumes: the slider was a no-op for a while, so a stored 0
-    // is almost certainly stale, and restoring it would mute the player invisibly
+    // ignore near-zero saved volumes — a stored 0 from an old build would mute invisibly
     try { const v = parseFloat(localStorage.getItem("ekam.vol") || ""); if (isFinite(v) && v >= 0.05 && v <= 1) setVol(v); } catch { /* default */ }
     if (window.innerWidth >= 900) setOpen(true);
   }, []);
 
-  // Volume drives BOTH the element and a GainNode in the WebAudio graph. Once a
-  // MediaElementSource exists, some browsers (Safari/iOS) ignore element.volume —
-  // the gain node is the one that actually works everywhere.
+  // Native volume — reliable because the element is never captured by Web Audio.
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = vol;
-    if (gainRef.current && acRef.current) gainRef.current.gain.setTargetAtTime(vol, acRef.current.currentTime, 0.02);
     try { localStorage.setItem("ekam.vol", String(vol)); } catch { /* fine */ }
   }, [vol]);
 
   const track = tracks[idx] ?? tracks[0];
 
-  // ── Web Audio graph (created lazily on first play; source node is one-per-element) ──
-  const ensureGraph = useCallback(() => {
-    if (acRef.current || !audioRef.current) return;
-    const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (!AC) return;
+  // Attach the visualizer's analysis graph once, via captureStream (output stays native).
+  // Any failure just leaves the faux animation running — audio is untouched either way.
+  const attachAnalyser = useCallback(() => {
+    if (attachedRef.current) return;
+    const a = audioRef.current as (HTMLAudioElement & { captureStream?: () => MediaStream; mozCaptureStream?: () => MediaStream }) | null;
+    if (!a) return;
+    attachedRef.current = true; // attempt only once
+    const cap = a.captureStream?.bind(a) || a.mozCaptureStream?.bind(a);
+    if (!cap) return; // no capture support (Safari/iOS) → faux viz, audio still native
     try {
-      const ac = new AC();
-      const src = ac.createMediaElementSource(audioRef.current);
-      const an = ac.createAnalyser();
-      const gain = ac.createGain();
-      gain.gain.value = vol;
-      an.fftSize = BARS * 2;
-      an.smoothingTimeConstant = 0.8;
-      src.connect(an); an.connect(gain); gain.connect(ac.destination);
-      acRef.current = ac; analyserRef.current = an; srcNodeRef.current = src; gainRef.current = gain;
-    } catch { /* visualizer optional — audio still plays */ }
-  }, [vol]);
-
-  // Tear down the dead pipeline and stand up a new one (element + context + graph),
-  // restoring the current track, position and play state. Throttled so a machine with
-  // genuinely broken audio can't rebuild-loop.
-  const rebuildPipeline = useCallback((wasPlaying: boolean) => {
-    const now = Date.now();
-    if (now - lastRebuildRef.current < 15000) return;
-    lastRebuildRef.current = now;
-    const a = audioRef.current;
-    restoreRef.current = { src: a?.src || "", time: a?.currentTime || 0, play: wasPlaying };
-    try { a?.pause(); } catch { /* already dead */ }
-    try { acRef.current?.close(); } catch { /* already closed */ }
-    acRef.current = null; analyserRef.current = null; gainRef.current = null; srcNodeRef.current = null;
-    setAudioKey((k) => k + 1);
+      const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AC) return;
+      const ctx = new AC();
+      const src = ctx.createMediaStreamSource(cap());
+      const an = ctx.createAnalyser();
+      an.fftSize = BARS * 2; an.smoothingTimeConstant = 0.8;
+      const g = ctx.createGain(); g.gain.value = 0; // keep the analyser pulled WITHOUT making sound
+      src.connect(an); an.connect(g); g.connect(ctx.destination);
+      acRef.current = ctx; analyserRef.current = an;
+    } catch { /* faux viz; audio unaffected */ }
   }, []);
 
-  // Health probe: a dead-but-"running" context has a frozen clock. Resume if suspended,
-  // then verify currentTime actually advances.
-  const graphAlive = useCallback(async () => {
-    const ac = acRef.current; if (!ac) return true; // no graph yet — the element is still native
-    try { if (ac.state !== "running") await ac.resume(); } catch { /* probe below decides */ }
-    if ((ac.state as string) !== "running") return false;
-    const t0 = ac.currentTime;
-    await new Promise((r) => setTimeout(r, 200));
-    return ac.currentTime > t0;
-  }, []);
+  // draw ONE visualizer frame — real spectrum when the analyser is live, else a faux animation.
+  const drawFrame = useCallback(() => {
+    const cv = vizRef.current; const ctx = cv?.getContext("2d");
+    if (!cv || !ctx) return;
+    ctx.clearRect(0, 0, VIZ_W, VIZ_H);
+    const now = performance.now() / 1000;
+    // energy eases in while playing, out while paused, so the bars settle instead of lying
+    energyRef.current += ((playingRef.current ? 1 : 0) - energyRef.current) * 0.08;
+    const e = energyRef.current;
 
-  // After a rebuild, the fresh element restores src/volume/position and resumes.
-  useEffect(() => {
-    if (audioKey === 0) return;
-    const a = audioRef.current; const r = restoreRef.current; restoreRef.current = null;
-    if (!a || !r) return;
-    a.volume = volRef.current;
-    pendingSeekRef.current = r.time;
-    if (r.src) a.src = r.src; else return;
-    ensureGraph();
-    if (r.play) {
-      setLoading(true);
-      const ac = acRef.current;
-      (async () => {
-        try { await ac?.resume(); } catch { /* may need a user gesture */ }
-        // a context rebuilt without a user gesture can't reach "running" — it would play the
-        // element THROUGH a suspended graph = silent. Don't claim "playing" then; show paused
-        // so a single click rebuilds + plays audibly (and never the silent-playing state).
-        if (ac && (ac.state as string) !== "running") { try { a.pause(); } catch { /* fine */ } setPlaying(false); setLoading(false); return; }
-        try { await a.play(); setPlaying(true); } catch { setPlaying(false); } finally { setLoading(false); }
-      })();
+    let data: Uint8Array | null = null;
+    const an = analyserRef.current;
+    if (an) {
+      const d = new Uint8Array(an.frequencyBinCount);
+      an.getByteFrequencyData(d);
+      let sum = 0; for (let i = 0; i < d.length; i++) sum += d[i];
+      if (sum > 0) lastRealAtRef.current = now;
+      if (now - lastRealAtRef.current < 2) data = d; // recent live data → use it
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [audioKey]);
 
-  // Watchdog while playing: if the context clock freezes mid-playback (came back to a
-  // killed tab), rebuild without waiting for a click.
-  useEffect(() => {
-    if (!playing) return;
-    let last = -1, misses = 0;
-    const id = window.setInterval(() => {
-      const ac = acRef.current; if (!ac) return;
-      if (ac.state === "running") {
-        if (ac.currentTime === last) { misses += 1; if (misses >= 2) rebuildPipeline(true); }
-        else { misses = 0; last = ac.currentTime; }
-      } else { ac.resume().catch(() => {}); }
-    }, 2000);
-    return () => window.clearInterval(id);
-  }, [playing, rebuildPipeline]);
-
-  // "Shows playing but silent" fix: the AudioContext gets suspended when the tab is
-  // backgrounded or by autoplay policy. Resume it whenever we come back — and remember
-  // that we were hidden, so the next play press rebuilds onto the current audio device.
-  useEffect(() => {
-    const resume = () => {
-      if (document.hidden) { hiddenAtRef.current = Date.now(); if (acRef.current) staleRef.current = true; return; }
-      const ac = acRef.current; if (!ac || !playingRef.current) return;
-      const hiddenAt = hiddenAtRef.current; hiddenAtRef.current = 0;
-      // THE "comes back after ~30 min, shows playing + equalizer but silent" BUG: after a long
-      // hide the audio pipeline / output device is stale even though the clock still ticks, so
-      // every probe says it's healthy — resuming it just keeps it silently "playing". A long
-      // absence must REBUILD onto the current device (the restore effect keeps it audible or
-      // shows paused, never silent). Short tab-switches still just resume.
-      if (hiddenAt && Date.now() - hiddenAt > 20000) { staleRef.current = false; lastRebuildRef.current = 0; rebuildPipeline(true); }
-      else if (ac.state === "suspended") ac.resume().catch(() => {});
-    };
-    const deviceChanged = () => {
-      if (!acRef.current) return;
-      if (playingRef.current) { lastRebuildRef.current = 0; rebuildPipeline(true); }
-      else staleRef.current = true;
-    };
-    document.addEventListener("visibilitychange", resume);
-    window.addEventListener("focus", resume);
-    window.addEventListener("pageshow", resume);
-    navigator.mediaDevices?.addEventListener?.("devicechange", deviceChanged);
-    return () => {
-      document.removeEventListener("visibilitychange", resume);
-      window.removeEventListener("focus", resume);
-      window.removeEventListener("pageshow", resume);
-      navigator.mediaDevices?.removeEventListener?.("devicechange", deviceChanged);
-    };
-  }, [rebuildPipeline]);
-
-  const drawIdle = useCallback(() => {
-    const cv = vizRef.current; const ctx = cv?.getContext("2d"); if (!cv || !ctx) return;
-    ctx.clearRect(0, 0, VIZ_W, VIZ_H);
-    const bw = VIZ_W / BARS;
-    ctx.fillStyle = "rgba(239,233,225,0.13)";
-    for (let i = 0; i < BARS; i++) { const h = 4 + ((i * 7) % 5); ctx.fillRect(i * bw + 1, VIZ_H - h, bw - 2, h); }
-  }, []);
-
-  const loop = useCallback(() => {
-    const an = analyserRef.current; const cv = vizRef.current; const ctx = cv?.getContext("2d");
-    if (!an || !cv || !ctx) { rafRef.current = requestAnimationFrame(loop); return; }
-    const data = new Uint8Array(an.frequencyBinCount);
-    an.getByteFrequencyData(data);
-    ctx.clearRect(0, 0, VIZ_W, VIZ_H);
-    // multi-colour spectrum across the bars (ekam's tile palette as a left→right rainbow)
     const grad = ctx.createLinearGradient(0, 0, VIZ_W, 0);
-    const cols = ["#9C4A33", "#C76B4A", "#E0A33E", "#8A9A5B", "#4F6F52", "#6E94BE", "#4E5C8A", "#8A5A78"];
-    cols.forEach((c, i) => grad.addColorStop(i / (cols.length - 1), c));
+    VIZ_COLORS.forEach((c, i) => grad.addColorStop(i / (VIZ_COLORS.length - 1), c));
     ctx.fillStyle = grad;
     const bw = VIZ_W / BARS;
     for (let i = 0; i < BARS; i++) {
-      const v = data[i] / 255;
-      const h = Math.max(3, v * v * VIZ_H);
+      let h;
+      if (data) {
+        h = Math.max(3, (data[i] / 255) ** 2 * VIZ_H);
+      } else {
+        // faux: layered sines, center-weighted like a spectrum, scaled by eased energy
+        const env = 0.45 + 0.55 * Math.sin(((i + 0.5) / BARS) * Math.PI);
+        const w1 = 0.5 + 0.5 * Math.sin(now * 2.3 + i * 0.55);
+        const w2 = 0.5 + 0.5 * Math.sin(now * 3.9 + i * 0.31 + 2.0);
+        const v = w1 * 0.65 + w2 * 0.35;
+        h = 3 + e * env * v * (VIZ_H - 6);
+      }
       ctx.fillRect(i * bw + 1, VIZ_H - h, bw - 2, h);
     }
-    rafRef.current = requestAnimationFrame(loop);
   }, []);
 
+  // run the viz loop only while the card is open (the canvas only exists then)
   useEffect(() => {
-    if (playing && open) { if (rafRef.current == null) rafRef.current = requestAnimationFrame(loop); }
-    else { if (rafRef.current != null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; } drawIdle(); }
-    return () => { if (rafRef.current != null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; } };
-  }, [playing, open, loop, drawIdle]);
-  useEffect(() => { drawIdle(); }, [drawIdle, open]);
+    if (!open) return;
+    let raf = 0;
+    const loop = () => { drawFrame(); raf = requestAnimationFrame(loop); };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [open, drawFrame]);
 
-  // start playback through a guaranteed-fresh-or-verified pipeline
-  const startThroughFreshPipeline = (src: string, time: number) => {
-    restoreRef.current = null; lastRebuildRef.current = 0; staleRef.current = false;
-    rebuildPipeline(true);
-    restoreRef.current = { src, time, play: true };
-  };
-  const play = async (i: number) => {
+  // Returning to the tab: native audio needs nothing (it kept playing / the element's own
+  // events keep the UI honest). Best-effort resume the analysis context so the bars wake up.
+  useEffect(() => {
+    const onVis = () => { if (!document.hidden) acRef.current?.resume?.().catch(() => {}); };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", onVis);
+    window.addEventListener("pageshow", onVis);
+    return () => { document.removeEventListener("visibilitychange", onVis); window.removeEventListener("focus", onVis); window.removeEventListener("pageshow", onVis); };
+  }, []);
+
+  const startPlayback = useCallback(async () => {
     const a = audioRef.current; if (!a) return;
-    setIdx(i); setCur(0); setLoading(true);
-    // hidden-since-last-play or device change → don't trust any probe, rebuild onto the current device
-    if (acRef.current && (staleRef.current || !(await graphAlive()))) { startThroughFreshPipeline(tracks[i].src, 0); return; }
-    ensureGraph(); acRef.current?.resume().catch(() => {});
+    setLoading(true);
+    try {
+      await a.play();
+      setPlaying(true); setLoading(false);
+      attachAnalyser();                            // viz only, best effort
+      acRef.current?.resume?.().catch(() => {});
+    } catch { setPlaying(false); setLoading(false); }
+  }, [attachAnalyser]);
+
+  const play = useCallback(async (i: number) => {
+    const a = audioRef.current; if (!a) return;
+    setIdx(i); setCur(0);
     a.src = tracks[i].src;
-    a.play().then(() => { setPlaying(true); setLoading(false); }).catch(() => { setPlaying(false); setLoading(false); });
-  };
-  const toggle = async () => {
+    await startPlayback();
+  }, [tracks, startPlayback]);
+
+  const toggle = useCallback(async () => {
     const a = audioRef.current; if (!a) return;
     if (playing) { a.pause(); setPlaying(false); return; }
-    setLoading(true);
-    if (acRef.current && (staleRef.current || !(await graphAlive()))) { startThroughFreshPipeline(a.src || track.src, a.currentTime || 0); return; }
-    ensureGraph(); acRef.current?.resume().catch(() => {});
     if (!a.src) a.src = track.src;
-    a.play().then(() => { setPlaying(true); setLoading(false); }).catch(() => { setLoading(false); });
-  };
-  const next = () => play((idx + 1) % tracks.length);
-  const prev = () => play((idx - 1 + tracks.length) % tracks.length);
+    await startPlayback();
+  }, [playing, track, startPlayback]);
+
+  const next = useCallback(() => play((idx + 1) % tracks.length), [play, idx, tracks.length]);
+  const prev = useCallback(() => play((idx - 1 + tracks.length) % tracks.length), [play, idx, tracks.length]);
   const seek = (t: number) => { const a = audioRef.current; if (a && isFinite(t)) { a.currentTime = t; setCur(t); } };
 
   const onDragStart = (e: React.PointerEvent) => {
@@ -283,17 +218,13 @@ export default function MusicPlayer() {
   return (
     <>
       <audio
-        key={audioKey}
         ref={audioRef} preload="none"
         onPlaying={() => { setPlaying(true); setLoading(false); }}
         onPause={() => setPlaying(false)}
         onWaiting={() => setLoading(true)}
         onError={() => { setLoading(false); setPlaying(false); }}
         onTimeUpdate={(e) => setCur(e.currentTarget.currentTime)}
-        onLoadedMetadata={(e) => {
-          setDur(e.currentTarget.duration);
-          if (pendingSeekRef.current > 0) { try { e.currentTarget.currentTime = pendingSeekRef.current; } catch { /* not seekable yet */ } pendingSeekRef.current = 0; }
-        }}
+        onLoadedMetadata={(e) => setDur(e.currentTarget.duration)}
         onEnded={() => next()}
       />
 
