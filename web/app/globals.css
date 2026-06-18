@@ -120,6 +120,10 @@ em{font-style:italic}
    trapped in the explorer's stacking context, so the root-level field/trail would otherwise
    render straight over the white paper you're painting on. */
 body:has(.studio-full) .embers,body:has(.studio-full) .paint-cursor{display:none}
+/* The explorer mounts its OWN ember field inside its stacking context (above the wall, below
+   the UI panels) so glints never cover the tile preview — so suppress the GLOBAL field (a direct
+   child of body) whenever the explorer is on screen. The internal one (.explorer .embers) stays. */
+body:has(.explorer)>.embers{display:none}
 
 /* reveal-on-scroll */
 .reveal{opacity:0;transform:translateY(18px);transition:opacity .8s cubic-bezier(.2,.7,.2,1),transform .8s cubic-bezier(.2,.7,.2,1)}

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import MosaicCanvas, { type MosaicApi, type Insets } from "@/components/MosaicCanvas";
 import Studio from "@/components/Studio";
+import Embers from "@/components/Embers";
 import { createRealWall, type RealTileInput } from "@/lib/realWall";
 import { stitchWall, downloadBlob } from "@/lib/stitch";
 import type { Wall, TileInfo } from "@/lib/demoWall";
@@ -589,6 +590,10 @@ export default function Explorer({ cols, total, tiles, claimed, email, signedIn 
           selectedIdx={selected ? selected.idx : -1} hoverIdx={hover ? hover.info.idx : -1} initialZoom="macro" />
         <div className="ex__grain" />
       </div>
+      {/* ember field INSIDE the explorer's stacking context: z:1 sits above the wall but below
+          every UI panel (≥24), so the glints never paint over the tile preview / dock / sidebar.
+          The global field is suppressed here (see body:has(.explorer) in globals.css). */}
+      <Embers density={0.00005} opacity={0.75} />
 
       <div className="ex__topbar">
         <Logo sm />
