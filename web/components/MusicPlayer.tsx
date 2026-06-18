@@ -58,7 +58,6 @@ export default function MusicPlayer() {
   const vizTriedRef = useRef(false);          // graph setup attempted (don't re-capture the twin)
   const vizOkRef = useRef(false);             // twin is captured + silenced → safe to play it
   const lastRealAtRef = useRef(0);            // last time the analyser had live data (seconds)
-  const energyRef = useRef(0);                // eased 0..1 for the faux fallback animation
 
   const [tracks, setTracks] = useState<Track[]>(DEFAULT);
   const [open, setOpen] = useState(false); // opens on mount for desktop only — on phones the card would cover the canvas
@@ -91,7 +90,7 @@ export default function MusicPlayer() {
 
   // Build the analysis graph off the SILENT twin. Created synchronously inside the play gesture
   // so the context can reach "running" (a context made/resumed outside a gesture stays suspended
-  // → analyser reads zeros → faux bars). createMediaElementSource is one-per-element; the twin is
+  // → analyser reads zeros → static idle bars). createMediaElementSource is one-per-element; the twin is
   // stable so this runs once. The twin is silent (it's captured + gain 0), so this never makes sound.
   const ensureVizGraph = useCallback(() => {
     if (acRef.current) { acRef.current.resume?.().catch(() => {}); return; }
@@ -110,12 +109,12 @@ export default function MusicPlayer() {
       acRef.current = ctx; analyserRef.current = an; srcNodeRef.current = src; gainRef.current = g;
       vizOkRef.current = true;                   // capture succeeded → the twin is now silent
       ctx.resume?.().catch(() => {});
-    } catch { /* capture failed → vizOkRef stays false: the twin is NEVER played (no echo), faux bars */ }
+    } catch { /* capture failed → vizOkRef stays false: the twin is NEVER played (no echo), static idle bars */ }
   }, []);
 
   // keep the silent twin tracking the audible element (track + rough position + play/pause).
   // ONLY drives the twin once it's confirmed captured + silenced — otherwise playing it would
-  // produce an audible second copy (echo). When not OK, the bars use the faux fallback instead.
+  // produce an audible second copy (echo). When not OK, the bars stay on the static idle baseline.
   const syncViz = useCallback(() => {
     const a = audioRef.current, v = vizAudioRef.current;
     if (!a || !v || !vizOkRef.current) return;
@@ -126,15 +125,14 @@ export default function MusicPlayer() {
     } catch { /* viz only */ }
   }, []);
 
-  // draw ONE visualizer frame — real spectrum when the analyser is live, else a faux animation.
+  // draw ONE visualizer frame — the REAL spectrum when the analyser is live, otherwise a quiet
+  // STATIC baseline. No animated faux: the bars must never appear to react when they aren't (that
+  // flash on play is what we're removing). Idle/loading = faint static dashes; playing = real FFT.
   const drawFrame = useCallback(() => {
     const cv = vizRef.current; const ctx = cv?.getContext("2d");
     if (!cv || !ctx) return;
     ctx.clearRect(0, 0, VIZ_W, VIZ_H);
     const now = performance.now() / 1000;
-    // energy eases in while playing, out while paused, so the bars settle instead of lying
-    energyRef.current += ((playingRef.current ? 1 : 0) - energyRef.current) * 0.08;
-    const e = energyRef.current;
 
     let data: Uint8Array | null = null;
     const an = analyserRef.current;
@@ -143,26 +141,18 @@ export default function MusicPlayer() {
       an.getByteFrequencyData(d);
       let sum = 0; for (let i = 0; i < d.length; i++) sum += d[i];
       if (sum > 0) lastRealAtRef.current = now;
-      if (now - lastRealAtRef.current < 2) data = d; // recent live data → use it
+      if (now - lastRealAtRef.current < 2) data = d; // recent live data → use it (rides out quiet beats)
     }
 
-    const grad = ctx.createLinearGradient(0, 0, VIZ_W, 0);
-    VIZ_COLORS.forEach((c, i) => grad.addColorStop(i / (VIZ_COLORS.length - 1), c));
-    ctx.fillStyle = grad;
     const bw = VIZ_W / BARS;
-    for (let i = 0; i < BARS; i++) {
-      let h;
-      if (data) {
-        h = Math.max(3, (data[i] / 255) ** 2 * VIZ_H);
-      } else {
-        // faux fallback: layered sines, center-weighted like a spectrum, scaled by eased energy
-        const env = 0.45 + 0.55 * Math.sin(((i + 0.5) / BARS) * Math.PI);
-        const w1 = 0.5 + 0.5 * Math.sin(now * 2.3 + i * 0.55);
-        const w2 = 0.5 + 0.5 * Math.sin(now * 3.9 + i * 0.31 + 2.0);
-        const v = w1 * 0.65 + w2 * 0.35;
-        h = 3 + e * env * v * (VIZ_H - 6);
-      }
-      ctx.fillRect(i * bw + 1, VIZ_H - h, bw - 2, h);
+    if (data) {
+      const grad = ctx.createLinearGradient(0, 0, VIZ_W, 0);
+      VIZ_COLORS.forEach((c, i) => grad.addColorStop(i / (VIZ_COLORS.length - 1), c));
+      ctx.fillStyle = grad;
+      for (let i = 0; i < BARS; i++) { const h = Math.max(3, (data[i] / 255) ** 2 * VIZ_H); ctx.fillRect(i * bw + 1, VIZ_H - h, bw - 2, h); }
+    } else {
+      ctx.fillStyle = "rgba(239,233,225,0.13)"; // idle / loading: faint static, clearly "off"
+      for (let i = 0; i < BARS; i++) { const h = 4 + ((i * 7) % 5); ctx.fillRect(i * bw + 1, VIZ_H - h, bw - 2, h); }
     }
   }, []);
 
