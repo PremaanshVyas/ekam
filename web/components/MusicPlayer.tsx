@@ -23,31 +23,42 @@ const VIZ_COLORS = ["#9C4A33", "#C76B4A", "#E0A33E", "#8A9A5B", "#4F6F52", "#6E9
 
 /* AUDIO ARCHITECTURE — read before changing.
  *
- * Audio output is 100% the NATIVE <audio> element (.play()/.pause()/.volume). The browser's
- * media stack survives tab backgrounding, long idle, and output-device changes — unlike a Web
- * Audio graph. The old player routed output through createMediaElementSource → … → destination;
- * after a long idle the AudioContext wedges (clock still runs, so the equalizer animated) while
- * its output sink died → "playing" + moving bars + NO SOUND, and a captured element can never
- * fall back to native playback. That whole class of bug is gone here.
+ * TWO <audio> elements, deliberately:
+ *   1. audioRef  (data-role="out") — the audible player. Plays 100% NATIVELY (.play()/.volume).
+ *      It is NEVER captured by Web Audio, so a wedged AudioContext can never silence it. This is
+ *      the permanent fix for the "shows playing but silent after ~20 min idle" bug — the browser's
+ *      native media stack survives backgrounding, long idle, and output-device changes.
+ *   2. vizAudioRef (data-role="viz") — a SILENT twin of the same track, routed through
+ *      createMediaElementSource → analyser → gain(0) → destination. It makes no sound (gain 0,
+ *      and being captured it has no native output), and only exists to drive the REAL,
+ *      music-synced equalizer. If its context ever dies, only the bars are affected — audio is
+ *      a separate native element and keeps playing.
  *
- * The visualizer uses a SEPARATE, analysis-only graph fed by audio.captureStream() (which does
- * NOT redirect the element's output). It connects analyser → gain(0) → destination only to keep
- * the analyser "pulled"; it is silent and can never affect what you hear. If captureStream is
- * unavailable (Safari/iOS) or stops feeding, the bars fall back to a faux animation. Audio is
- * never involved in any of that.
+ * Why not a single element? createMediaElementSource captures an element's output permanently
+ * (it can never play natively again) and ties it to a fragile context → the original silent bug.
+ * Why not captureStream on the audible element? In real Chrome the captureStream → MediaStreamSource
+ * → analyser path frequently delivers silence (works in headless, faux in the wild), so the
+ * music-synced bars never showed. createMediaElementSource on the silent twin is the analyser path
+ * that reliably produces real spectrum data on every browser (incl. Safari).
  *
- * DO NOT reintroduce createMediaElementSource / GainNode-for-volume / rebuild-on-idle here. */
+ * INVARIANT: only the "viz" element may be captured by createMediaElementSource. NEVER capture,
+ * GainNode-route, or rebuild the "out" element — that reintroduces the silent-after-idle bug.
+ * Volume is native on the audible element (iOS ignores it — slider is a no-op there, hardware only). */
 export default function MusicPlayer() {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);     // audible, native — never touched by Web Audio
+  const vizAudioRef = useRef<HTMLAudioElement | null>(null);  // silent twin — feeds the analyser
   const cardRef = useRef<HTMLDivElement | null>(null);
   const vizRef = useRef<HTMLCanvasElement | null>(null);
 
-  // analysis-only graph (visualizer). NEVER in the audio output path.
+  // analysis graph (visualizer) — fed ONLY by the silent twin, never the audible element.
   const acRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const wiredRef = useRef(false);             // captureStream → analyser is wired
+  const srcNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const gainRef = useRef<GainNode | null>(null);
+  const vizTriedRef = useRef(false);          // graph setup attempted (don't re-capture the twin)
+  const vizOkRef = useRef(false);             // twin is captured + silenced → safe to play it
   const lastRealAtRef = useRef(0);            // last time the analyser had live data (seconds)
-  const energyRef = useRef(0);                // eased 0..1 for the faux animation
+  const energyRef = useRef(0);                // eased 0..1 for the faux fallback animation
 
   const [tracks, setTracks] = useState<Track[]>(DEFAULT);
   const [open, setOpen] = useState(false); // opens on mount for desktop only — on phones the card would cover the canvas
@@ -70,7 +81,7 @@ export default function MusicPlayer() {
     if (window.innerWidth >= 900) setOpen(true);
   }, []);
 
-  // Native volume — reliable because the element is never captured by Web Audio.
+  // Native volume on the AUDIBLE element (it isn't captured, so element.volume works).
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = vol;
     try { localStorage.setItem("ekam.vol", String(vol)); } catch { /* fine */ }
@@ -78,38 +89,41 @@ export default function MusicPlayer() {
 
   const track = tracks[idx] ?? tracks[0];
 
-  // Create the analysis-only AudioContext. MUST be called synchronously inside the play
-  // click so the context can actually reach "running" — a context created/resumed outside a
-  // user gesture stays "suspended", the analyser returns all-zeros, and the bars fall back to
-  // the faux animation. This context never carries audio (gain 0), so it can't affect sound.
-  const ensureVizCtx = useCallback((): AudioContext | null => {
-    if (acRef.current) return acRef.current;
+  // Build the analysis graph off the SILENT twin. Created synchronously inside the play gesture
+  // so the context can reach "running" (a context made/resumed outside a gesture stays suspended
+  // → analyser reads zeros → faux bars). createMediaElementSource is one-per-element; the twin is
+  // stable so this runs once. The twin is silent (it's captured + gain 0), so this never makes sound.
+  const ensureVizGraph = useCallback(() => {
+    if (acRef.current) { acRef.current.resume?.().catch(() => {}); return; }
+    if (vizTriedRef.current) return;            // tried already — don't re-capture the twin
+    const v = vizAudioRef.current; if (!v) return;
+    vizTriedRef.current = true;
     try {
       const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (AC) acRef.current = new AC();
-    } catch { acRef.current = null; }
-    return acRef.current;
-  }, []);
-
-  // Wire captureStream → analyser onto the (already-running) context. captureStream does NOT
-  // redirect the element's output, so audio stays native; failure just leaves the faux viz.
-  const attachAnalyser = useCallback(() => {
-    if (wiredRef.current) return;
-    const a = audioRef.current as (HTMLAudioElement & { captureStream?: () => MediaStream; mozCaptureStream?: () => MediaStream }) | null;
-    const ctx = acRef.current;
-    if (!a || !ctx) return;
-    const cap = a.captureStream?.bind(a) || a.mozCaptureStream?.bind(a);
-    if (!cap) { wiredRef.current = true; return; } // no capture support (Safari/iOS) → faux viz
-    try {
-      const stream = cap();
-      if (!stream.getAudioTracks || stream.getAudioTracks().length === 0) return; // not ready — retry
-      const src = ctx.createMediaStreamSource(stream);
+      if (!AC) return;
+      const ctx = new AC();
+      const src = ctx.createMediaElementSource(v);
       const an = ctx.createAnalyser();
       an.fftSize = BARS * 2; an.smoothingTimeConstant = 0.8;
-      const g = ctx.createGain(); g.gain.value = 0; // keep the analyser pulled WITHOUT making sound
+      const g = ctx.createGain(); g.gain.value = 0; // the twin must stay SILENT
       src.connect(an); an.connect(g); g.connect(ctx.destination);
-      analyserRef.current = an; wiredRef.current = true;
-    } catch { wiredRef.current = true; /* faux viz; audio unaffected */ }
+      acRef.current = ctx; analyserRef.current = an; srcNodeRef.current = src; gainRef.current = g;
+      vizOkRef.current = true;                   // capture succeeded → the twin is now silent
+      ctx.resume?.().catch(() => {});
+    } catch { /* capture failed → vizOkRef stays false: the twin is NEVER played (no echo), faux bars */ }
+  }, []);
+
+  // keep the silent twin tracking the audible element (track + rough position + play/pause).
+  // ONLY drives the twin once it's confirmed captured + silenced — otherwise playing it would
+  // produce an audible second copy (echo). When not OK, the bars use the faux fallback instead.
+  const syncViz = useCallback(() => {
+    const a = audioRef.current, v = vizAudioRef.current;
+    if (!a || !v || !vizOkRef.current) return;
+    try {
+      if (a.src && v.src !== a.src) v.src = a.src;
+      if (Math.abs((v.currentTime || 0) - (a.currentTime || 0)) > 0.25) v.currentTime = a.currentTime || 0;
+      if (a.paused) { if (!v.paused) v.pause(); } else if (v.paused) v.play().catch(() => {});
+    } catch { /* viz only */ }
   }, []);
 
   // draw ONE visualizer frame — real spectrum when the analyser is live, else a faux animation.
@@ -141,7 +155,7 @@ export default function MusicPlayer() {
       if (data) {
         h = Math.max(3, (data[i] / 255) ** 2 * VIZ_H);
       } else {
-        // faux: layered sines, center-weighted like a spectrum, scaled by eased energy
+        // faux fallback: layered sines, center-weighted like a spectrum, scaled by eased energy
         const env = 0.45 + 0.55 * Math.sin(((i + 0.5) / BARS) * Math.PI);
         const w1 = 0.5 + 0.5 * Math.sin(now * 2.3 + i * 0.55);
         const w2 = 0.5 + 0.5 * Math.sin(now * 3.9 + i * 0.31 + 2.0);
@@ -161,35 +175,33 @@ export default function MusicPlayer() {
     return () => cancelAnimationFrame(raf);
   }, [open, drawFrame]);
 
-  // Returning to the tab: native audio needs nothing (it kept playing / the element's own
-  // events keep the UI honest). Best-effort resume the analysis context so the bars wake up.
+  // Returning to the tab: native audio needs nothing. Resume the viz context + resync the silent
+  // twin so the bars wake up in step. None of this can affect the audible element.
   useEffect(() => {
-    const onVis = () => { if (!document.hidden) acRef.current?.resume?.().catch(() => {}); };
+    const onVis = () => {
+      if (document.hidden) return;
+      acRef.current?.resume?.().catch(() => {});
+      if (playingRef.current) syncViz();
+    };
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("focus", onVis);
     window.addEventListener("pageshow", onVis);
     return () => { document.removeEventListener("visibilitychange", onVis); window.removeEventListener("focus", onVis); window.removeEventListener("pageshow", onVis); };
-  }, []);
+  }, [syncViz]);
 
   const startPlayback = useCallback(async () => {
     const a = audioRef.current; if (!a) return;
-    // create + resume the viz context HERE, synchronously, while we still hold the user
-    // gesture — otherwise it stays suspended and the real spectrum never flows (→ faux bars).
-    const ctx = ensureVizCtx();
-    ctx?.resume?.().catch(() => {});
+    ensureVizGraph();                       // sync, inside the gesture → context can run
+    acRef.current?.resume?.().catch(() => {});
     setLoading(true);
+    syncViz();                              // start the silent twin alongside
     try {
       await a.play();
       setPlaying(true); setLoading(false);
-      ctx?.resume?.().catch(() => {});
-      attachAnalyser(); // wire captureStream → analyser onto the now-running context
-      // the captured audio track can lag the play() resolve by a tick — retry briefly
-      if (!wiredRef.current) {
-        let n = 0;
-        const id = window.setInterval(() => { attachAnalyser(); if (wiredRef.current || ++n >= 6) window.clearInterval(id); }, 250);
-      }
+      acRef.current?.resume?.().catch(() => {});
+      syncViz();
     } catch { setPlaying(false); setLoading(false); }
-  }, [ensureVizCtx, attachAnalyser]);
+  }, [ensureVizGraph, syncViz]);
 
   const play = useCallback(async (i: number) => {
     const a = audioRef.current; if (!a) return;
@@ -200,14 +212,17 @@ export default function MusicPlayer() {
 
   const toggle = useCallback(async () => {
     const a = audioRef.current; if (!a) return;
-    if (playing) { a.pause(); setPlaying(false); return; }
+    if (playing) { a.pause(); try { vizAudioRef.current?.pause(); } catch {} setPlaying(false); return; }
     if (!a.src) a.src = track.src;
     await startPlayback();
   }, [playing, track, startPlayback]);
 
   const next = useCallback(() => play((idx + 1) % tracks.length), [play, idx, tracks.length]);
   const prev = useCallback(() => play((idx - 1 + tracks.length) % tracks.length), [play, idx, tracks.length]);
-  const seek = (t: number) => { const a = audioRef.current; if (a && isFinite(t)) { a.currentTime = t; setCur(t); } };
+  const seek = (t: number) => {
+    const a = audioRef.current; if (a && isFinite(t)) { a.currentTime = t; setCur(t); }
+    const v = vizAudioRef.current; if (v && isFinite(t)) { try { v.currentTime = t; } catch { /* viz only */ } }
+  };
 
   const onDragStart = (e: React.PointerEvent) => {
     const el = cardRef.current; if (!el) return;
@@ -238,16 +253,19 @@ export default function MusicPlayer() {
 
   return (
     <>
+      {/* audible player — native output, never captured by Web Audio */}
       <audio
-        ref={audioRef} preload="none"
+        ref={audioRef} data-role="out" preload="none"
         onPlaying={() => { setPlaying(true); setLoading(false); }}
-        onPause={() => setPlaying(false)}
+        onPause={() => { setPlaying(false); try { vizAudioRef.current?.pause(); } catch {} }}
         onWaiting={() => setLoading(true)}
         onError={() => { setLoading(false); setPlaying(false); }}
         onTimeUpdate={(e) => setCur(e.currentTarget.currentTime)}
         onLoadedMetadata={(e) => setDur(e.currentTarget.duration)}
         onEnded={() => next()}
       />
+      {/* silent twin — feeds the analyser only; makes no sound (captured + gain 0) */}
+      <audio ref={vizAudioRef} data-role="viz" preload="none" aria-hidden tabIndex={-1} />
 
       {open ? (
         <div ref={cardRef} style={{ position: "fixed", ...place, zIndex: 27, width: "min(272px, calc(100vw - 20px))", background: "var(--color-bg-elevated)", border: "1px solid var(--color-border-default)", borderRadius: 12, boxShadow: "0 14px 38px rgba(0,0,0,.35)", fontFamily: "var(--font-ui), sans-serif", overflow: "hidden" }}>
