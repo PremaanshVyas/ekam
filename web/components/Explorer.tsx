@@ -364,13 +364,45 @@ export default function Explorer({ cols, total, tiles, claimed, email, signedIn 
   }, [cols, tiles, myIdx, myArt, topIdx, complete]);
 
   // live wall: server actions broadcast on the "wall" channel whenever a tile changes;
-  // refresh (debounced) so new paintings + counters land without anyone touching reload
+  // refresh (debounced) so new paintings + counters land without anyone touching reload.
   useEffect(() => {
+    // Reload-loop guard. Some browser extensions / strict blockers abort Next's RSC
+    // (?_rsc=) requests, so an automatic router.refresh() falls back to a HARD page reload
+    // — and the visibility toggle during that reload fires another refresh, so the page
+    // white-flashes forever. If /canvas has mounted many times in a few seconds we're in
+    // that loop: disable ALL auto-refresh (the wall just stops live-updating; a manual
+    // reload still works) so the page stays stable.
+    let autoRefresh = true;
+    try {
+      const now = Date.now();
+      const mounts = (JSON.parse(sessionStorage.getItem("ekam.canvasMounts") || "[]") as number[]).filter((x) => now - x < 12000);
+      mounts.push(now);
+      sessionStorage.setItem("ekam.canvasMounts", JSON.stringify(mounts.slice(-10)));
+      if (mounts.length > 3) autoRefresh = false; // >3 /canvas mounts in 12s ⇒ runaway reload loop, cut auto-refresh
+    } catch { /* private mode — just proceed */ }
+    if (!autoRefresh) return;
+
     const supa = createSupabaseBrowser();
     let t: number | null = null;
-    const refresh = () => { if (t) return; t = window.setTimeout(() => { t = null; router.refresh(); }, 800); };
+    let last = 0;
+    const refresh = () => {
+      if (t) return;
+      t = window.setTimeout(() => {
+        t = null;
+        const now = Date.now();
+        if (now - last < 1500) return; // hard throttle so a burst can never storm refreshes
+        last = now; router.refresh();
+      }, 800);
+    };
     const ch = supa.channel("wall").on("broadcast", { event: "tiles" }, refresh).subscribe();
-    const vis = () => { if (!document.hidden) router.refresh(); };
+    // catch up when returning to the tab — throttled to 10s so a reload's visibility toggle can't loop it
+    let lastVis = 0;
+    const vis = () => {
+      if (document.hidden) return;
+      const now = Date.now();
+      if (now - lastVis < 10000) return;
+      lastVis = now; refresh();
+    };
     document.addEventListener("visibilitychange", vis);
     return () => { supa.removeChannel(ch); document.removeEventListener("visibilitychange", vis); if (t) window.clearTimeout(t); };
   }, [router]);
