@@ -45,7 +45,7 @@ export default function MusicPlayer() {
   // analysis-only graph (visualizer). NEVER in the audio output path.
   const acRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const attachedRef = useRef(false);          // captureStream attach attempted once
+  const wiredRef = useRef(false);             // captureStream → analyser is wired
   const lastRealAtRef = useRef(0);            // last time the analyser had live data (seconds)
   const energyRef = useRef(0);                // eased 0..1 for the faux animation
 
@@ -78,26 +78,38 @@ export default function MusicPlayer() {
 
   const track = tracks[idx] ?? tracks[0];
 
-  // Attach the visualizer's analysis graph once, via captureStream (output stays native).
-  // Any failure just leaves the faux animation running — audio is untouched either way.
-  const attachAnalyser = useCallback(() => {
-    if (attachedRef.current) return;
-    const a = audioRef.current as (HTMLAudioElement & { captureStream?: () => MediaStream; mozCaptureStream?: () => MediaStream }) | null;
-    if (!a) return;
-    attachedRef.current = true; // attempt only once
-    const cap = a.captureStream?.bind(a) || a.mozCaptureStream?.bind(a);
-    if (!cap) return; // no capture support (Safari/iOS) → faux viz, audio still native
+  // Create the analysis-only AudioContext. MUST be called synchronously inside the play
+  // click so the context can actually reach "running" — a context created/resumed outside a
+  // user gesture stays "suspended", the analyser returns all-zeros, and the bars fall back to
+  // the faux animation. This context never carries audio (gain 0), so it can't affect sound.
+  const ensureVizCtx = useCallback((): AudioContext | null => {
+    if (acRef.current) return acRef.current;
     try {
       const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (!AC) return;
-      const ctx = new AC();
-      const src = ctx.createMediaStreamSource(cap());
+      if (AC) acRef.current = new AC();
+    } catch { acRef.current = null; }
+    return acRef.current;
+  }, []);
+
+  // Wire captureStream → analyser onto the (already-running) context. captureStream does NOT
+  // redirect the element's output, so audio stays native; failure just leaves the faux viz.
+  const attachAnalyser = useCallback(() => {
+    if (wiredRef.current) return;
+    const a = audioRef.current as (HTMLAudioElement & { captureStream?: () => MediaStream; mozCaptureStream?: () => MediaStream }) | null;
+    const ctx = acRef.current;
+    if (!a || !ctx) return;
+    const cap = a.captureStream?.bind(a) || a.mozCaptureStream?.bind(a);
+    if (!cap) { wiredRef.current = true; return; } // no capture support (Safari/iOS) → faux viz
+    try {
+      const stream = cap();
+      if (!stream.getAudioTracks || stream.getAudioTracks().length === 0) return; // not ready — retry
+      const src = ctx.createMediaStreamSource(stream);
       const an = ctx.createAnalyser();
       an.fftSize = BARS * 2; an.smoothingTimeConstant = 0.8;
       const g = ctx.createGain(); g.gain.value = 0; // keep the analyser pulled WITHOUT making sound
       src.connect(an); an.connect(g); g.connect(ctx.destination);
-      acRef.current = ctx; analyserRef.current = an;
-    } catch { /* faux viz; audio unaffected */ }
+      analyserRef.current = an; wiredRef.current = true;
+    } catch { wiredRef.current = true; /* faux viz; audio unaffected */ }
   }, []);
 
   // draw ONE visualizer frame — real spectrum when the analyser is live, else a faux animation.
@@ -161,14 +173,23 @@ export default function MusicPlayer() {
 
   const startPlayback = useCallback(async () => {
     const a = audioRef.current; if (!a) return;
+    // create + resume the viz context HERE, synchronously, while we still hold the user
+    // gesture — otherwise it stays suspended and the real spectrum never flows (→ faux bars).
+    const ctx = ensureVizCtx();
+    ctx?.resume?.().catch(() => {});
     setLoading(true);
     try {
       await a.play();
       setPlaying(true); setLoading(false);
-      attachAnalyser();                            // viz only, best effort
-      acRef.current?.resume?.().catch(() => {});
+      ctx?.resume?.().catch(() => {});
+      attachAnalyser(); // wire captureStream → analyser onto the now-running context
+      // the captured audio track can lag the play() resolve by a tick — retry briefly
+      if (!wiredRef.current) {
+        let n = 0;
+        const id = window.setInterval(() => { attachAnalyser(); if (wiredRef.current || ++n >= 6) window.clearInterval(id); }, 250);
+      }
     } catch { setPlaying(false); setLoading(false); }
-  }, [attachAnalyser]);
+  }, [ensureVizCtx, attachAnalyser]);
 
   const play = useCallback(async (i: number) => {
     const a = audioRef.current; if (!a) return;
