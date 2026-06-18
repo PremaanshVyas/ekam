@@ -374,11 +374,17 @@ export default function Explorer({ cols, total, tiles, claimed, email, signedIn 
     // reload still works) so the page stays stable.
     let autoRefresh = true;
     try {
+      // (1) precise: if our last refresh turned into a HARD reload, the in-flight flag
+      // survives into this fresh mount (a soft refresh would have cleared it 2.5s later) —
+      // so RSC refreshes are being blocked here. Stop auto-refresh after that single reload.
+      if (sessionStorage.getItem("ekam.refreshing") === "1") autoRefresh = false;
+      sessionStorage.removeItem("ekam.refreshing");
+      // (2) backstop: many /canvas mounts in a few seconds ⇒ a loop from any cause.
       const now = Date.now();
       const mounts = (JSON.parse(sessionStorage.getItem("ekam.canvasMounts") || "[]") as number[]).filter((x) => now - x < 12000);
       mounts.push(now);
       sessionStorage.setItem("ekam.canvasMounts", JSON.stringify(mounts.slice(-10)));
-      if (mounts.length > 3) autoRefresh = false; // >3 /canvas mounts in 12s ⇒ runaway reload loop, cut auto-refresh
+      if (mounts.length > 3) autoRefresh = false;
     } catch { /* private mode — just proceed */ }
     if (!autoRefresh) return;
 
@@ -391,7 +397,11 @@ export default function Explorer({ cols, total, tiles, claimed, email, signedIn 
         t = null;
         const now = Date.now();
         if (now - last < 1500) return; // hard throttle so a burst can never storm refreshes
-        last = now; router.refresh();
+        last = now;
+        // mark in-flight: a soft refresh clears this 2.5s later; a hard reload leaves it set,
+        // which the next mount reads to disable auto-refresh (see the guard above).
+        try { sessionStorage.setItem("ekam.refreshing", "1"); window.setTimeout(() => { try { sessionStorage.removeItem("ekam.refreshing"); } catch { /* fine */ } }, 2500); } catch { /* private mode */ }
+        router.refresh();
       }, 800);
     };
     const ch = supa.channel("wall").on("broadcast", { event: "tiles" }, refresh).subscribe();
