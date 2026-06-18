@@ -9,8 +9,6 @@ import { createDemoWall, drawTileArt, type Wall } from "@/lib/demoWall";
 import SignInModal from "@/components/SignInModal";
 import { signOut } from "@/app/actions";
 import Logo from "@/components/Logo";
-import Embers from "@/components/Embers";
-import PaintCursor from "@/components/PaintCursor";
 
 const fmt = (n: number) => n.toLocaleString("en-US");
 
@@ -118,8 +116,6 @@ export default function Landing({ total, claimed, published, email, myTile, clos
 
   return (
     <div className="scroll-root">
-      <Embers density={0.00005} opacity={0.75} />
-      <PaintCursor />
       {/* nav */}
       <header className={"nav" + (solid ? " nav--solid" : "")}>
         <div className="nav__brand">

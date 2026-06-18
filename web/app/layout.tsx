@@ -3,6 +3,7 @@ import type { Viewport } from "next";
 import { Spectral, Inter, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import MusicPlayerMount from "@/components/MusicPlayerMount";
+import SiteAmbience from "@/components/SiteAmbience";
 import { Analytics } from "@vercel/analytics/next";
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#16110d" };
@@ -53,6 +54,7 @@ export default function RootLayout({
         {supa && <link rel="preconnect" href={supa} crossOrigin="anonymous" />}
         {supa && <link rel="dns-prefetch" href={supa} />}
         {children}
+        <SiteAmbience />
         <MusicPlayerMount />
         <Analytics />
       </body>
