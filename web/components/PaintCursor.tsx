@@ -31,11 +31,16 @@ export default function PaintCursor() {
       g.fillStyle = rad; g.fillRect(0, 0, 48, 48);
     }
     const pts: { x: number; y: number }[] = [];
-    let mx = -9999, my = -9999, has = false;
-    const onM = (e: PointerEvent) => { mx = e.clientX; my = e.clientY; has = true; };
+    let mx = -9999, my = -9999, lastMove = 0, running = false;
+    // PERF: the loop SLEEPS when the cursor is idle (no 60fps clears when nothing moves). A move
+    // wakes it; once you stop, the ribbon drains its points then the rAF cancels itself → zero work.
+    const wake = () => { if (!running) { running = true; raf = requestAnimationFrame(loop); } };
+    const onM = (e: PointerEvent) => { mx = e.clientX; my = e.clientY; lastMove = performance.now(); wake(); };
     window.addEventListener("pointermove", onM); window.addEventListener("resize", resize);
-    const loop = () => {
-      if (has) { pts.push({ x: mx, y: my }); if (pts.length > 22) pts.shift(); }
+    function loop() {
+      const moving = performance.now() - lastMove < 120;
+      if (moving) { pts.push({ x: mx, y: my }); if (pts.length > 22) pts.shift(); }
+      else if (pts.length) pts.shift();        // idle: drain the trail behind the cursor, then sleep
       ctx.clearRect(0, 0, W, H);
       if (pts.length > 2) {
         ctx.globalCompositeOperation = "lighter"; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#e8643c";
@@ -53,10 +58,10 @@ export default function PaintCursor() {
         ctx.drawImage(glow, h.x - 16, h.y - 16, 32, 32); // bright head, cheap
         ctx.globalCompositeOperation = "source-over";
       }
+      if (!moving && pts.length === 0) { running = false; return; } // nothing left to draw → sleep
       raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    return () => { cancelAnimationFrame(raf); window.removeEventListener("pointermove", onM); window.removeEventListener("resize", resize); };
+    }
+    return () => { cancelAnimationFrame(raf); running = false; window.removeEventListener("pointermove", onM); window.removeEventListener("resize", resize); };
   }, []);
   return <canvas ref={ref} className="paint-cursor" aria-hidden />;
 }

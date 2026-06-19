@@ -25,14 +25,25 @@ export default function Embers({ density = 0.00006, opacity = 0.85 }: { density?
     let ps: P[] = [];
     const mouse = { x: -9999, y: -9999, on: false };
     const make = (): P => ({ x: Math.random() * W, y: Math.random() * H, r: 2 + Math.random() * 9, vy: 4 + Math.random() * 16, vx: (Math.random() - 0.5) * 6, a: 0.12 + Math.random() * 0.5, ph: Math.random() * 6.28, s: sprites[(Math.random() * sprites.length) | 0] });
-    const resize = () => { W = window.innerWidth; H = window.innerHeight; cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ps = Array.from({ length: Math.round(W * H * density) }, make); };
+    // PERF: cap the particle count so a big/4K monitor doesn't spawn 300-400 additive sprites per
+    // frame (the heaviest continuous GPU cost, brutal on weak Windows GPUs). At ~1080p the density
+    // already lands near this cap, so healthy screens look identical; only huge screens are trimmed.
+    const CAP = 120, FLOOR = 24;
+    const targetCount = () => Math.min(CAP, Math.round(W * H * density));
+    const resize = () => { W = window.innerWidth; H = window.innerHeight; cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ps = Array.from({ length: targetCount() }, make); };
     resize();
     const onR = () => resize();
     const onM = (e: PointerEvent) => { mouse.x = e.clientX; mouse.y = e.clientY; mouse.on = true; };
     window.addEventListener("resize", onR); window.addEventListener("pointermove", onM);
     let last = performance.now();
+    // SELF-HEAL: if a weak GPU can't keep up, quietly thin the field until it's smooth again
+    // (monotonic down — never oscillates). Adapts to any device instead of guessing the hardware.
+    let avgDt = 16, slowFor = 0;
     const loop = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      const frameMs = now - last; const dt = Math.min(0.05, frameMs / 1000); last = now;
+      const realFrame = frameMs < 100;                   // exclude hidden-tab / stall throttling
+      if (realFrame) avgDt += (frameMs - avgDt) * 0.05;   // smoothed frame time (ms)
+      if (realFrame && avgDt > 30 && ps.length > FLOOR) { slowFor += dt; if (slowFor > 1.5) { ps.length = Math.max(FLOOR, (ps.length * 0.7) | 0); slowFor = 0; } } else slowFor = 0;
       ctx.clearRect(0, 0, W, H); ctx.globalCompositeOperation = "lighter";
       for (const p of ps) {
         p.ph += dt * 1.6; p.y -= p.vy * dt; p.x += (p.vx + Math.sin(p.ph) * 8) * dt;
