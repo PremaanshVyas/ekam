@@ -180,16 +180,28 @@ export default function MosaicCanvas({
   useEffect(() => { requestDraw(); }, [version, viewMode, selectedIdx, hoverIdx, accent, seamless, requestDraw]);
 
   // hero Ken Burns autoplay
+  // PERF: the loop is GATED — it only runs while the hero is actually on screen AND the tab is
+  // visible. Scrolling past it (IntersectionObserver) or hiding the tab (visibilitychange) stops
+  // the rAF entirely, so it never burns GPU offscreen/in the background. The motion is wall-clock
+  // based, so resuming picks up at the right phase with no jump.
   useEffect(() => {
-    if (!hero) return; let running = true; const start = performance.now();
+    if (!hero) return;
+    const wrap = wrapRef.current; const start = performance.now();
+    let running = false, onScreen = true;
     const loop = (now: number) => {
       if (!running) return; const t = (now - start) / 1000; const fit = fitScaleRef.current;
       const zoomT = (Math.sin(t * 0.16) + 1) / 2; const scale = fit * (1.15 + zoomT * 1.6);
       const panX = Math.sin(t * 0.11) * 0.16 + 0.5; const panY = Math.cos(t * 0.09) * 0.10 + 0.52;
-      view.current = centerOn(panX * GRID, panY * GRID, scale); draw(); heroRef.current = scheduleFrame(loop);
+      view.current = centerOn(panX * GRID, panY * GRID, scale); draw(); heroRef.current = requestAnimationFrame(loop);
     };
-    heroRef.current = scheduleFrame(loop);
-    return () => { running = false; cancelAnimationFrame(heroRef.current); clearTimeout(heroRef.current); };
+    const startLoop = () => { if (!running && onScreen && !document.hidden) { running = true; heroRef.current = requestAnimationFrame(loop); } };
+    const stopLoop = () => { running = false; cancelAnimationFrame(heroRef.current); };
+    const io = wrap ? new IntersectionObserver(([e]) => { onScreen = e.isIntersecting; if (onScreen) startLoop(); else stopLoop(); }) : null;
+    io?.observe(wrap!);
+    const onVis = () => { if (document.hidden) stopLoop(); else startLoop(); };
+    document.addEventListener("visibilitychange", onVis);
+    startLoop();
+    return () => { stopLoop(); io?.disconnect(); document.removeEventListener("visibilitychange", onVis); };
   }, [hero, GRID, centerOn, draw, version]);
 
   useEffect(() => {
