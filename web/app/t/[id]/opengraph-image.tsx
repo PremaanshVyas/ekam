@@ -38,8 +38,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
       <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", gap: 64, padding: "0 80px", background: "#16110d", color: "#efe9e1", fontFamily: "Inter" }}>
         <div style={{ display: "flex", width: 460, height: 460, borderRadius: 14, overflow: "hidden", border: "1px solid rgba(239,233,225,0.12)", background: "#f4eee2", flex: "none" }}>
           {img ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={img} width={460} height={460} style={{ objectFit: "cover" }} />
+            <img src={img} alt="" width={460} height={460} style={{ objectFit: "cover" }} />
           ) : (
             <div style={{ display: "flex", width: "100%", height: "100%", background: hex || "#f4eee2" }} />
           )}

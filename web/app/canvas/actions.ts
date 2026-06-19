@@ -46,8 +46,9 @@ export async function claimTileAt(idx: number, displayName?: string): Promise<Cl
   };
   const claimQ = (payload: Record<string, unknown>) => db.from("tiles").update(payload)
     .eq("canvas_id", canvas.id).eq("x", x).eq("y", y).eq("status", "open").select("id");
-  let { data: rows, error: claimErr } = await claimQ({ ...base, claim_expires_at: graceWindowEnd(closesAt), expiry_warned_at: null });
-  if (claimErr) ({ data: rows } = await claimQ(base));
+  const claimFirst = await claimQ({ ...base, claim_expires_at: graceWindowEnd(closesAt), expiry_warned_at: null });
+  let rows = claimFirst.data;
+  if (claimFirst.error) rows = (await claimQ(base)).data;
   if (!rows || rows.length === 0) return { ok: false, error: "taken", x, y };
   await notify(db, { email: me.email, userId: me.userId }, "claim", `Tile R${String(y + 1).padStart(2, "0")}·C${String(x + 1).padStart(2, "0")} is yours ✦`, "Make your first stroke within the hour to keep it. Once you start painting it's yours for 48 hours to finish and submit.");
   await broadcastWallChange();

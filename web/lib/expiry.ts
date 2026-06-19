@@ -39,8 +39,9 @@ export async function sweepClaimWindows(force = false): Promise<{ reopened: numb
       };
       const flip = (payload: Record<string, unknown>) =>
         db.from("tiles").update(payload).eq("id", t.id).eq("status", "claimed").select("id");
-      let { data: rows, error: flipErr } = await flip({ ...reset, expiry_warned_at: null });
-      if (flipErr) ({ data: rows } = await flip(reset)); // expiry_warned_at may not exist before 0008
+      const flipFirst = await flip({ ...reset, expiry_warned_at: null });
+      let rows = flipFirst.data;
+      if (flipFirst.error) rows = (await flip(reset)).data; // expiry_warned_at may not exist before 0008
       if (rows && rows.length) {
         reopened++;
         await notify(db, { email: t.artist_email, userId: t.artist_user_id }, "expired", `Tile ${lbl(t.x, t.y)} reopened`,

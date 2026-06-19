@@ -154,7 +154,7 @@ export default function Landing({ total, claimed, published, email, myTile, clos
         <div className="hero__inner">
           <div className="hero__eyebrow"><span className="livedot" /> {fmt(open)} tiles still open on this canvas</div>
           <h1 className="hero__title">Leave the words.<br />Draw the lines.<br /><em>Say what&apos;s in your mind.</em></h1>
-          <p className="hero__sub">Claim a tile and paint what's in your mind. Something surreal is forming here: one canvas, hundreds of strangers, each holding one small square. No sign up, just a few minutes.</p>
+          <p className="hero__sub">Claim a tile and paint what&apos;s in your mind. Something surreal is forming here: one canvas, hundreds of strangers, each holding one small square. No sign up, just a few minutes.</p>
           <div className="hero__cta">
             <Link className="btn btn--primary btn--lg" href="/canvas">Claim your tile</Link>
             <a className="btn btn--ghost btn--lg" href="#how">See how it works</a>
@@ -186,7 +186,7 @@ export default function Landing({ total, claimed, published, email, myTile, clos
       <section className="band" id="manifesto">
         <Reveal>
           <p className="bigquote">This isn&apos;t a marketplace. It&apos;s a <em>wall</em>: {fmt(total)} little squares, each one painted by a different person, sitting side by side at exactly the same size.</p>
-          <p className="bigquote__by">Claim one, paint what's in your mind, and your mark stays. That&apos;s the whole thing.</p>
+          <p className="bigquote__by">Claim one, paint what&apos;s in your mind, and your mark stays. That&apos;s the whole thing.</p>
         </Reveal>
       </section>
 

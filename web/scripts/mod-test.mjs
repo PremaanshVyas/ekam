@@ -52,7 +52,7 @@ for (const [name, [expect, fn]] of Object.entries(CASES)) {
   const good = expect === "approve" ? final === "approve" : blocked;
   console.log(`${good ? "✓ PASS" : "✗ FAIL"}  [${final.toUpperCase()}]  ${name}`);
   console.log(`        p1=${v1.verdict} text="${v1.text_found}" — ${why}`);
-  good ? pass++ : fail++;
+  if (good) pass++; else fail++;
 }
 console.log(`\n${pass}/${pass + fail} correct` + (fail ? `  — ${fail} FAILED` : "  — all good ✦"));
 await browser.close();
