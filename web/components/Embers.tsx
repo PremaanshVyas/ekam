@@ -10,8 +10,9 @@ const COLORS = ["#e8643c", "#e0a23a", "#f5832a", "#c2563c", "#f6a623"];
 export default function Embers({ density = 0.00006, opacity = 0.85 }: { density?: number; opacity?: number }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
   useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const cv = ref.current!; const ctx = cv.getContext("2d")!;
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const dpr = 1; // soft glow overlay — DPR 1 keeps memory + fill-rate low (smooth on weak Windows GPUs)
     let W = 0, H = 0, raf = 0;
     const sprite = (col: string) => {
       const s = document.createElement("canvas"); s.width = s.height = 32;

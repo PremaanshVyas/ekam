@@ -11,9 +11,13 @@ import PaintCursor from "@/components/PaintCursor";
 export default function SiteAmbience() {
   const pathname = usePathname() || "";
   if (pathname.startsWith("/admin")) return null;
+  // On /canvas the explorer renders its OWN ember field (above the wall, below the panels), and
+  // the global one is hidden by CSS anyway — so don't mount a second, hidden embers canvas + rAF
+  // loop there. The trailing paint cursor stays on every page (it skips touch internally).
+  const onCanvas = pathname.startsWith("/canvas");
   return (
     <>
-      <Embers density={0.00005} opacity={0.75} />
+      {!onCanvas && <Embers density={0.00005} opacity={0.75} />}
       <PaintCursor />
     </>
   );

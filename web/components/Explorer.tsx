@@ -364,59 +364,12 @@ export default function Explorer({ cols, total, tiles, claimed, email, signedIn 
     setWall(w); setVer((v) => v + 1);
   }, [cols, tiles, myIdx, myArt, topIdx, complete]);
 
-  // live wall: server actions broadcast on the "wall" channel whenever a tile changes;
-  // refresh (debounced) so new paintings + counters land without anyone touching reload.
-  useEffect(() => {
-    // Reload-loop guard. Some browser extensions / strict blockers abort Next's RSC
-    // (?_rsc=) requests, so an automatic router.refresh() falls back to a HARD page reload
-    // — and the visibility toggle during that reload fires another refresh, so the page
-    // white-flashes forever. If /canvas has mounted many times in a few seconds we're in
-    // that loop: disable ALL auto-refresh (the wall just stops live-updating; a manual
-    // reload still works) so the page stays stable.
-    let autoRefresh = true;
-    try {
-      // (1) precise: if our last refresh turned into a HARD reload, the in-flight flag
-      // survives into this fresh mount (a soft refresh would have cleared it 2.5s later) —
-      // so RSC refreshes are being blocked here. Stop auto-refresh after that single reload.
-      if (sessionStorage.getItem("ekam.refreshing") === "1") autoRefresh = false;
-      sessionStorage.removeItem("ekam.refreshing");
-      // (2) backstop: many /canvas mounts in a few seconds ⇒ a loop from any cause.
-      const now = Date.now();
-      const mounts = (JSON.parse(sessionStorage.getItem("ekam.canvasMounts") || "[]") as number[]).filter((x) => now - x < 12000);
-      mounts.push(now);
-      sessionStorage.setItem("ekam.canvasMounts", JSON.stringify(mounts.slice(-10)));
-      if (mounts.length > 3) autoRefresh = false;
-    } catch { /* private mode — just proceed */ }
-    if (!autoRefresh) return;
-
-    const supa = createSupabaseBrowser();
-    let t: number | null = null;
-    let last = 0;
-    const refresh = () => {
-      if (t) return;
-      t = window.setTimeout(() => {
-        t = null;
-        const now = Date.now();
-        if (now - last < 1500) return; // hard throttle so a burst can never storm refreshes
-        last = now;
-        // mark in-flight: a soft refresh clears this 2.5s later; a hard reload leaves it set,
-        // which the next mount reads to disable auto-refresh (see the guard above).
-        try { sessionStorage.setItem("ekam.refreshing", "1"); window.setTimeout(() => { try { sessionStorage.removeItem("ekam.refreshing"); } catch { /* fine */ } }, 2500); } catch { /* private mode */ }
-        router.refresh();
-      }, 800);
-    };
-    const ch = supa.channel("wall").on("broadcast", { event: "tiles" }, refresh).subscribe();
-    // catch up when returning to the tab — throttled to 10s so a reload's visibility toggle can't loop it
-    let lastVis = 0;
-    const vis = () => {
-      if (document.hidden) return;
-      const now = Date.now();
-      if (now - lastVis < 10000) return;
-      lastVis = now; refresh();
-    };
-    document.addEventListener("visibilitychange", vis);
-    return () => { supa.removeChannel(ch); document.removeEventListener("visibilitychange", vis); if (t) window.clearTimeout(t); };
-  }, [router]);
+  // Live wall updates intentionally do NOT auto-refresh the route. router.refresh() issues an
+  // RSC fetch (/canvas?_rsc=…) that gets ERR_ABORTED on some networks / extensions / weaker
+  // (esp. Windows) GPUs, and Next then falls back to a HARD reload → the white-flash reload loop.
+  // The page is stable instead: the wall loads fresh on every visit / navigation, and new tiles
+  // show on the next load. NEVER reintroduce an automatic router.refresh() here — a future live
+  // update must be a client-side Supabase refetch that updates state in place (no route refresh).
 
   // viewport class + pointer type; sidebar starts closed on small screens
   useEffect(() => {

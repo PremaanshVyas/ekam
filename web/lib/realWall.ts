@@ -30,7 +30,7 @@ export function createRealWall(GRID: number, tiles: RealTileInput[], myIdx: numb
   // Adaptive composite resolution: small screens get 64px/tile (24×24 → 1536²,
   // ~9MB), larger screens 128px/tile. Detail views always load the full PNG.
   const small = typeof window !== "undefined" && Math.min(window.innerWidth, window.innerHeight) < 700;
-  const TILE_PX = small ? 64 : 128;
+  const TILE_PX = small ? 64 : 96; // 96px/tile (24×24 → 2304²) keeps the composite bitmap light on weak GPUs; detail views load the full PNG
 
   const HI = GRID * TILE_PX, N_TOTAL = GRID * GRID;
   const byIdx = new Map<number, RealTileInput>();
