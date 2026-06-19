@@ -7,6 +7,7 @@ import { findMyTile } from "@/lib/tiles";
 import type { RealTileInput } from "@/lib/realWall";
 import { canvasClosesAt, canvasClosed } from "@/lib/deadline";
 import { sweepClaimWindows } from "@/lib/expiry";
+import { loadWallData } from "@/lib/wallData";
 
 export const dynamic = "force-dynamic";
 // submit's server action runs through this route — give the post-response AI screen room
@@ -14,11 +15,6 @@ export const maxDuration = 60;
 
 const SUPA = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const artUrl = (p: string | null) => (p && !p.startsWith("#") ? `${SUPA}/storage/v1/object/public/tiles/${p}` : null);
-
-type Row = {
-  id: string; x: number; y: number; status: string; artist_name: string | null; artist_location: string | null;
-  story: string | null; image_path: string | null; thumb_path: string | null; published_at: string | null;
-};
 
 export default async function CanvasPage({ searchParams }: { searchParams: Promise<{ mine?: string }> }) {
   const autoOpenMine = (await searchParams).mine === "1";
@@ -53,42 +49,15 @@ export default async function CanvasPage({ searchParams }: { searchParams: Promi
     rows = canvas?.grid_rows ?? 24;
 
     if (canvas) {
-      // Parallel: the tile list + the signed-in person's tile.
-      const [tilesRes, mt] = await Promise.all([
-        db.from("public_tiles")
-          .select("id, x, y, status, artist_name, artist_location, story, image_path, thumb_path, published_at")
-          .eq("canvas_id", canvas.id),
+      // Parallel: the wall data (single source of truth, shared with the live fetchWallTiles
+      // server action) + the signed-in person's own tile.
+      const [wall, mt] = await Promise.all([
+        loadWallData(canvas.id, me),
         me ? findMyTile(supabaseAdmin(), canvas.id, me) : Promise.resolve(null),
       ]);
-
-      // upvotes: aggregate counts + the viewer's own votes (server-only reads; emails stay private)
-      const voteCount = new Map<string, number>();
-      const myVotes = new Set<string>();
-      try {
-        const [allVotes, mine] = await Promise.all([
-          supabaseAdmin().from("tile_votes").select("tile_id"),
-          me ? supabaseAdmin().from("tile_votes").select("tile_id").or(ownerOr(me, "voter_user_id", "voter_email")) : Promise.resolve({ data: [] as { tile_id: string }[] }),
-        ]);
-        for (const v of allVotes.data ?? []) voteCount.set(v.tile_id, (voteCount.get(v.tile_id) ?? 0) + 1);
-        for (const v of mine.data ?? []) myVotes.add(v.tile_id);
-      } catch { /* migration 0007 not run yet */ }
-
-      tiles = ((tilesRes.data as Row[]) ?? []).map((t) => {
-        const isPub = t.status === "published";
-        const ip = t.image_path;
-        const img = isPub && ip ? (ip.startsWith("#") ? ip : `${SUPA}/storage/v1/object/public/tiles/${ip}`) : null;
-        const thumb = isPub && t.thumb_path && !t.thumb_path.startsWith("#") ? `${SUPA}/storage/v1/object/public/tiles/${t.thumb_path}` : null;
-        if (["claimed", "pending", "published"].includes(t.status)) claimed++;
-        if (isPub) {
-          published++;
-          if (t.published_at) {
-            if (!finaleFrom || t.published_at < finaleFrom) finaleFrom = t.published_at;
-            if (!finaleTo || t.published_at > finaleTo) finaleTo = t.published_at;
-          }
-        }
-        return { x: t.x, y: t.y, status: t.status, name: isPub ? t.artist_name : null, loc: isPub ? t.artist_location : null, story: isPub ? t.story : null, img, thumb, uuid: t.id, votes: voteCount.get(t.id) ?? 0, voted: myVotes.has(t.id) };
-      });
-      if (tilesRes.error) loadError = true;
+      tiles = wall.tiles; claimed = wall.claimed; published = wall.published;
+      finaleFrom = wall.finaleFrom; finaleTo = wall.finaleTo;
+      if (wall.error) loadError = true;
 
       if (me) {
         try {

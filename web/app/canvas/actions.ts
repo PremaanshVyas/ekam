@@ -5,6 +5,20 @@ import { currentIdentity, ownerOr, owns } from "@/lib/identity";
 import { broadcastWallChange } from "@/lib/broadcast";
 import { notify } from "@/lib/notify";
 import { canvasClosesAt, canvasClosed, graceWindowEnd } from "@/lib/deadline";
+import { loadWallData, type WallData } from "@/lib/wallData";
+
+// Live wall data for the client to refetch on a "wall" broadcast — the SAME data the page renders
+// (shared loadWallData). Called from Explorer via the server-action endpoint; it never triggers a
+// route refresh / RSC navigation, so it can't cause the white-flash reload loop. Returns null on a
+// transient failure (the client just keeps the current wall — never reloads).
+export async function fetchWallTiles(): Promise<WallData | null> {
+  try {
+    const me = await currentIdentity();
+    const { data: canvas } = await supabaseAdmin().from("canvases").select("id").eq("slug", CANVAS_SLUG).maybeSingle();
+    if (!canvas) return null;
+    return await loadWallData(canvas.id, me);
+  } catch { return null; }
+}
 
 export type ClaimResult =
   | { ok: true; tileId: string; x: number; y: number }

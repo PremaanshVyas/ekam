@@ -9,7 +9,7 @@ import { createRealWall, type RealTileInput } from "@/lib/realWall";
 import { stitchWall, downloadBlob } from "@/lib/stitch";
 import type { Wall, TileInfo } from "@/lib/demoWall";
 import { createSupabaseBrowser } from "@/lib/auth-browser";
-import { claimTileAt, toggleVote } from "@/app/canvas/actions";
+import { claimTileAt, toggleVote, fetchWallTiles } from "@/app/canvas/actions";
 import { submitTile, saveDraft, reviewStatus, requestManualReview, type ReviewState } from "@/app/paint/actions";
 import { signOut, markNotificationsRead } from "@/app/actions";
 import SignInModal from "@/components/SignInModal";
@@ -316,7 +316,7 @@ function ConfettiSky({ n, once = false }: { n: number; once?: boolean }) {
   );
 }
 
-export default function Explorer({ cols, total, tiles, claimed, email, signedIn = false, myTile, autoOpenMine, loadError, notifs = [], unread = 0, complete = false, published = 0, finaleFrom = null, finaleTo = null, closesAt = null, deadlinePassed = false }: {
+export default function Explorer({ cols, total, tiles: initialTiles, claimed: initialClaimed, email, signedIn = false, myTile, autoOpenMine, loadError, notifs = [], unread = 0, complete = false, published: initialPublished = 0, finaleFrom: initialFinaleFrom = null, finaleTo: initialFinaleTo = null, closesAt = null, deadlinePassed = false }: {
   cols: number; total: number; tiles: RealTileInput[]; claimed: number; email: string | null; signedIn?: boolean; myTile: MyTile | null; autoOpenMine?: boolean; loadError?: boolean; notifs?: Notif[]; unread?: number;
   complete?: boolean; published?: number; finaleFrom?: string | null; finaleTo?: string | null; closesAt?: string | null; deadlinePassed?: boolean;
 }) {
@@ -348,6 +348,14 @@ export default function Explorer({ cols, total, tiles, claimed, email, signedIn 
   const [shared, setShared] = useState(false);
   const [burst, setBurst] = useState(false); // one confetti rain over the artwork right after the celebration
 
+  // Wall data is STATE (seeded from the server props) so it can live-update IN PLACE via a client
+  // server-action refetch — no router.refresh()/RSC navigation (the cause of the reload loop).
+  const [tiles, setTiles] = useState(initialTiles);
+  const [claimed, setClaimed] = useState(initialClaimed);
+  const [published, setPublished] = useState(initialPublished);
+  const [finaleFrom, setFinaleFrom] = useState(initialFinaleFrom);
+  const [finaleTo, setFinaleTo] = useState(initialFinaleTo);
+
   const myIdx = myTile?.idx ?? -1;
   const accent = "#e8643c";
 
@@ -364,12 +372,32 @@ export default function Explorer({ cols, total, tiles, claimed, email, signedIn 
     setWall(w); setVer((v) => v + 1);
   }, [cols, tiles, myIdx, myArt, topIdx, complete]);
 
-  // Live wall updates intentionally do NOT auto-refresh the route. router.refresh() issues an
-  // RSC fetch (/canvas?_rsc=…) that gets ERR_ABORTED on some networks / extensions / weaker
-  // (esp. Windows) GPUs, and Next then falls back to a HARD reload → the white-flash reload loop.
-  // The page is stable instead: the wall loads fresh on every visit / navigation, and new tiles
-  // show on the next load. NEVER reintroduce an automatic router.refresh() here — a future live
-  // update must be a client-side Supabase refetch that updates state in place (no route refresh).
+  // Live wall WITHOUT a route refresh: on the Supabase "wall" broadcast (or tab-return) refetch the
+  // tiles via the fetchWallTiles server action and update state IN PLACE. There is NO router.refresh()
+  // / RSC navigation here, so the ERR_ABORTED → hard-reload loop can never happen; a blocked or failed
+  // fetch is caught and skipped (the wall keeps its current tiles — it never reloads). Do not swap
+  // this back to router.refresh().
+  useEffect(() => {
+    const supa = createSupabaseBrowser();
+    let timer: number | null = null, last = 0, stop = false;
+    const pull = async () => {
+      try {
+        const w = await fetchWallTiles();
+        if (stop || !w || w.error) return;
+        setTiles(w.tiles); setClaimed(w.claimed); setPublished(w.published);
+        setFinaleFrom(w.finaleFrom); setFinaleTo(w.finaleTo);
+      } catch { /* blocked / offline — skip; NEVER reload */ }
+    };
+    const schedule = () => {
+      if (timer) return;
+      timer = window.setTimeout(() => { timer = null; const now = Date.now(); if (now - last < 1500) return; last = now; pull(); }, 800);
+    };
+    const ch = supa.channel("wall").on("broadcast", { event: "tiles" }, schedule).subscribe();
+    let lastVis = 0;
+    const vis = () => { if (document.hidden) return; const now = Date.now(); if (now - lastVis < 10000) return; lastVis = now; schedule(); };
+    document.addEventListener("visibilitychange", vis);
+    return () => { stop = true; supa.removeChannel(ch); document.removeEventListener("visibilitychange", vis); if (timer) window.clearTimeout(timer); };
+  }, []);
 
   // viewport class + pointer type; sidebar starts closed on small screens
   useEffect(() => {
